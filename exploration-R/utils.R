@@ -12,6 +12,7 @@ format_task_tbl <- function(tbl_tasks) {
   tbl_tasks %>%
     mutate(
       nr_arms = fct_inorder(factor(nr_arms), ordered = TRUE),
+      nr_samples = fct_inorder(factor(nr_samples), ordered = TRUE)
     )
 }
 
@@ -76,7 +77,8 @@ plot_task_table <- function(tbl_tasks) {
   
   names(tbl_tasks) <- c(
     "Task Name", "Nr. Arms", "Moving Stats", 
-    "Generalization", "Experience", "Capacity", "Info Reward Confound"
+    "Generalization", "Experience", "Capacity", "Info Reward Confound",
+    "Nr. Trials"
   )
   tbl_tasks <- tbl_tasks %>% arrange(`Info Reward Confound`, `Capacity`)
   tbl_tasks <- tbl_tasks %>% mutate_if(is.logical, function(x) as.character(x))
@@ -107,7 +109,8 @@ plot_task_table <- function(tbl_tasks) {
           "background-color" = csscolor(gradient(x, customGreen, customRed)),
           width = percent(x/3)
         )
-      )
+      ),
+      `Nr. Trials` = color_tile(customGreen0, customGreen)
     )
   )
 }
