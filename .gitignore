@@ -7,3 +7,4 @@ documents/
 *Rproj*
 *lock*
 exploration-R/renv/
+*.ipynb_checkpoints*
