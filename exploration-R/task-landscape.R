@@ -3,21 +3,20 @@ library(factoextra)
 library(ggrepel)
 library(formattable)
 
-home_grown_stuff <- c("R/utils.R")
+home_grown_stuff <- c("exploration-R/utils.R")
 walk(home_grown_stuff, source)
 
 # create a list with tasks used previously
 
 tbl_tasks <- tribble(
-  ~task_name,           ~nr_arms, ~moving_stats, ~add_gen, ~experience, ~confound_rew_inf, ~capacity,
-  "observe-or-bet",     "few",    FALSE,        FALSE,    TRUE,         FALSE,             1,
-  "two-armed-bandit",   "few",    FALSE,        FALSE,    TRUE,         TRUE,              1,
-  "restless-bandit",    "few",    TRUE,         FALSE,    TRUE,         TRUE,              2,
-  "grid-task",          "many",   FALSE,        TRUE,     TRUE,         TRUE,              3,
-  "dfe",                "few",    FALSE,        FALSE,    TRUE,         TRUE,              1,
-  "dfe-sampling",       "few",    FALSE,        FALSE,    TRUE,         FALSE,             1,
-  "dfd",                "few",    FALSE,        FALSE,    FALSE,        FALSE,             0,
-  "horizon-task",       "few",    FALSE,        FALSE,    FALSE,        FALSE,             0,
+  ~task_name,           ~nr_arms, ~moving_stats, ~add_gen, ~experience, ~capacity, ~confound_rew_inf, 
+  "Observe Or Bet",     "few",    FALSE,         FALSE,    TRUE,         1,        FALSE,
+  "Two-Armed Bandit",   "few",    FALSE,         FALSE,    TRUE,         1,        TRUE,
+  "Restless Bandit",    "few",    TRUE,          FALSE,    TRUE,         2,        TRUE,
+  "Grid Task",          "many",   FALSE,         TRUE,     TRUE,         3,        TRUE,
+  "DFE",                "few",    FALSE,         FALSE,    TRUE,         1,        TRUE,
+  "DFE Sampling",       "few",    FALSE,         FALSE,    TRUE,         1,        FALSE,
+  "DFD",                "few",    FALSE,         FALSE,    FALSE,        0,        FALSE,
 )
 
 tbl_tasks <- format_task_tbl(tbl_tasks)
