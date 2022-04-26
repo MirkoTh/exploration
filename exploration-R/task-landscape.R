@@ -28,3 +28,15 @@ plot_labels_task(tbl_tasks)
 x11()
 plot_pca(tbl_tasks = tbl_tasks)
 
+tbl_tasks2 <- tribble(
+  ~task_name,           ~trials, ~nr_arms, ~moving_stats, ~capacity, ~confound_rew_inf, 
+  "Two-Armed Bandit",   "k = n", "2",      FALSE,         2,        TRUE,             
+  "Restless Bandit",    "k = n", "4",      TRUE,          3,        TRUE,             
+  "Horizon Task",       "k = 1/3","2",     FALSE,         1,        FALSE,
+  "Observe Or Bet",     "k = n - o", "2",  FALSE,         2,        TRUE,
+  "DFE",                "k = 1", "2",      FALSE,         2,        TRUE,             
+  "DFE Sampling",       "k = 1", "2",      FALSE,         2,        FALSE,            
+)
+
+plot_task_table2(tbl_tasks2)
+plot_cut_task_table2(tbl_tasks2)
