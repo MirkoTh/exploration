@@ -47,3 +47,14 @@ plot_mean_trajectories <- function(l_l_m) {
       y = "Estimated Mean"
     )
 }
+
+
+plot_total_reward_against_gamma <- function(tbl_results_agg) {
+  ggplot(tbl_results_agg, aes(gamma, mean_reward_tot, group = n_options)) +
+    geom_line(aes(color = n_options)) +
+    geom_point(color = "white", size = 3) +
+    geom_point(aes(color = n_options)) +
+    theme_bw() +
+    scale_color_brewer(name = "Nr. Options", palette = "Set1") +
+    labs(x = "Gamma", y = "Total Reward")
+}

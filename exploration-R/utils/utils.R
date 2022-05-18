@@ -240,7 +240,7 @@ update_kalman_filter <- function(var_prev, var_innov, var_error) {
 }
 
 
-rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, gamma) {
+rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, params) {
   nt <- nrow(rewards) # number of time points
   no <- ncol(rewards) # number of options
   m <- matrix(m0,ncol=no,nrow=nt+1) # to hold the posterior means
@@ -250,20 +250,29 @@ rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, gamma) {
   # loop over all time points
   for(t in 1:nt) {
     # use the prior means and compute the probability of choosing each option
-    p <- exp(gamma*m[t,])
+    p <- exp(params$gamma*m[t,])
     p <- p/sum(p)
     # choose an option according to these probabilities
     choice[t] <- sample(1:no,size=1,prob=p)
     # get the reward of the choice
     reward[t] <- rewards[t,choice[t]]
-    # set the Kalman gain for unchosen options
-    kt <- rep(0,no)
-    # set the Kalman gain for the chosen option
-    kt[choice[t]] <- (v[t,choice[t]])/(v[t,choice[t]] + sigma_epsilon_sq)
-    # compute the posterior means
-    m[t+1,] <- m[t,] + kt*(reward[t] - m[t,])
-    # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,])
+    
+    if (params$model == "Kalman") {
+      # set the Kalman gain for unchosen options
+      kt <- rep(0,no)
+      # set the Kalman gain for the chosen option
+      kt[choice[t]] <- (v[t,choice[t]])/(v[t,choice[t]] + sigma_epsilon_sq)
+      # compute the posterior means
+      m[t+1,] <- m[t,] + kt*(reward[t] - m[t,])
+      # compute the posterior variances
+      v[t+1,] <- (1-kt)*(v[t,])
+      
+    } else if (params$model == "Decay") {
+      m[t+1, choice[t]] <- params$eta * m[t, choice[t]] + reward[t]
+      v[t+1, choice[t]] <- 0
+      
+    }
+    
   }
   # return everything of interest
   return(list(m=m,v=v,choice=choice,reward=reward))
