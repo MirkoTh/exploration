@@ -191,7 +191,7 @@ plot_cut_task_table2 <- function(tbl_tasks) {
 
 
 conditions_and_rewards_fixed_means <- function(
-    n_conditions, mn_spacing, sd_fixed, n_trials
+    n_conditions, mn_spacing, var_fixed, n_trials
 ) {
   #' create tbl with info about conditions and rewards per trial
   #' 
@@ -199,7 +199,7 @@ conditions_and_rewards_fixed_means <- function(
   #' and list cols reward_stats (mns and sds) and rewards (by-trial rewards)
   #' @param n_conditions nr of different experimental conditions
   #' @param mn_spacing constant spacing between means
-  #' @param sd_fixed sd for all conditions and options
+  #' @param var_fixed var for all conditions and options
   #' @param n_trials nr trials of the experiment
   #' @return the tbl with all information
   
@@ -209,7 +209,7 @@ conditions_and_rewards_fixed_means <- function(
     reward_stats = map(
       n_options, ~ list(
         reward_mn = seq(mn_spacing, .x*mn_spacing, by = mn_spacing),
-        reward_sd = rep(sd_fixed, .x)
+        reward_var = rep(var_fixed, .x)
       )
     )
   )
@@ -220,13 +220,13 @@ conditions_and_rewards_fixed_means <- function(
   
   l_out <- map(1:nrow(tbl_conditions), ~pmap(list(
     tbl_conditions$reward_stats[[.x]]$reward_mn,
-    tbl_conditions$reward_stats[[.x]]$reward_sd
-  ), ~ my_rnorm(n = n_trials, mn = ..1, sd = ..2)
+    tbl_conditions$reward_stats[[.x]]$reward_var
+  ), ~ my_rnorm(n = n_trials, mn = ..1, sd = sqrt(..2))
   ))
   
   # rewards per trial as matrix
   tbl_conditions$rewards <- l_out %>% 
-    map(~ unlist(.x) %>%matrix(nrow = length(.x), byrow = FALSE)) %>% 
+    map(~ unlist(.x) %>% matrix(nrow = length(.x), byrow = TRUE)) %>% 
     map(~ t(.x))
   
   return(tbl_conditions)
@@ -240,7 +240,7 @@ update_kalman_filter <- function(var_prev, var_innov, var_error) {
 }
 
 
-rl_softmax_sim <- function(rewards,m0,v0,sigma_xi_sq,sigma_epsilon_sq,gamma) {
+rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, gamma) {
   nt <- nrow(rewards) # number of time points
   no <- ncol(rewards) # number of options
   m <- matrix(m0,ncol=no,nrow=nt+1) # to hold the posterior means
@@ -253,17 +253,17 @@ rl_softmax_sim <- function(rewards,m0,v0,sigma_xi_sq,sigma_epsilon_sq,gamma) {
     p <- exp(gamma*m[t,])
     p <- p/sum(p)
     # choose an option according to these probabilities
-    choice[t] <- sample(1:4,size=1,prob=p)
+    choice[t] <- sample(1:no,size=1,prob=p)
     # get the reward of the choice
     reward[t] <- rewards[t,choice[t]]
     # set the Kalman gain for unchosen options
-    kt <- rep(0,4)
+    kt <- rep(0,no)
     # set the Kalman gain for the chosen option
-    kt[choice[t]] <- (v[t,choice[t]] + sigma_xi_sq)/(v[t,choice[t]] + sigma_xi_sq + sigma_epsilon_sq)
+    kt[choice[t]] <- (v[t,choice[t]])/(v[t,choice[t]] + sigma_epsilon_sq)
     # compute the posterior means
     m[t+1,] <- m[t,] + kt*(reward[t] - m[t,])
     # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,] + sigma_xi_sq)
+    v[t+1,] <- (1-kt)*(v[t,])
   }
   # return everything of interest
   return(list(m=m,v=v,choice=choice,reward=reward))
