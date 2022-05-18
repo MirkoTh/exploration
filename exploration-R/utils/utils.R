@@ -224,7 +224,11 @@ conditions_and_rewards_fixed_means <- function(
   ), ~ my_rnorm(n = n_trials, mn = ..1, sd = ..2)
   ))
   
-  tbl_conditions$rewards <- l_out
+  # rewards per trial as matrix
+  tbl_conditions$rewards <- l_out %>% 
+    map(~ unlist(.x) %>%matrix(nrow = length(.x), byrow = FALSE)) %>% 
+    map(~ t(.x))
+  
   return(tbl_conditions)
 }
 
