@@ -12,6 +12,7 @@ format_task_tbl <- function(tbl_tasks) {
   tbl_tasks %>%
     mutate(
       nr_arms = fct_inorder(factor(nr_arms), ordered = TRUE),
+      nr_samples = fct_inorder(factor(nr_samples), ordered = TRUE)
     )
 }
 
@@ -76,22 +77,114 @@ plot_task_table <- function(tbl_tasks) {
   
   names(tbl_tasks) <- c(
     "Task Name", "Nr. Arms", "Moving Stats", 
-    "Generalization", "Experience", "Information-Reward Confound", "Capacity"
+    "Generalization", "Experience", "Capacity", "Info Reward Confound",
+    "Nr. Trials"
   )
+  tbl_tasks <- tbl_tasks %>% arrange(`Info Reward Confound`, `Capacity`)
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.logical, function(x) as.character(x))
+  tbl_tasks[tbl_tasks == "FALSE"] <- "No"
+  tbl_tasks[tbl_tasks == "TRUE"] <- "Yes"
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.character, function(x) as.factor(x))
+  
+  
   
   formattable(
     tbl_tasks,
-    align = c("l","c","c","c","c", "c", "r"), list(
+    align = c("l","c","c","c","c", "r", "r"), list(
       `Task Name` = formatter(
-        "span", style = x ~ style(color = "gray"),
-        x ~ icontext(ifelse(x == "Prevalence of Tobacco Use", "star", ""), x)
+        "span", style = x ~ style(color = "gray", width = 100),
+        x ~ icontext(ifelse(x %in% c("DFD", "DFE Sampling", "DFE"), "star", ""), x)
       ), 
-      `Information-Reward Confound`= color_tile(customGreen, customRed),
+      `Info Reward Confound`= color_tile(customGreen, customRed),
       `Nr. Arms`= color_tile(customGreen0, customGreen),
       `Moving Stats`= color_tile(customGreen0, customGreen),
       `Generalization`= color_tile(customGreen0, customGreen),
       `Experience`= color_tile(customGreen0, customGreen),
-      `Capacity`= color_tile(customGreen, customRed)
+      #`Capacity`= color_bar(customRed)
+      `Capacity` = formatter(
+        "span", style = x ~ style(
+          display = "inline-block",
+          direction = "ltr",
+          color = ifelse(x == 0, "black", "white"),
+          "background-color" = csscolor(gradient(x, customGreen, customRed)),
+          width = percent(x/3)
+        )
+      ),
+      `Nr. Trials` = color_tile(customGreen0, customGreen)
+    )
+  )
+}
+
+plot_task_table2 <- function(tbl_tasks) {
+  #' plot formatted task tbl
+  #' 
+  #' @description plot a formatted tbl of the task tbl
+  #' @param tbl_tasks \code{tibble} containing the tasks with their features
+  #' 
+  
+  names(tbl_tasks) <- c(
+    "Task Name", "Bet vs. Total Trials", "Nr. Arms", "Moving Stats",
+    "Capacity", "Info Reward Confound"
+  )
+  tbl_tasks <- tbl_tasks %>% arrange(`Info Reward Confound`, `Capacity`)
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.logical, function(x) as.character(x))
+  tbl_tasks[tbl_tasks == "FALSE"] <- "no"
+  tbl_tasks[tbl_tasks == "TRUE"] <- "yes"
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.character, function(x) as.factor(x))
+  
+  formattable(
+    tbl_tasks,
+    align = c("l","c","c","c","c", "r"), list(
+      `Task Name` = formatter(
+        "span", style = x ~ style(color = "gray", width = 100),
+        x ~ icontext(ifelse(x %in% c("DFD", "DFE Sampling", "DFE"), "star", ""), x)
+      ), 
+      `Info Reward Confound`= color_tile(customGreen, customRed),
+      `Nr. Arms`= color_tile(customGreen0, customGreen),
+      `Moving Stats`= color_tile(customGreen0, customGreen),
+      #`Capacity`= color_bar(customRed)
+      `Capacity` = formatter(
+        "span", style = x ~ style(
+          display = "inline-block",
+          direction = "ltr",
+          color = ifelse(x == 0, "black", "white"),
+          "background-color" = csscolor(gradient(x, customGreen, customRed)),
+          width = percent(x/3)
+        )
+      ),
+      `Nr. Trials` = color_tile(customGreen0, customGreen)
+    )
+  )
+}
+
+plot_cut_task_table2 <- function(tbl_tasks) {
+  #' plot formatted task tbl
+  #' 
+  #' @description plot a formatted tbl of the task tbl
+  #' @param tbl_tasks \code{tibble} containing the tasks with their features
+  #' 
+  
+  names(tbl_tasks) <- c(
+    "Task Name", "Bet vs. Total Trials", "Nr. Arms", "Moving Stats",
+    "Capacity", "Info Reward Confound"
+  )
+  tbl_tasks <- tbl_tasks %>% arrange(`Info Reward Confound`, `Capacity`)
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.logical, function(x) as.character(x))
+  tbl_tasks[tbl_tasks == "FALSE"] <- "no"
+  tbl_tasks[tbl_tasks == "TRUE"] <- "yes"
+  tbl_tasks <- tbl_tasks %>% mutate_if(is.character, function(x) as.factor(x))
+  
+  formattable(
+    tbl_tasks %>% select(-c(Capacity, `Info Reward Confound`)),
+    align = c("l","c","c","r"), list(
+      `Task Name` = formatter(
+        "span", style = x ~ style(color = "gray", width = 100),
+        x ~ icontext(ifelse(x %in% c("DFD", "DFE Sampling", "DFE"), "star", ""), x)
+      ), 
+      `Nr. Arms`= color_tile(customGreen0, customGreen),
+      `Moving Stats`= color_tile(customGreen0, customGreen),
+      #`Capacity`= color_bar(customRed),
+      `Nr. Trials` = color_tile(customGreen0, customGreen)
     )
   )
 }
