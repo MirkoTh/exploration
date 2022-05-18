@@ -268,3 +268,37 @@ rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, gamma) {
   # return everything of interest
   return(list(m=m,v=v,choice=choice,reward=reward))
 }
+
+
+
+total_rewards <- function(param_gamma) {
+  #' helper function to compute total rewards for given gamma
+  #' @return the tbl with all information
+  
+  l_l_m <- map(tbl_conditions$rewards, rl_softmax_sim, m0 = 0, v0 = var_fixed, 
+               sigma_epsilon_sq = var_fixed, gamma = param_gamma)
+  map_dbl(l_l_m, ~ sum(.x[["reward"]]))
+  
+}
+
+
+iterate_once <- function(x) {
+  #' iterate over gamma values for each condition
+  #' 
+  #' @description iterate once over a sequence of gamma values and return total_rewards
+  #' once for each condition in tbl_conditions
+  #' @param x dummy variable not used
+  #' @return the results tbl
+  
+  tbl_conditions <- conditions_and_rewards_fixed_means(
+    n_conditions, mn_spacing, var_fixed, n_trials
+  )
+  params_grid <- seq(0.1, 5.1, by = .25)
+  l_results <- map(params_grid, total_rewards)
+  tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
+  colnames(tbl_results) <- tbl_conditions$n_options
+  tbl_results$gamma <- params_grid
+  tbl_results <- tbl_results %>% 
+    pivot_longer(cols = -gamma, names_to = "n_options", values_to = "reward_tot")
+  return(tbl_results)
+}
