@@ -18,3 +18,32 @@ check_reward_distributions <- function(tbl_conditions) {
     theme_bw() +
     labs(x = "Option", y = "Reward")
 }
+
+plot_mean_trajectories <- function(l_l_m) {
+  #' plot estimated mean trajectories of response options
+  #' 
+  #' @description using one walk through with the rl model
+  #' @param l_l_m nested list with modeling results in inner lists
+  #' @return nothing; just plots
+  
+  
+  format_means <- function(l_m) {
+    l_m$m %>% as.data.frame() %>% as_tibble() %>%
+      rename_all(~ substr(.x, 2, 4)) %>%
+      mutate(trial_id = 1:nrow(l_m$m)) %>%
+      pivot_longer(cols = -trial_id) %>%
+      mutate(n_options = length(unique(name)))
+  }
+  map(l_l_m, format_means) %>% reduce(rbind) %>%
+    ggplot(aes(trial_id, value, group = name)) +
+    geom_line(aes(color = name)) +
+    geom_point(color = "white", size = 3) +
+    geom_point(aes(color = name), shape = 1) +
+    facet_wrap(~ n_options) +
+    scale_color_brewer(name = "Option", palette = "Set1") +
+    theme_bw() +
+    labs(
+      x = "Trial ID",
+      y = "Estimated Mean"
+    )
+}
