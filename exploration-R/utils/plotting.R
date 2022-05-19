@@ -49,8 +49,14 @@ plot_mean_trajectories <- function(l_l_m) {
 }
 
 
-plot_total_reward_against_gamma <- function(tbl_results_agg) {
-  ggplot(tbl_results_agg, aes(gamma, mean_reward_tot, group = n_options)) +
+plot_total_rewards_kalman <- function(tbl_results_agg) {
+  tbl_plot <- tbl_results_agg %>% filter(model == "Kalman")
+  ggplot(tbl_plot, aes(gamma, mean_reward_tot, group = n_options)) +
+    geom_errorbar(aes(
+      ymin = mean_reward_tot - se_reward_tot * 1.96,
+      ymax = mean_reward_tot + se_reward_tot * 1.96,
+      color = n_options
+    )) +
     geom_line(aes(color = n_options)) +
     geom_point(color = "white", size = 3) +
     geom_point(aes(color = n_options)) +
@@ -58,3 +64,25 @@ plot_total_reward_against_gamma <- function(tbl_results_agg) {
     scale_color_brewer(name = "Nr. Options", palette = "Set1") +
     labs(x = "Gamma", y = "Total Reward")
 }
+
+plot_total_rewards_decay <- function(tbl_results_agg) {
+  tbl_plot <- tbl_results_agg %>% filter(model == "Decay") %>%
+    group_by(n_options) %>%
+    mutate(mean_reward_prop = mean_reward_tot / max(mean_reward_tot)) %>%
+    ungroup()
+  
+  ggplot(tbl_plot, aes(gamma, eta)) +
+    geom_tile(aes(fill = mean_reward_prop)) +
+    facet_wrap(~ n_options) +
+    scale_fill_viridis_c(name = "Proportionate\nReward") +
+    labs(x = "Gamma", y = "Eta")
+  
+}
+
+
+
+
+
+
+
+

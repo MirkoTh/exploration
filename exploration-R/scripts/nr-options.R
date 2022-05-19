@@ -4,26 +4,28 @@
 # for part 1
 
 # load packages and libraries
-libs_required <- c("tidyverse", "furrr", "rutils")
-walk(libs_required, require)
+
 library(tidyverse)
 library(furrr)
 library(rutils)
 
-paths_local <- c("utils/utils.R")
+paths_local <- c("utils/utils.R", "utils/plotting.R")
 walk(paths_local, source)
 
 # simulate data for conditions with different nr of response options
 # means and sds are fixed over trials (not restless)
 
-# conditions
+# simulation experiment conditions
 n_conditions <- 3
 mn_spacing <- 1
 var_fixed <- 5
 
-# experiment
+# individual experiment parameters
 n_trials <- 200
-n_rep <- 200
+n_rep <- 2
+
+
+# Run Experiments Once ----------------------------------------------------
 
 tbl_conditions <- conditions_and_rewards_fixed_means(
   n_conditions, mn_spacing, var_fixed, n_trials
@@ -46,9 +48,9 @@ l_l_m <- map(tbl_conditions$rewards, rl_softmax_sim, m0 = 0, v0 = var_fixed,
 plot_mean_trajectories(l_l_m)
 
 
-# run models over parameter grid to approximately maximize rewards
-# different number of response options
-# kalman filter model
+
+# Iterate over Experiment Runs --------------------------------------------
+
 
 n_workers_use <- future::availableCores() / 2
 plan(multisession, workers = n_workers_use)
@@ -59,15 +61,17 @@ suppressMessages(
   )
 )
 
-tbl_results_agg <- l_tbl_results %>% reduce(rbind) %>%
-  grouped_agg(c(gamma, n_options), reward_tot)
+# Analyze Results ---------------------------------------------------------
 
-tbl_results_max <- tbl_results_agg %>% group_by(n_options) %>%
+
+tbl_results_agg <- l_tbl_results %>% reduce(rbind) %>%
+  grouped_agg(c(model, gamma, eta, n_options), reward_tot) %>%
+  relocate(n_options, .after = model)
+
+tbl_results_max <- tbl_results_agg %>% group_by(model, n_options) %>%
   mutate(rwn = row_number(desc(mean_reward_tot))) %>%
   filter(rwn == 1)
 
-plot_total_reward_against_gamma(tbl_results_agg)
-
-
-# decay rule model
+plot_total_rewards_kalman(tbl_results_agg)
+plot_total_rewards_decay(tbl_results_agg)
 
