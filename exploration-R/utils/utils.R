@@ -298,14 +298,13 @@ iterate_once <- function(x) {
   #' @description iterate once over a sequence of gamma values and return total_rewards
   #' once for each condition in tbl_conditions
   #' @param x dummy param to iterate over
-  #' @param params grid with all combiantions of parameter values
   #' @return the results tbl
   
   tbl_params <- params_grid()
   tbl_conditions <- conditions_and_rewards_fixed_means(
     n_conditions, mn_spacing, var_fixed, n_trials
   )
-  l_results <- pmap(params, total_rewards)
+  l_results <- pmap(tbl_params, total_rewards)
   tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
   colnames(tbl_results) <- tbl_conditions$n_options
   tbl_results <- cbind(tbl_results, tbl_params)
