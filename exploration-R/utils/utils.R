@@ -280,34 +280,52 @@ rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, params) {
 
 
 
-total_rewards <- function(param_gamma) {
+total_rewards <- function(params) {
   #' helper function to compute total rewards for given gamma
   #' @return the tbl with all information
   
   l_l_m <- map(tbl_conditions$rewards, rl_softmax_sim, m0 = 0, v0 = var_fixed, 
-               sigma_epsilon_sq = var_fixed, gamma = param_gamma)
+               sigma_epsilon_sq = var_fixed, params = params)
   map_dbl(l_l_m, ~ sum(.x[["reward"]]))
   
 }
 
 
-iterate_once <- function(x) {
+iterate_once <- function(params) {
   #' iterate over gamma values for each condition
   #' 
   #' @description iterate once over a sequence of gamma values and return total_rewards
   #' once for each condition in tbl_conditions
-  #' @param x dummy variable not used
+  #' @param params tbl with all required parameter combinations
   #' @return the results tbl
   
   tbl_conditions <- conditions_and_rewards_fixed_means(
     n_conditions, mn_spacing, var_fixed, n_trials
   )
-  params_grid <- seq(0.1, 5.1, by = .25)
-  l_results <- map(params_grid, total_rewards)
+  l_results <- pmap(params, total_rewards)
   tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
   colnames(tbl_results) <- tbl_conditions$n_options
   tbl_results$gamma <- params_grid
   tbl_results <- tbl_results %>% 
     pivot_longer(cols = -gamma, names_to = "n_options", values_to = "reward_tot")
   return(tbl_results)
+}
+
+
+params_grid <- function() {
+  #' create grid of parameter combinations to iterate over
+  #' 
+  #' @description crosses different different parameters for each model
+  #' and combines them in one tbl
+  #' @return tbl with parameter combinations
+  
+  gamma <- seq(.1, 5.1, by = .25) # temperature of softmax
+  eta <- seq(.2, .8, by = .2) # decay rate in decay rule
+  model <- "Decay"
+  tbl_params_decay <- crossing(model, gamma, eta)
+  eta <- 0
+  model <- "Kalman"
+  tbl_params_kalman <- crossing(model, gamma, eta)
+  tbl_params <- rbind(tbl_params_decay, tbl_params_kalman)
+  return(tbl_params)
 }

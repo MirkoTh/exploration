@@ -13,7 +13,7 @@ check_reward_distributions <- function(tbl_conditions) {
   
   ggplot(tbl_rewards, aes(name, value, group = name)) +
     geom_violin(draw_quantiles = .5, aes(fill = name)) +
-    scale_color_brewer(name = "Option", palette = "Set1") +
+    scale_fill_brewer(name = "Option", palette = "Set1") +
     facet_wrap(~ n_arms) + 
     theme_bw() +
     labs(x = "Option", y = "Reward")
