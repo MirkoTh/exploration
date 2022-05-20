@@ -26,6 +26,7 @@ check_reward_distributions <- function(tbl_conditions) {
     geom_violin(draw_quantiles = .5, aes(fill = name)) +
     scale_fill_brewer(name = "Option", palette = "Set1") +
     facet_grid(var ~ n_arms) + 
+    coord_flip() +
     theme_bw() +
     labs(x = "Option", y = "Reward")
 }
@@ -64,9 +65,10 @@ plot_mean_trajectories <- function(l_l_m, tbl_conditions) {
 
 
 plot_total_rewards_kalman <- function(tbl_results_agg) {
+  var_min <- min(as.numeric(tbl_results_agg$var))
   tbl_plot <- tbl_results_agg %>% filter(model == "Kalman") %>%
     mutate(var = factor(str_c("Var = ", var)))
-  tbl_plot$var <- tbl_plot$var %>% relevel("Var = 5")
+  tbl_plot$var <- tbl_plot$var %>% relevel(str_c("Var = ", var_min))
   ggplot(tbl_plot, aes(gamma, mean_reward_tot, group = n_options)) +
     geom_errorbar(aes(
       ymin = mean_reward_tot - se_reward_tot * 1.96,
@@ -83,6 +85,7 @@ plot_total_rewards_kalman <- function(tbl_results_agg) {
 }
 
 plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
+  var_min <- min(as.numeric(tbl_results_agg$var))
   tbl_plot <- tbl_results_agg %>% filter(model == "Decay") %>%
     group_by(n_options) %>%
     mutate(
@@ -91,12 +94,15 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
       n_options = str_c("Nr. Options = ", n_options)
       ) %>%
     ungroup()
-  tbl_plot$var <- tbl_plot$var %>% relevel("Var = 5")
+  tbl_plot$var <- tbl_plot$var %>% relevel(str_c("Var = ", var_min))
   
   if (p_eta == "all") {
     ggplot(tbl_plot, aes(gamma, eta)) +
     geom_raster(aes(fill = mean_reward_prop)) +
-    geom_text(aes(label = substr(round(mean_reward_prop, 2), 2, 4), color = mean_reward_prop)) +
+    geom_text(aes(
+      label = ifelse(mean_reward_prop >= .995, 1, substr(round(mean_reward_prop, 2), 2, 4)),
+      color = mean_reward_prop
+      )) +
     facet_wrap(n_options ~ var, ncol = 2) +
     theme_bw() +
     scale_fill_viridis_c(name = "Proportionate\nReward") +
@@ -121,21 +127,29 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
 }
 
 plot_optimal_gammas <- function(tbl_results_max) {
+  var_min <- min(as.numeric(tbl_results_agg$var))
   tbl_results_max <- tbl_results_max %>%
     mutate(
       modelxeta = interaction(model, eta, sep = ", Eta = "),
-      modelxeta = case_when(model == "Kalman" ~ "Kalman", TRUE ~ as.character(modelxeta))
+      modelxeta = case_when(
+        model == "Kalman" ~ "Kalman", TRUE ~ str_c(as.character(modelxeta), "*")
+        ),
+      var = factor(str_c("Var = ", var))
       )
+  tbl_results_max$var <- tbl_results_max$var %>% relevel(str_c("Var = ", var_min))
+  
+  dg <- position_dodge(width = .2)
   ggplot(tbl_results_max, aes(n_options, gamma, group = modelxeta)) +
-    geom_line(aes(color = modelxeta, linetype = model)) +
-    geom_point(size = 3, color = "white") +
-    geom_point(aes(color = modelxeta)) +
+    geom_line(aes(color = modelxeta, linetype = model), position = dg) +
+    geom_point(size = 3, color = "white", position = dg) +
+    geom_point(aes(color = modelxeta), position = dg) +
+    facet_wrap(~ var) +
     theme_bw() +
     scale_color_brewer(name = "Updating Rule / Model", palette = "Set1") +
     guides(linetype = "none") +
     labs(
       x = "Nr. Options",
       y = "Gamma",
-      caption = "* Best-fitting Eta in Speekenbrink & Konstantinidis (2015) approx. .6"
+      caption = "* Best-fitting Eta in Speekenbrink & Konstantinidis (2015) approx. 0.6"
     )
 }

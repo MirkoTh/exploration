@@ -16,9 +16,9 @@ walk(paths_local, source)
 # means and sds are fixed over trials (not restless)
 
 # simulation experiment conditions
-n_conditions <- 3
+opts <- seq(2, 6, by = 2) # nr of response options
 mn_spacing <- 1
-var_fixed <- 5
+vars <- c(1, 4)
 
 # individual experiment parameters
 n_trials <- 200
@@ -27,9 +27,8 @@ n_rep <- 200
 
 # Run Experiments Once ----------------------------------------------------
 
-tbl_conditions <- conditions_and_rewards_fixed_means(
-  n_conditions, mn_spacing, var_fixed, n_trials
-)
+tbl_conditions <- make_conditions_and_rewards(opts, mn_spacing, vars, n_trials)
+
 
 # plot reward distributions as a check
 
@@ -39,13 +38,16 @@ check_reward_distributions(tbl_conditions)
 params <- list(
   gamma = .3,
   eta = .8,
-  model = "Decay"
+  model = "Kalman"
 )
-l_l_m <- map(tbl_conditions$rewards, rl_softmax_sim, m0 = 0, v0 = var_fixed, 
-             sigma_epsilon_sq = var_fixed, params = params)
+l_l_m <- pmap(
+  list(tbl_conditions$rewards, as.list(tbl_conditions$var)), 
+  rl_softmax_sim,
+  m0 = 0, params = params
+)
 
 # plot some of the results
-plot_mean_trajectories(l_l_m)
+plot_mean_trajectories(l_l_m, tbl_conditions)
 
 
 
@@ -65,19 +67,19 @@ suppressMessages(
 
 
 tbl_results_agg <- l_tbl_results %>% reduce(rbind) %>%
-  grouped_agg(c(model, gamma, eta, n_options), reward_tot) %>%
-  relocate(n_options, .after = model) %>% ungroup()
+  grouped_agg(c(model, gamma, eta, n_options, var), reward_tot) %>%
+  relocate(n_options, .after = model) %>% relocate(var, .after = n_options) %>% ungroup()
 
-eta_speek_konst <- c(.4, .6) # approximately in speekenbrink & konstantinidis (2015)
-
+eta_speek_konst <- c(.6, 1) # approximately in speekenbrink & konstantinidis (2015)
 
 # some plots visualizing parameters optimizing rewards
 plot_total_rewards_kalman(tbl_results_agg)
 plot_total_rewards_decay(tbl_results_agg)
-plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst[1])
+plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst[2])
 
 
-tbl_results_max <- tbl_results_agg %>% group_by(model, n_options, eta) %>%
+tbl_results_max <- tbl_results_agg %>% 
+  group_by(model, n_options, var, eta) %>%
   mutate(rwn = row_number(desc(mean_reward_tot))) %>%
   filter(
     rwn == 1 & near(eta, eta_speek_konst[1]) |

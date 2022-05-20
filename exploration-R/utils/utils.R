@@ -249,7 +249,8 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
   # loop over all time points
   for(t in 1:nt) {
     # use the prior means and compute the probability of choosing each option
-    p <- exp(params$gamma*m[t,])
+    tb_exp <- params$gamma*m[t,]
+    p <- exp(ifelse(tb_exp > 700, 700, tb_exp))
     p <- p/sum(p)
     # choose an option according to these probabilities
     choice[t] <- sample(1:no,size=1,prob=p)
@@ -257,7 +258,7 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
     reward[t] <- rewards[t,choice[t]]
     
     if (params$model == "Kalman") {
-      # set the Kalman gain for unchosen options
+      # set the Kalman gain for not chosen options
       kt <- rep(0,no)
       # set the Kalman gain for the chosen option
       kt[choice[t]] <- (v[t,choice[t]])/(v[t,choice[t]] + sigma_epsilon_sq)
@@ -267,7 +268,8 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
       v[t+1,] <- (1-kt)*(v[t,])
       
     } else if (params$model == "Decay") {
-      m[t+1, choice[t]] <- params$eta * m[t, choice[t]] + reward[t]
+      m[t+1, ] <- params$eta * m[t, ]
+      m[t+1, choice[t]] <- m[t, choice[t]] + reward[t]
       v[t+1, choice[t]] <- 0
       
     }
@@ -326,7 +328,7 @@ params_grid <- function() {
   #' @return tbl with parameter combinations
   
   gamma <- seq(.1, 5.1, by = .25) # temperature of softmax
-  eta <- seq(.2, .8, by = .2) # decay rate in decay rule
+  eta <- seq(.2, 1, by = .2) # decay rate in decay rule
   model <- "Decay"
   tbl_params_decay <- crossing(model, gamma, eta)
   eta <- 0
