@@ -190,27 +190,25 @@ plot_cut_task_table2 <- function(tbl_tasks) {
 }
 
 
-conditions_and_rewards_fixed_means <- function(
-    n_conditions, mn_spacing, var_fixed, n_trials
+make_conditions_and_rewards <- function(
+    opts, mn_spacing, vars, n_trials
 ) {
   #' create tbl with info about conditions and rewards per trial
   #' 
   #' @description creates a tbl with cols condition_id, n_options
   #' and list cols reward_stats (mns and sds) and rewards (by-trial rewards)
-  #' @param n_conditions nr of different experimental conditions
+  #' @param opts vector with number of response options across conditions
   #' @param mn_spacing constant spacing between means
-  #' @param var_fixed var for all conditions and options
+  #' @param vars variances of the data
   #' @param n_trials nr trials of the experiment
   #' @return the tbl with all information
   
-  tbl_conditions <- tibble(
-    condition_id = seq(1, n_conditions, by = 1),
-    n_options = seq(2, 2*n_conditions, by = 2),
-    reward_stats = map(
-      n_options, ~ list(
-        reward_mn = seq(mn_spacing, .x*mn_spacing, by = mn_spacing),
-        reward_var = rep(var_fixed, .x)
-      )
+  tbl_conditions <- crossing(opts, mn_spacing, vars)
+  colnames(tbl_conditions) <- c("n_options", "mn_spacing", "var")
+  tbl_conditions$reward_stats = pmap(
+    tbl_conditions, ~ list(
+      reward_mn = seq(..2, ..1*..2, by = ..2),
+      reward_var = rep(..3, ..1)
     )
   )
   
@@ -231,6 +229,7 @@ conditions_and_rewards_fixed_means <- function(
   
   return(tbl_conditions)
 }
+
 
 update_kalman_filter <- function(var_prev, var_innov, var_error) {
   kg <- (var_prev + var_innov) / (var_prev + var_innov + var_error)
@@ -301,9 +300,7 @@ iterate_once <- function(x) {
   #' @return the results tbl
   
   tbl_params <- params_grid()
-  tbl_conditions <- conditions_and_rewards_fixed_means(
-    n_conditions, mn_spacing, var_fixed, n_trials
-  )
+  tbl_conditions <- make_conditions_and_rewards(opts, mn_spacing, vars, n_trials)
   l_results <- pmap(tbl_params, total_rewards)
   tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
   colnames(tbl_results) <- tbl_conditions$n_options
