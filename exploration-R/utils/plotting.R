@@ -16,6 +16,11 @@ check_reward_distributions <- function(tbl_conditions) {
     map(~ pivot_longer(.x, -c(var, n_arms))) %>%
     reduce(rbind) %>% 
     mutate(name = substr(name, 2, 5))
+  tbl_rewards <- tbl_rewards %>%
+    mutate(
+      var = str_c("Var = ", var),
+      n_arms = str_c("Nr. Options = ", n_arms)
+    )
   
   ggplot(tbl_rewards, aes(name, value, group = name)) +
     geom_violin(draw_quantiles = .5, aes(fill = name)) +
@@ -25,7 +30,7 @@ check_reward_distributions <- function(tbl_conditions) {
     labs(x = "Option", y = "Reward")
 }
 
-plot_mean_trajectories <- function(l_l_m) {
+plot_mean_trajectories <- function(l_l_m, tbl_conditions) {
   #' plot estimated mean trajectories of response options
   #' 
   #' @description using one walk through with the rl model
@@ -33,19 +38,22 @@ plot_mean_trajectories <- function(l_l_m) {
   #' @return nothing; just plots
   
   
-  format_means <- function(l_m) {
+  format_means <- function(l_m, var) {
     l_m$m %>% as.data.frame() %>% as_tibble() %>%
       rename_all(~ substr(.x, 2, 4)) %>%
-      mutate(trial_id = 1:nrow(l_m$m)) %>%
-      pivot_longer(cols = -trial_id) %>%
-      mutate(n_options = length(unique(name)))
+      mutate(
+        trial_id = 1:nrow(l_m$m),
+        var = str_c("Var = ", var)
+        ) %>%
+      pivot_longer(cols = -c(trial_id, var)) %>%
+      mutate(n_options = str_c("Nr. Options = ", length(unique(name))))
   }
-  map(l_l_m, format_means) %>% reduce(rbind) %>%
+  pmap(list(l_l_m, as.list(tbl_conditions$var)), format_means) %>% reduce(rbind) %>%
     ggplot(aes(trial_id, value, group = name)) +
     geom_line(aes(color = name)) +
     geom_point(color = "white", size = 3) +
     geom_point(aes(color = name), shape = 1) +
-    facet_wrap(~ n_options) +
+    facet_grid(var ~ n_options) +
     scale_color_brewer(name = "Option", palette = "Set1") +
     theme_bw() +
     labs(
@@ -56,7 +64,9 @@ plot_mean_trajectories <- function(l_l_m) {
 
 
 plot_total_rewards_kalman <- function(tbl_results_agg) {
-  tbl_plot <- tbl_results_agg %>% filter(model == "Kalman")
+  tbl_plot <- tbl_results_agg %>% filter(model == "Kalman") %>%
+    mutate(var = factor(str_c("Var = ", var)))
+  tbl_plot$var <- tbl_plot$var %>% relevel("Var = 5")
   ggplot(tbl_plot, aes(gamma, mean_reward_tot, group = n_options)) +
     geom_errorbar(aes(
       ymin = mean_reward_tot - se_reward_tot * 1.96,
@@ -66,6 +76,7 @@ plot_total_rewards_kalman <- function(tbl_results_agg) {
     geom_line(aes(color = n_options)) +
     geom_point(color = "white", size = 3) +
     geom_point(aes(color = n_options)) +
+    facet_wrap(~ var) +
     theme_bw() +
     scale_color_brewer(name = "Nr. Options", palette = "Set1") +
     labs(x = "Gamma", y = "Total Reward")
