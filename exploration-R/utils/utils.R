@@ -269,7 +269,7 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
       
     } else if (params$model == "Decay") {
       m[t+1, ] <- params$eta * m[t, ]
-      m[t+1, choice[t]] <- m[t, choice[t]] + reward[t]
+      m[t+1, choice[t]] <- m[t+1, choice[t]] + reward[t]
       v[t+1, choice[t]] <- 0
       
     }
@@ -327,8 +327,8 @@ params_grid <- function() {
   #' and combines them in one tbl
   #' @return tbl with parameter combinations
   
-  gamma <- seq(.1, 5.1, by = .25) # temperature of softmax
-  eta <- seq(.2, 1, by = .2) # decay rate in decay rule
+  gamma <- seq(.1, 5.1, by = .5) # temperature of softmax
+  eta <- seq(.25, 1, by = .25) # decay rate in decay rule
   model <- "Decay"
   tbl_params_decay <- crossing(model, gamma, eta)
   eta <- 0

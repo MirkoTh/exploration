@@ -70,7 +70,7 @@ tbl_results_agg <- l_tbl_results %>% reduce(rbind) %>%
   grouped_agg(c(model, gamma, eta, n_options, var), reward_tot) %>%
   relocate(n_options, .after = model) %>% relocate(var, .after = n_options) %>% ungroup()
 
-eta_speek_konst <- c(.6, 1) # approximately in speekenbrink & konstantinidis (2015)
+eta_speek_konst <- c(.5, .75) # approximately in speekenbrink & konstantinidis (2015)
 
 # some plots visualizing parameters optimizing rewards
 plot_total_rewards_kalman(tbl_results_agg)
