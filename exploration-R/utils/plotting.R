@@ -93,21 +93,26 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
       geom_point(aes(color = n_options)) +
       theme_bw() +
       scale_color_brewer(name = "Nr. Options", palette = "Set1") +
-      labs(x = "Gamma", y = "Total Reward", title = str_c("Eta = ", eta))
+      labs(x = "Gamma", y = "Total Reward", title = str_c("Eta = ", p_eta))
   }
 }
 
-plot_optimal_gammas <- function(tbl_results_max, eta_speek_konst) {
-  ggplot(tbl_results_max, aes(n_options, gamma, group = model)) +
-    geom_line(aes(color = model)) +
+plot_optimal_gammas <- function(tbl_results_max) {
+  tbl_results_max <- tbl_results_max %>%
+    mutate(
+      modelxeta = interaction(model, eta, sep = ", Eta = "),
+      modelxeta = case_when(model == "Kalman" ~ "Kalman", TRUE ~ as.character(modelxeta))
+      )
+  ggplot(tbl_results_max, aes(n_options, gamma, group = modelxeta)) +
+    geom_line(aes(color = modelxeta, linetype = model)) +
     geom_point(size = 3, color = "white") +
-    geom_point(aes(color = model)) +
+    geom_point(aes(color = modelxeta)) +
     theme_bw() +
-    scale_color_brewer(name = "Model", palette = "Set1") +
+    scale_color_brewer(name = "Updating Rule / Model", palette = "Set1") +
+    guides(linetype = "none") +
     labs(
       x = "Nr. Options",
       y = "Gamma",
-      title = str_c("Decay Model: eta = ", eta_speek_konst, " *"),
-      caption = "* Approx. value taken from Speekenbrink & Konstantinidis (2015)"
+      caption = "* Best-fitting Eta in Speekenbrink & Konstantinidis (2015) approx. .6"
     )
 }

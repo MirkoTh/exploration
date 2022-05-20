@@ -68,20 +68,21 @@ tbl_results_agg <- l_tbl_results %>% reduce(rbind) %>%
   grouped_agg(c(model, gamma, eta, n_options), reward_tot) %>%
   relocate(n_options, .after = model) %>% ungroup()
 
-eta_speek_konst <- .6 # approximately in speekenbrink & konstantinidis (2015)
+eta_speek_konst <- c(.4, .6) # approximately in speekenbrink & konstantinidis (2015)
 
 
 # some plots visualizing parameters optimizing rewards
 plot_total_rewards_kalman(tbl_results_agg)
 plot_total_rewards_decay(tbl_results_agg)
-plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst)
+plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst[1])
 
 
 tbl_results_max <- tbl_results_agg %>% group_by(model, n_options, eta) %>%
   mutate(rwn = row_number(desc(mean_reward_tot))) %>%
   filter(
-    rwn == 1 & near(eta, eta_speek_konst) |
+    rwn == 1 & near(eta, eta_speek_konst[1]) |
+      rwn == 1 & near(eta, eta_speek_konst[2]) |
       rwn == 1 & model == "Kalman"
   )
 
-plot_optimal_gammas(tbl_results_max, eta_speek_konst)
+plot_optimal_gammas(tbl_results_max)
