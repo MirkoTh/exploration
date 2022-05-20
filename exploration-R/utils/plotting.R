@@ -85,14 +85,19 @@ plot_total_rewards_kalman <- function(tbl_results_agg) {
 plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
   tbl_plot <- tbl_results_agg %>% filter(model == "Decay") %>%
     group_by(n_options) %>%
-    mutate(mean_reward_prop = mean_reward_tot / max(mean_reward_tot)) %>%
+    mutate(
+      mean_reward_prop = mean_reward_tot / max(mean_reward_tot),
+      var = factor(str_c("Var = ", var)),
+      n_options = str_c("Nr. Options = ", n_options)
+      ) %>%
     ungroup()
+  tbl_plot$var <- tbl_plot$var %>% relevel("Var = 5")
   
   if (p_eta == "all") {
     ggplot(tbl_plot, aes(gamma, eta)) +
     geom_raster(aes(fill = mean_reward_prop)) +
-    geom_text(aes(label = round(mean_reward_prop, 2), color = mean_reward_prop)) +
-    facet_wrap(~ n_options, ncol = 1) +
+    geom_text(aes(label = substr(round(mean_reward_prop, 2), 2, 4), color = mean_reward_prop)) +
+    facet_wrap(n_options ~ var, ncol = 2) +
     theme_bw() +
     scale_fill_viridis_c(name = "Proportionate\nReward") +
     scale_color_gradient(low = "white", high = "black", guide = "none") +
@@ -108,6 +113,7 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
       geom_line(aes(color = n_options)) +
       geom_point(color = "white", size = 3) +
       geom_point(aes(color = n_options)) +
+      facet_wrap(~ var) +
       theme_bw() +
       scale_color_brewer(name = "Nr. Options", palette = "Set1") +
       labs(x = "Gamma", y = "Total Reward", title = str_c("Eta = ", p_eta))
