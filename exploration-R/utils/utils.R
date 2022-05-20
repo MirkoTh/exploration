@@ -239,11 +239,11 @@ update_kalman_filter <- function(var_prev, var_innov, var_error) {
 }
 
 
-rl_softmax_sim <- function(rewards, m0, v0, sigma_epsilon_sq, params) {
+rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
   nt <- nrow(rewards) # number of time points
   no <- ncol(rewards) # number of options
   m <- matrix(m0,ncol=no,nrow=nt+1) # to hold the posterior means
-  v <- matrix(v0,ncol=no,nrow=nt+1) # to hold the posterior variances
+  v <- matrix(sigma_epsilon_sq,ncol=no,nrow=nt+1) # to hold the posterior variances
   choice <- rep(0,nt) # to hold the choices of the RL agent
   reward <- rep(0.0,nt) # to hold the obtained rewards by the RL agent
   # loop over all time points
@@ -284,8 +284,11 @@ total_rewards <- function(model, gamma, eta) {
   #' @return the tbl with all information
   
   l_params <- list(model = model, gamma = gamma, eta = eta)
-  l_l_m <- map(tbl_conditions$rewards, rl_softmax_sim, m0 = 0, v0 = var_fixed, 
-               sigma_epsilon_sq = var_fixed, params = l_params)
+  l_l_m <- pmap(
+    list(tbl_conditions$rewards, as.list(tbl_conditions$var)),
+    rl_softmax_sim,
+    m0 = 0, params = l_params
+  )
   map_dbl(l_l_m, ~ sum(.x[["reward"]]))
   
 }
@@ -303,10 +306,14 @@ iterate_once <- function(x) {
   tbl_conditions <- make_conditions_and_rewards(opts, mn_spacing, vars, n_trials)
   l_results <- pmap(tbl_params, total_rewards)
   tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
-  colnames(tbl_results) <- tbl_conditions$n_options
+  colnames(tbl_results) <- interaction(tbl_conditions$n_options, tbl_conditions$var)
   tbl_results <- cbind(tbl_results, tbl_params)
   tbl_results <- tbl_results %>% 
-    pivot_longer(cols = -colnames(tbl_params), names_to = "n_options", values_to = "reward_tot")
+    pivot_longer(cols = -colnames(tbl_params), names_to = "noxvar", values_to = "reward_tot") %>%
+    mutate(
+      n_options = str_extract(noxvar, "^([0-9]+)"),
+      var = str_extract(noxvar, "([0-9]+)$")
+      )
   return(tbl_results)
 }
 
