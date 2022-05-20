@@ -327,8 +327,8 @@ params_grid <- function() {
   #' and combines them in one tbl
   #' @return tbl with parameter combinations
   
-  gamma <- seq(.1, 5.1, by = .5) # temperature of softmax
-  eta <- seq(.25, 1, by = .25) # decay rate in decay rule
+  gamma <- seq(.1, 5, by = .1) # temperature of softmax
+  eta <- seq(.2, 1, by = .2) # decay rate in decay rule
   model <- "Decay"
   tbl_params_decay <- crossing(model, gamma, eta)
   eta <- 0

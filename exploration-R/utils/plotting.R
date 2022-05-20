@@ -99,10 +99,10 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
   if (p_eta == "all") {
     ggplot(tbl_plot, aes(gamma, eta)) +
     geom_raster(aes(fill = mean_reward_prop)) +
-    geom_text(aes(
-      label = ifelse(mean_reward_prop >= .995, 1, substr(round(mean_reward_prop, 2), 2, 4)),
-      color = mean_reward_prop
-      )) +
+    # geom_text(aes(
+    #   label = ifelse(mean_reward_prop >= .995, 1, substr(round(mean_reward_prop, 2), 2, 4)),
+    #   color = mean_reward_prop
+    #   )) +
     facet_wrap(n_options ~ var, ncol = 2) +
     theme_bw() +
     scale_fill_viridis_c(name = "Proportionate\nReward") +
@@ -138,7 +138,7 @@ plot_optimal_gammas <- function(tbl_results_max) {
       )
   tbl_results_max$var <- tbl_results_max$var %>% relevel(str_c("Var = ", var_min))
   
-  dg <- position_dodge(width = .2)
+  dg <- position_dodge(width = .0)
   ggplot(tbl_results_max, aes(n_options, gamma, group = modelxeta)) +
     geom_line(aes(color = modelxeta, linetype = model), position = dg) +
     geom_point(size = 3, color = "white", position = dg) +
