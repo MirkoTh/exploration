@@ -3,7 +3,7 @@ library(factoextra)
 library(ggrepel)
 library(formattable)
 
-home_grown_stuff <- c("exploration-R/utils.R")
+home_grown_stuff <- c("utils/utils.R")
 walk(home_grown_stuff, source)
 
 # create a list with tasks used previously
@@ -40,3 +40,15 @@ tbl_tasks2 <- tribble(
 
 plot_task_table2(tbl_tasks2)
 plot_cut_task_table2(tbl_tasks2)
+
+
+
+tbl_studies <- tribble(
+  ~authorlist,            ~driftcondition,  ~directed,    ~valueguided,
+  "Gershman (2018)",      FALSE,            TRUE,         TRUE,
+  "Wilson et al. (2014)", FALSE,            TRUE,         TRUE,
+  "Speekenbrink & Konstantinidis (2015)", TRUE, FALSE,    TRUE,
+  "Daw et al. (2006)",    TRUE,             FALSE,        TRUE,
+  "Wu et al. (2022)",     FALSE,            TRUE,         TRUE,
+  "Dubois et al. (2021)", FALSE,            TRUE,         TRUE
+)
