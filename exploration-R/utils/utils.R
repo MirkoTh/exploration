@@ -240,3 +240,48 @@ kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
     m_rewards_2, params_fixed$v_sd, 0, params_fixed
   )
 }
+
+
+# two helper functions to calculate density above zero after each choice
+cum_density_above_zero <- function(i, l) {
+ 
+  #' @description calculate density of difference of posterior distributions above zero
+  #' 
+  
+  m <- l$m[i, 1] + l$m[i, 2]
+  sd <- sqrt(l$v[i, 1] + l$v[i, 2])
+  pnorm(0, m, sd)
+}
+
+wrap_all_densities <- function(l) {
+  map_dbl(1:nrow(l$m), cum_density_above_zero, l = l)
+}
+
+
+agg_runs <-function(condition_idx, l_results, params_fixed) {
+  #' aggregate simulation runs by condition and trial
+  #' 
+  #' @description calculate average proportion people should
+  #' choose the option with the higher mean
+  #' @param condition_idx index stating which condition should be aggregated
+  #' @param l_results list with simulation results
+  #' @param params_fixed list with simulation parameters
+  #' @return tbl grouped by condition and trial
+  #' 
+  
+  map(l_results, condition_idx) %>% 
+    unlist() %>%
+    matrix(nrow = 13, ncol = n_runs, byrow = FALSE) %>%
+    as.data.frame() %>%
+    mutate(
+      trial_id = seq(1, nrow(.)),
+      condition = params_fixed$conditions[condition_idx],
+    ) %>%
+    pivot_longer(cols = starts_with("V")) %>%
+    # group_by(condition, trial_id) %>%
+    # summarize(
+    #   val_mean = mean(value),
+    #   val_sd = sd(value)
+    # ) %>%
+    ungroup()
+} 
