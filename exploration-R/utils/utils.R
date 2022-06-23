@@ -157,6 +157,9 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
   #' 
   #' @description makes a tbl for the forced-choice trials
   #' using desired parameter settings
+  #' @param n_options number of response options
+  #' @param params_fixed list with simulation parameters
+  #' @param condition_distinct_ii vector with most distinctive response option 1
   #' @return tbl with separate row for each forced-choice trial
   #'
   my_rnorm <- function(m, sd) rnorm(params_fixed$n_trials, m, sd)
@@ -190,6 +193,9 @@ calc_discriminability <- function(tb, c, alpha) {
   #' 
   #' @description calculates discriminability of presented items
   #' given temporal structure using SIMPLE formulae
+  #' @param tbl for one of the three conditions with by-trial info
+  #' @param c SIMPLE parameter: scaling of exponential function
+  #' @param alpha SIMPLE parameter: 1 = exponential, 2 = Gaussian
   #' @return list with all discriminabilities
   #' 
   distances_all <- tb$distance_t_log
