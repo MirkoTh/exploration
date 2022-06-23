@@ -145,3 +145,41 @@ params_grid <- function() {
   tbl_params <- rbind(tbl_params_decay, tbl_params_kalman)
   return(tbl_params)
 }
+
+
+make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii) {
+  #' make forced-choice trials for all conditions
+  #' 
+  #' @description makes a tbl for the forced-choice trials
+  #' using desired parameter settings
+  #' @return tbl with separate row for each forced-choice trial
+  #' 
+  tibble(
+    trial_id = rep(
+      seq(1, params_fixed$n_trials, by = 1), length(params_fixed$conditions)),
+    condition = rep(params_fixed$conditions, each = params_fixed$n_trials),
+    setsize = n_options,
+    option_selected = factor(c(
+      rep(1:n_options, each = params_fixed$n_trials/n_options),
+      rep(1:n_options, params_fixed$n_trials/n_options),
+      condition_distinct_ii
+    )),
+    value_sampled = rnorm(params_fixed$v_means[option_selected], params_fixed$v_sd),
+    distance_t = abs(params_fixed$n_trials - trial_id) + params_fixed$ri,
+    distance_t_log = log(distance_t)
+  )
+}
+
+calc_discriminability <- function(tb, c, alpha) {
+  #' SIMPLE discriminability
+  #' 
+  #' @description calculates discriminability of presented items
+  #' given temporal structure using SIMPLE formulae
+  #' @return list with all discriminabilities
+  #' 
+  distances_all <- tb$distance_t_log
+  # map over all distances besides n
+  all_positions <- seq(1, length(distances_all), by = 1)
+  f_distinct <- function(n) 1/sum(map_dbl(distances_all, ~ exp(-c*abs(distances_all[n] - .x)^alpha)))
+  map_dbl(all_positions, f_distinct)
+}

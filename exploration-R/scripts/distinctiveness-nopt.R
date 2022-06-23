@@ -1,37 +1,20 @@
 library(tidyverse)
 library(rutils)
 
+l_utils <- c("exploration-R/utils/utils.R")
+walk(l_utils, source)
+
+n_options_max <- 4
 params_fixed <- list(
   "n_trials" = 12,
-  "n_options_max" = 4,
+  "n_options_max" = n_options_max,
   "ri" = 2,
   "v_means" = seq(1, n_options_max*2, by = 2),
   "v_sd" = c(1),
   "conditions" = fct_inorder(c("Massed", "Distinct I", "Distinct II"), ordered = TRUE)
 )
 
-
-
-
 # set up conditions table
-
-make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii) {
-  tibble(
-    trial_id = rep(
-      seq(1, params_fixed$n_trials, by = 1), length(params_fixed$conditions)),
-    condition = rep(params_fixed$conditions, each = params_fixed$n_trials),
-    setsize = n_options,
-    option_selected = factor(c(
-      rep(1:n_options, each = params_fixed$n_trials/n_options),
-      rep(1:n_options, params_fixed$n_trials/n_options),
-      condition_distinct_ii
-    )),
-    value_sampled = rnorm(params_fixed$v_means[option_selected], v_sd),
-    distance_t = abs(params_fixed$n_trials - trial_id) + ri,
-    distance_t_log = log(distance_t)
-  )
-}
-
 distinct_ii <- c(1, 1, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1)
 tbl_2 <- make_condition_trials(2, params_fixed, distinct_ii)
 distinct_ii <- c(1, 2, 3, 4, 2, 3, 1, 4, 2, 3, 4, 1)
@@ -45,13 +28,7 @@ tbl_setsize <- tbl_setsize %>% group_by(condition, setsize, option_selected) %>%
 l_tbl_setsize <- split(tbl_setsize, interaction(tbl_setsize$condition, tbl_setsize$setsize))
 # drop empty list elements
 l_tbl_setsize <- l_tbl_setsize[map_lgl(l_tbl_setsize, ~ nrow(.x) > 0)]
-calc_discriminability <- function(tb, c, alpha) {
-  distances_all <- tb$distance_t_log
-  # map over all distances besides n
-  all_positions <- seq(1, length(distances_all), by = 1)
-  f_distinct <- function(n) 1/sum(map_dbl(distances_all, ~ exp(-c*abs(distances_all[n] - .x)^alpha)))
-  map_dbl(all_positions, f_distinct)
-}
+
 
 tbl_setsize$discriminability <- unlist(map(l_tbl_setsize, calc_discriminability, 1, 1))
 
@@ -65,7 +42,7 @@ ggplot(tbl_setsize, aes(trial_id, as.numeric(as.character(option_selected)), gro
   facet_wrap(setsize ~ condition) +
   theme_bw() +
   scale_color_brewer(palette = "Set1", guide = "none") +
-  scale_x_continuous(breaks = seq(1, n_trials, by = 2)) +
+  scale_x_continuous(breaks = seq(1, params_fixed$n_trials, by = 2)) +
   scale_y_continuous(breaks = c(1, 2)) + # , 3, 4
   coord_cartesian(ylim = c(0, 3)) +
   labs(
@@ -85,7 +62,7 @@ ggplot(
   facet_wrap(setsize ~ condition) +
   theme_bw() +
   scale_color_brewer(palette = "Set1", guide = "none") +
-  scale_x_continuous(breaks = seq(1, n_trials, by = 2)) +
+  scale_x_continuous(breaks = seq(1, params_fixed$n_trials, by = 2)) +
   labs(
     x = "Trial ID",
     y = "Discriminability in Memory",
@@ -109,3 +86,14 @@ grouped_agg(tbl_last_3  %>% mutate(
     y = "Mean Discriminability",
     title = "Last Three Items Per Response Option"
   )
+
+
+
+
+
+
+
+
+
+
+
