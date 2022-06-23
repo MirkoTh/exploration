@@ -10,7 +10,7 @@ check_reward_distributions <- function(tbl_conditions) {
       tbl_conditions$rewards, 
       as.list(tbl_conditions$var),
       as.list(tbl_conditions$n_options)
-      ), 
+    ), 
     ~ as.data.frame(..1) %>% mutate(var = ..2, n_arms = ..3)
   ) %>%
     map(~ pivot_longer(.x, -c(var, n_arms))) %>%
@@ -45,7 +45,7 @@ plot_mean_trajectories <- function(l_l_m, tbl_conditions) {
       mutate(
         trial_id = 1:nrow(l_m$m),
         var = str_c("Var = ", var)
-        ) %>%
+      ) %>%
       pivot_longer(cols = -c(trial_id, var)) %>%
       mutate(n_options = str_c("Nr. Options = ", length(unique(name))))
   }
@@ -92,22 +92,22 @@ plot_total_rewards_decay <- function(tbl_results_agg, p_eta = "all") {
       mean_reward_prop = mean_reward_tot / max(mean_reward_tot),
       var = factor(str_c("Var = ", var)),
       n_options = str_c("Nr. Options = ", n_options)
-      ) %>%
+    ) %>%
     ungroup()
   tbl_plot$var <- tbl_plot$var %>% relevel(str_c("Var = ", var_min))
   
   if (p_eta == "all") {
     ggplot(tbl_plot, aes(gamma, eta)) +
-    geom_raster(aes(fill = mean_reward_prop)) +
-    # geom_text(aes(
-    #   label = ifelse(mean_reward_prop >= .995, 1, substr(round(mean_reward_prop, 2), 2, 4)),
-    #   color = mean_reward_prop
-    #   )) +
-    facet_wrap(n_options ~ var, ncol = 2) +
-    theme_bw() +
-    scale_fill_viridis_c(name = "Proportionate\nReward") +
-    scale_color_gradient(low = "white", high = "black", guide = "none") +
-    labs(x = "Gamma", y = "Eta")
+      geom_raster(aes(fill = mean_reward_prop)) +
+      # geom_text(aes(
+      #   label = ifelse(mean_reward_prop >= .995, 1, substr(round(mean_reward_prop, 2), 2, 4)),
+      #   color = mean_reward_prop
+      #   )) +
+      facet_wrap(n_options ~ var, ncol = 2) +
+      theme_bw() +
+      scale_fill_viridis_c(name = "Proportionate\nReward") +
+      scale_color_gradient(low = "white", high = "black", guide = "none") +
+      labs(x = "Gamma", y = "Eta")
   } else if (p_eta != "all") {
     tbl_plot <- tbl_plot %>% filter(near(eta, p_eta))
     ggplot(tbl_plot, aes(gamma, mean_reward_tot, group = n_options)) +
@@ -133,9 +133,9 @@ plot_optimal_gammas <- function(tbl_results_max) {
       modelxeta = interaction(model, eta, sep = ", Eta = "),
       modelxeta = case_when(
         model == "Kalman" ~ "Kalman", TRUE ~ str_c(as.character(modelxeta), "*")
-        ),
+      ),
       var = factor(str_c("Var = ", var))
-      )
+    )
   tbl_results_max$var <- tbl_results_max$var %>% relevel(str_c("Var = ", var_min))
   
   dg <- position_dodge(width = .0)
@@ -157,6 +157,8 @@ plot_optimal_gammas <- function(tbl_results_max) {
 customGreen0 <- "#DeF7E9"
 customGreen <- "#71CA97"
 customRed <- "#ff7f7f"
+customBlue <- "#4363d8"
+customGrey <- "#a9a9a9"
 
 format_task_tbl <- function(tbl_tasks) {
   #' format task tbl
@@ -354,9 +356,14 @@ plot_study_table <- function(tbl_studies) {
   #' @description plot a formatted tbl of the task tbl
   #' @param tbl_studies \code{tibble} containing the tasks with their features
   #' 
-  
+  improvement_formatter <- formatter(
+    "span", style = x ~ icontext(ifelse(x>0, "arrow-up", "arrow-down"), x)
+  )
+  tbl_studies <- tbl_studies %>% relocate(ir_confound, .after = driftcondition)
+
   names(tbl_studies) <- c(
-    "Authors", "Mean Drifting?", "Explore Directed", "Explore Value-Guided"
+    "Authors", "Mean Drifting?",
+    "Confound Inf.-Reward?", "Explore Directed", "Explore Value-Guided"
   )
   tbl_studies <- tbl_studies %>% arrange(Authors, `Mean Drifting?`)
   tbl_studies <- tbl_studies %>% mutate_if(is.logical, function(x) as.character(x))
@@ -367,9 +374,10 @@ plot_study_table <- function(tbl_studies) {
   formattable(
     tbl_studies,
     align = c("l","c","c", "r"), list(
-      `driftcondition`= color_tile(customGreen, customRed),
-      `directed`= color_tile(customGreen, customRed),
-      `valueguided`= color_tile(customGreen, customRed),
-  )
+      `Mean Drifting?`= color_tile(customGrey, customBlue),
+      `Confound Inf.-Reward?` = color_tile(customGreen, customRed),
+      `Explore Directed`= color_tile(customRed, customGreen),
+      `Explore Value-Guided`= color_tile(customRed, customGreen)
+    )
   )
 }

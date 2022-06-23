@@ -9,7 +9,7 @@ library(tidyverse)
 library(furrr)
 library(rutils)
 
-paths_local <- c("utils/utils.R", "utils/plotting.R")
+paths_local <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(paths_local, source)
 
 # simulate data for conditions with different nr of response options
@@ -63,6 +63,7 @@ suppressMessages(
   )
 )
 saveRDS(l_tbl_results, "data/2022-05-20-nops-var.rds")
+l_tbl_results <- readRDS("exploration-R/data/2022-05-20-nops-var.rds")
 # Analyze Results ---------------------------------------------------------
 
 
@@ -75,7 +76,7 @@ eta_speek_konst <- c(.6, .8) # approximately in speekenbrink & konstantinidis (2
 # some plots visualizing parameters optimizing rewards
 plot_total_rewards_kalman(tbl_results_agg)
 plot_total_rewards_decay(tbl_results_agg)
-plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst[2])
+plot_total_rewards_decay(tbl_results_agg, p_eta = eta_speek_konst[1])
 
 
 tbl_results_max <- tbl_results_agg %>% 
