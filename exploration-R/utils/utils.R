@@ -47,7 +47,7 @@ update_kalman_filter <- function(var_prev, var_innov, var_error) {
 }
 
 
-rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
+rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params, choices = NULL) {
   nt <- nrow(rewards) # number of time points
   no <- ncol(rewards) # number of options
   m <- matrix(m0,ncol=no,nrow=nt+1) # to hold the posterior means
@@ -56,13 +56,18 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params) {
   reward <- rep(0.0,nt) # to hold the obtained rewards by the RL agent
   # loop over all time points
   for(t in 1:nt) {
-    # use the prior means and compute the probability of choosing each option
-    tb_exp <- params$gamma*m[t,]
-    p <- exp(ifelse(tb_exp > 700, 700, tb_exp))
-    p <- p/sum(p)
-    # choose an option according to these probabilities
-    choice[t] <- sample(1:no,size=1,prob=p)
-    # get the reward of the choice
+    if (is.null(choices)) {
+      # use the prior means and compute the probability of choosing each option
+      tb_exp <- params$gamma*m[t,]
+      p <- exp(ifelse(tb_exp > 700, 700, tb_exp))
+      p <- p/sum(p)
+      # choose an option according to these probabilities
+      choice[t] <- sample(1:no,size=1,prob=p)
+      # get the reward of the choice
+    } else {
+      choice = choices
+    }
+    
     reward[t] <- rewards[t,choice[t]]
     
     if (params$model == "Kalman") {
@@ -123,7 +128,7 @@ iterate_once <- function(x) {
     mutate(
       n_options = str_extract(noxvar, "^([0-9]+)"),
       var = str_extract(noxvar, "([0-9]+)$")
-      )
+    )
   return(tbl_results)
 }
 
@@ -153,8 +158,10 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
   #' @description makes a tbl for the forced-choice trials
   #' using desired parameter settings
   #' @return tbl with separate row for each forced-choice trial
-  #' 
-  tibble(
+  #'
+  my_rnorm <- function(m, sd) rnorm(params_fixed$n_trials, m, sd)
+  l_rewards <- pmap(list(m = params_fixed$v_means, sd = params_fixed$v_sd), my_rnorm)
+  tbl_prep <- tibble(
     trial_id = rep(
       seq(1, params_fixed$n_trials, by = 1), length(params_fixed$conditions)),
     condition = rep(params_fixed$conditions, each = params_fixed$n_trials),
@@ -164,10 +171,18 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
       rep(1:n_options, params_fixed$n_trials/n_options),
       condition_distinct_ii
     )),
-    value_sampled = rnorm(params_fixed$v_means[option_selected], params_fixed$v_sd),
+    value_sampled = NA,
+    #value_sampled = rnorm(params_fixed$v_means[option_selected], params_fixed$v_sd),
     distance_t = abs(params_fixed$n_trials - trial_id) + params_fixed$ri,
     distance_t_log = log(distance_t)
   )
+  extract_nested_sample <- function(idx_l, idx_pos) {
+    l_rewards[[idx_l]][idx_pos]
+  }
+  tbl_prep$value_sampled <- pmap(
+    tbl_prep[, c("option_selected", "trial_id")], ~ extract_nested_sample(.x, .y)
+    ) %>% unlist()
+  return(list(tbl_prep, l_rewards))
 }
 
 calc_discriminability <- function(tb, c, alpha) {
