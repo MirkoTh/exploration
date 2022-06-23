@@ -65,7 +65,7 @@ rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params, choices = NULL
       choice[t] <- sample(1:no,size=1,prob=p)
       # get the reward of the choice
     } else {
-      choice = choices
+      choice <- choices
     }
     
     reward[t] <- rewards[t,choice[t]]
@@ -197,4 +197,40 @@ calc_discriminability <- function(tb, c, alpha) {
   all_positions <- seq(1, length(distances_all), by = 1)
   f_distinct <- function(n) 1/sum(map_dbl(distances_all, ~ exp(-c*abs(distances_all[n] - .x)^alpha)))
   map_dbl(all_positions, f_distinct)
+}
+
+kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
+  #' update Kalman filter using forced-choices
+  #' 
+  #' @description update Kalman filter over n trials using forced choices
+  #' from tbl with by-trial info
+  #' @param params_fixed list with simulation parameters
+  #' @l_tbl_rewards nested list with reward matrix
+  #' and tbl with by-trial info about choices and rewards
+  #' @return nested list containing list with Kalman 
+  #' results (i.e., ms, sds, choices, rewards)
+  #' 
+
+  # reward matrix
+  rewards <- l_tbl_rewards[[2]]
+  # tbl with by-trial info
+  tbl_2 <- l_tbl_rewards[[1]]
+  m_rewards_2 <- matrix(
+    unlist(rewards)[1:(2*params_fixed$n_trials)], 
+    nrow = params_fixed$n_trials, ncol = 2, byrow = FALSE
+  )
+  l_options_selected <- list(
+    tbl_2$option_selected[seq(1, params_fixed$n_trials, by = 1)],
+    tbl_2$option_selected[seq(params_fixed$n_trials + 1, 2 * params_fixed$n_trials, by = 1)],
+    tbl_2$option_selected[seq(params_fixed$n_trials * 2 + 1, 3 * params_fixed$n_trials, by = 1)]
+  )
+  
+  rl_softmax_sim_wrap <- function(choices, m_rew, sd, m, pars) {
+    rl_softmax_sim(m_rew, sd, m, pars, choices)
+  }
+  
+  map(
+    l_options_selected, rl_softmax_sim_wrap,
+    m_rewards_2, params_fixed$v_sd, 0, params_fixed
+  )
 }
