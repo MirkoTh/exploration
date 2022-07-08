@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+
+<div id="condition_id_prep" style="display:none"></div>
+
+
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="2D Memory Representations">
+    <meta name="author" content="Mirko Thalmann, Akshay Jagadish, & Eric Schulz">
+    <meta charset="utf-8">
+    <title>2D Memory Representations</title>
+
+    <link rel="stylesheet" href="js/myStyle.css">
+
+    <script src='https://cdn.firebase.com/js/client/1.1.1/firebase.js'></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
+    <link href="https://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css" rel="stylesheet" type="text/css">
+    <script src="js/d3.v4.js" charset="utf-8"></script>
+    <script src="js/js-helpers.js" charset="utf-8"></script>
+    <script src="js/js-txt.js" charset="utf-8" </script></script>
+    <script>
+        var _rollbarConfig = {
+            accessToken: 'ce189ef6e760416db77b45599958b9e8',
+            captureUncaught: true,
+            captureUnhandledRejections: true,
+            payload: {
+                environment: 'production',
+                //context: 'home/index',
+                //trace_id: 'abc123',
+                client: {
+                    javascript: {
+                        code_version: '1.0.0',
+                        //source_map_enabled: true,
+                        //guess_uncaught_frames: true
+                    }
+                }
+            }
+        };
+        // Rollbar Snippet
+        !function (r) { var e = {}; function o(n) { if (e[n]) return e[n].exports; var t = e[n] = { i: n, l: !1, exports: {} }; return r[n].call(t.exports, t, t.exports, o), t.l = !0, t.exports } o.m = r, o.c = e, o.d = function (r, e, n) { o.o(r, e) || Object.defineProperty(r, e, { enumerable: !0, get: n }) }, o.r = function (r) { "undefined" != typeof Symbol && Symbol.toStringTag && Object.defineProperty(r, Symbol.toStringTag, { value: "Module" }), Object.defineProperty(r, "__esModule", { value: !0 }) }, o.t = function (r, e) { if (1 & e && (r = o(r)), 8 & e) return r; if (4 & e && "object" == typeof r && r && r.__esModule) return r; var n = Object.create(null); if (o.r(n), Object.defineProperty(n, "default", { enumerable: !0, value: r }), 2 & e && "string" != typeof r) for (var t in r) o.d(n, t, function (e) { return r[e] }.bind(null, t)); return n }, o.n = function (r) { var e = r && r.__esModule ? function () { return r.default } : function () { return r }; return o.d(e, "a", e), e }, o.o = function (r, e) { return Object.prototype.hasOwnProperty.call(r, e) }, o.p = "", o(o.s = 0) }([function (r, e, o) { "use strict"; var n = o(1), t = o(5); _rollbarConfig = _rollbarConfig || {}, _rollbarConfig.rollbarJsUrl = _rollbarConfig.rollbarJsUrl || "https://cdn.rollbar.com/rollbarjs/refs/tags/v2.24.0/rollbar.min.js", _rollbarConfig.async = void 0 === _rollbarConfig.async || _rollbarConfig.async; var a = n.setupShim(window, _rollbarConfig), l = t(_rollbarConfig); window.rollbar = n.Rollbar, a.loadFull(window, document, !_rollbarConfig.async, _rollbarConfig, l) }, function (r, e, o) { "use strict"; var n = o(2), t = o(3); function a(r) { return function () { try { return r.apply(this, arguments) } catch (r) { try { console.error("[Rollbar]: Internal error", r) } catch (r) { } } } } var l = 0; function i(r, e) { this.options = r, this._rollbarOldOnError = null; var o = l++; this.shimId = function () { return o }, "undefined" != typeof window && window._rollbarShims && (window._rollbarShims[o] = { handler: e, messages: [] }) } var s = o(4), d = function (r, e) { return new i(r, e) }, c = function (r) { return new s(d, r) }; function u(r) { return a((function () { var e = this, o = Array.prototype.slice.call(arguments, 0), n = { shim: e, method: r, args: o, ts: new Date }; window._rollbarShims[this.shimId()].messages.push(n) })) } i.prototype.loadFull = function (r, e, o, n, t) { var l = !1, i = e.createElement("script"), s = e.getElementsByTagName("script")[0], d = s.parentNode; i.crossOrigin = "", i.src = n.rollbarJsUrl, o || (i.async = !0), i.onload = i.onreadystatechange = a((function () { if (!(l || this.readyState && "loaded" !== this.readyState && "complete" !== this.readyState)) { i.onload = i.onreadystatechange = null; try { d.removeChild(i) } catch (r) { } l = !0, function () { var e; if (void 0 === r._rollbarDidLoad) { e = new Error("rollbar.js did not load"); for (var o, n, a, l, i = 0; o = r._rollbarShims[i++];)for (o = o.messages || []; n = o.shift();)for (a = n.args || [], i = 0; i < a.length; ++i)if ("function" == typeof (l = a[i])) { l(e); break } } "function" == typeof t && t(e) }() } })), d.insertBefore(i, s) }, i.prototype.wrap = function (r, e, o) { try { var n; if (n = "function" == typeof e ? e : function () { return e || {} }, "function" != typeof r) return r; if (r._isWrap) return r; if (!r._rollbar_wrapped && (r._rollbar_wrapped = function () { o && "function" == typeof o && o.apply(this, arguments); try { return r.apply(this, arguments) } catch (o) { var e = o; throw e && ("string" == typeof e && (e = new String(e)), e._rollbarContext = n() || {}, e._rollbarContext._wrappedSource = r.toString(), window._rollbarWrappedError = e), e } }, r._rollbar_wrapped._isWrap = !0, r.hasOwnProperty)) for (var t in r) r.hasOwnProperty(t) && (r._rollbar_wrapped[t] = r[t]); return r._rollbar_wrapped } catch (e) { return r } }; for (var p = "log,debug,info,warn,warning,error,critical,global,configure,handleUncaughtException,handleAnonymousErrors,handleUnhandledRejection,captureEvent,captureDomContentLoaded,captureLoad".split(","), f = 0; f < p.length; ++f)i.prototype[p[f]] = u(p[f]); r.exports = { setupShim: function (r, e) { if (r) { var o = e.globalAlias || "Rollbar"; if ("object" == typeof r[o]) return r[o]; r._rollbarShims = {}, r._rollbarWrappedError = null; var l = new c(e); return a((function () { e.captureUncaught && (l._rollbarOldOnError = r.onerror, n.captureUncaughtExceptions(r, l, !0), e.wrapGlobalEventHandlers && t(r, l, !0)), e.captureUnhandledRejections && n.captureUnhandledRejections(r, l, !0); var a = e.autoInstrument; return !1 !== e.enabled && (void 0 === a || !0 === a || "object" == typeof a && a.network) && r.addEventListener && (r.addEventListener("load", l.captureLoad.bind(l)), r.addEventListener("DOMContentLoaded", l.captureDomContentLoaded.bind(l))), r[o] = l, l }))() } }, Rollbar: c } }, function (r, e, o) { "use strict"; function n(r, e, o, n) { r._rollbarWrappedError && (n[4] || (n[4] = r._rollbarWrappedError), n[5] || (n[5] = r._rollbarWrappedError._rollbarContext), r._rollbarWrappedError = null); var t = e.handleUncaughtException.apply(e, n); o && o.apply(r, n), "anonymous" === t && (e.anonymousErrorsPending += 1) } r.exports = { captureUncaughtExceptions: function (r, e, o) { if (r) { var t; if ("function" == typeof e._rollbarOldOnError) t = e._rollbarOldOnError; else if (r.onerror) { for (t = r.onerror; t._rollbarOldOnError;)t = t._rollbarOldOnError; e._rollbarOldOnError = t } e.handleAnonymousErrors(); var a = function () { var o = Array.prototype.slice.call(arguments, 0); n(r, e, t, o) }; o && (a._rollbarOldOnError = t), r.onerror = a } }, captureUnhandledRejections: function (r, e, o) { if (r) { "function" == typeof r._rollbarURH && r._rollbarURH.belongsToShim && r.removeEventListener("unhandledrejection", r._rollbarURH); var n = function (r) { var o, n, t; try { o = r.reason } catch (r) { o = void 0 } try { n = r.promise } catch (r) { n = "[unhandledrejection] error getting `promise` from event" } try { t = r.detail, !o && t && (o = t.reason, n = t.promise) } catch (r) { } o || (o = "[unhandledrejection] error getting `reason` from event"), e && e.handleUnhandledRejection && e.handleUnhandledRejection(o, n) }; n.belongsToShim = o, r._rollbarURH = n, r.addEventListener("unhandledrejection", n) } } } }, function (r, e, o) { "use strict"; function n(r, e, o) { if (e.hasOwnProperty && e.hasOwnProperty("addEventListener")) { for (var n = e.addEventListener; n._rollbarOldAdd && n.belongsToShim;)n = n._rollbarOldAdd; var t = function (e, o, t) { n.call(this, e, r.wrap(o), t) }; t._rollbarOldAdd = n, t.belongsToShim = o, e.addEventListener = t; for (var a = e.removeEventListener; a._rollbarOldRemove && a.belongsToShim;)a = a._rollbarOldRemove; var l = function (r, e, o) { a.call(this, r, e && e._rollbar_wrapped || e, o) }; l._rollbarOldRemove = a, l.belongsToShim = o, e.removeEventListener = l } } r.exports = function (r, e, o) { if (r) { var t, a, l = "EventTarget,Window,Node,ApplicationCache,AudioTrackList,ChannelMergerNode,CryptoOperation,EventSource,FileReader,HTMLUnknownElement,IDBDatabase,IDBRequest,IDBTransaction,KeyOperation,MediaController,MessagePort,ModalWindow,Notification,SVGElementInstance,Screen,TextTrack,TextTrackCue,TextTrackList,WebSocket,WebSocketWorker,Worker,XMLHttpRequest,XMLHttpRequestEventTarget,XMLHttpRequestUpload".split(","); for (t = 0; t < l.length; ++t)r[a = l[t]] && r[a].prototype && n(e, r[a].prototype, o) } } }, function (r, e, o) { "use strict"; function n(r, e) { this.impl = r(e, this), this.options = e, function (r) { for (var e = function (r) { return function () { var e = Array.prototype.slice.call(arguments, 0); if (this.impl[r]) return this.impl[r].apply(this.impl, e) } }, o = "log,debug,info,warn,warning,error,critical,global,configure,handleUncaughtException,handleAnonymousErrors,handleUnhandledRejection,_createItem,wrap,loadFull,shimId,captureEvent,captureDomContentLoaded,captureLoad".split(","), n = 0; n < o.length; n++)r[o[n]] = e(o[n]) }(n.prototype) } n.prototype._swapAndProcessMessages = function (r, e) { var o, n, t; for (this.impl = r(this.options); o = e.shift();)n = o.method, t = o.args, this[n] && "function" == typeof this[n] && ("captureDomContentLoaded" === n || "captureLoad" === n ? this[n].apply(this, [t[0], o.ts]) : this[n].apply(this, t)); return this }, r.exports = n }, function (r, e, o) { "use strict"; r.exports = function (r) { return function (e) { if (!e && !window._rollbarInitialized) { for (var o, n, t = (r = r || {}).globalAlias || "Rollbar", a = window.rollbar, l = function (r) { return new a(r) }, i = 0; o = window._rollbarShims[i++];)n || (n = o.handler), o.handler._swapAndProcessMessages(l, o.messages); window[t] = n, window._rollbarInitialized = !0 } } } }]);
+        // End Rollbar Snippet
+
+    </script>
+
+</head>
+
+<body>
+    <!-- initialize a few variables -->
+    <div id="condition_id" style="display:none">-1</div>
+    <div id="n_categories" style="display:none">-1</div>
+    <div id="trial_nr_cr_practice" style="display:none">0</div>
+    <div id="trial_nr_cr1" style="display:none">0</div>
+    <div id="part_reproduction" style="display:none">0</div>
+    <div id="show_trial" style="display:none">0</div>
+    <div id="time_var" style="display:none"></div>
+    <div id="cr_deviation_cum" style="display:none">0</div>
+    <div id="cat_accuracy_cum" style="display:none">0</div>
+    <div id="cat_accuracy_running_mean" style="display:none">Average Accuracy = </div>
+    <div id="myRange1_start" style="display:none">-1</div>
+    <div id="myRange2_start" style="display:none">-1</div>
+    <div id="n_trials_cat_lag" style="display:none">-1</div>
+
+    <div class='centeredtext'>
+
+        <div id="page0" style="display:block">
+
+            <h1>Welcome to the study</h1>
+
+            This study is part of a research project conducted
+            by the <a href="http://cpilab.org/" target="_blank">Computational Principles of Intelligence Group</a><br>
+            at the Max Planck Institute for Biological Cybernetics in Tuebingen, Germany.<br><br>
+
+            <span>
+                <img src="./stimuli/tuebingen.jpg" height="300px">
+                <img src="./stimuli/mpi.jpg" height="300px">
+                <figcaption style="font-size: 12px;">By Rabe! - Own work, CC BY-SA 3.0, <a
+                        href=" https://commons.wikimedia.org/w/index.php?curid=33554043" target="_blank"> Source </a>
+                </figcaption>
+            </span>
+
+            <br>
+            Please switch off your addblockers during the study. That will allow us to trace back any unexpected errors.
+            <br><br>
+
+            <button id="consent_button" type="button" name="button" id="buttonConsentForm" class="default_button"
+                onclick="setup_experiment()"> Progress to Informed Consent</button><br>
+        </div>
+
+        <div id="page1" style="display:none;">
+            <h1>Information on tasks and purpose of the study</h4>
+                Today, you are carrying out various tasks with friendly monsters.<br>
+                You are randomly going to be assigned to one of several conditions. <br>
+                Depending on the condition you are in, you are going to carry out a subset of the following tasks:
+                <ul class="centeredtext">
+                    <li style="font-size: 70%;"><b>Memory:</b> Remember a monster on every trial as precisely as
+                        possible</li>
+                    <li style="font-size: 70%;"><b>Similarity:</b> Use your memory to compare the monster from the
+                        current trial to the monster of the previous trial as precisely as possible</li>
+                    <li style="font-size: 70%;"><b>Category Learning</b>: The monsters come from different tribes; learn
+                        to categorize them into the tribes they come from over several trials</li>
+                </ul> <br>
+                The purpose of the study is to gain knowledge about how people mentally represent two-dimensional
+                information.<br>
+                On the next page you will get detailed instructions about the specific combination of tasks you
+                are going to carry out.
+                <br>
+
+                To be eligible to participate, you <strong> MUST </strong> meet the following criteria:
+                <ol class="centeredtext">
+                    <li style="font-size: 70%;">Be between 18 and 35 years of age.</li>
+                    <li style="font-size: 70%;">Be a fluent speaker of English.</li>
+                </ol>
+                <b style="color:maroon;">Please use a device with a keyboard.
+                    Please do not accept this task if you are using a touch screen device, it will not work!</b><br>
+
+                <h4>How much time will it take and how much can you earn?</h4>
+                The study duration depends on your performance in the first two parts of the experiment.<br>
+                If your performance is above pre-defined thresholds, you can make it to the bonus part of the experiment
+                (i.e., the third part).<br>
+                The first two parts of the study will take <b>approx. 60 minutes</b>.<br>
+                If you make it to the bonus round, the total duration will be <b></b>approx. 80 minutes</b>.<br>
+                In any case, you will be paid a base payment of <b>£6.00</b> pounds for your participation.
+                In the bonus round, you can receive a bonus of up to <b>£7.20</b>, but it will be at least
+                <b>£3.60</b>.<br>
+                The amount of the bonus depends on your performance in all three parts of the experiment.<br>
+
+                Please note that this is going to be a <b>long and challenging </b>study!</b><br>
+
+                <h4>Confidentiality</h4>
+                Your participation in this study will remain confidential.
+                Your Prolific ID will NOT be shared with anyone outside the research team.
+
+                <h4>Participation and withdrawal</h4>
+                Your participation in this study is completely voluntary and you may refuse to participate<br>
+                or you may choose to withdraw at any time.<br>
+                However, you will only be paid for the participation upon completion<br>
+                and after clicking the button re-directing you to the prolific webpage and storing your completion code.
+
+                <h4>How to contact the researchers?</h4>
+                If you have questions or concerns about your participation or payment
+                please email the <a href="mailto:mirko.thalmann@tuebingen.mpg.de">researcher</a>
+                or the <a href="mailto:eric.schulz@tuebingen.mpg.de">principal investigator</a>.
+
+
+                <h4>Data protection</h4>
+                Your data will be anonymized and only used in the manner described in our data protection sheet,
+                available <a href="https://kyblab.tuebingen.mpg.de/t-reps/data_protection.pdf" target="_blank">here</a>
+                (please do not fill out this sheet!). <br>
+                The following text box summarizes the main points. Please read it carefully and provide consent
+                below:<br>
+                <br>
+
+                <body onload="myDataProtection()"></body>
+                <textarea id="DataProtection" rows="15" cols="100" style="font-size: 100%;" readonly></textarea>
+
+                <br>
+                <br>
+                By selecting the consent option below, you acknowledge that you fulfill all of the participation
+                criteria and you agree to your data being used as described.
+                <br>
+                <br>
+
+                <button type="button" name="button" id="buttonConsentForm" class="default_button"
+                    onclick="route_instructions(parseInt(document.getElementById('condition_id').innerHTML));">I consent
+                    to participate</button><br><br>
+        </div>
+        <div id="page2" style="display:none">
+            <br>
+
+
+            <h1>Welcome to Monster World</h1>
+            <br>
+            Today, you find yourself in <b>Monster World</b>.<br>
+            In Monster World, you are introduced to a new species of friendly monsters.<br>
+            All monsters differ from each other. Even though they come from the same planet, they are from different
+            tribes.<br>
+            The way the monsters differ from each other can be described according to variation in two dimensions:
+            <br>
+            <ol>
+                <li>The spikiness of their head varies from very spiky to rather smooth.</li>
+                <li>The size of their belly varies from empty to full</li>
+            </ol>
+            Monsters with a spiky/smooth head and an empty/full belly, for example, are going to look like this:
+            <div>
+                <img src="./stimuli/stimulus[1,1].png" height="300px">
+                <img src="./stimuli/stimulus[100,100].png" height="300px">
+            </div></br>
+            <br>
+            These are just two examples, though. All possible combinations of these two dimensions are possible. <br>
+
+            <h1>Instructions</h1>
+            <p>
+                Your session today will be split up into two tasks:
+            </p>
+            <ol>
+                <li>
+                    <b>Memory:</b> Remember the spikiness of the monster's head and
+                    the fill of the monster's belly. <br> You are presented
+                    with a monster only for a short period of time on every trial. <br>
+                    After that, you are required to adjust two sliders to reconstruct
+                    the head and the belly of the monster.<br>
+                    In the beginning, you will get some practice trials on the memory task. These are not going to be
+                    used
+                    to calculate your bonus payment.<br>
+                    <b> --> Takes approx. 45 min</b><br>
+                </li>
+                <br>
+                <li>
+                    <span id="taskTextCondition"></span>
+
+                </li>
+                <br>
+            </ol>
+            <button type="button" name="bbutton" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
+            </button>
+            <!-- page2b -->
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page8')" ;>
+                Check Comprehension
+            </button>
+        </div>
+
+        <div id="page2b" style="display:none">
+            <fieldset>
+                <legend>Please answer a few questions about this study before proceeding</legend>
+                <p style="font-size:100%;color:maroon;"> You will only be directed to the next page if you manage to
+                    answer
+                    all of the questions correctly.</p>
+                <fieldset>
+                    <b>What is your goal in the memory task? </b><br>
+                    <label for="q1l1" style="font-weight: normal;"><input type="radio" name="q1" id="l1"><span
+                            id="q1l1">
+                            Remember the color of the monster. </span></label><br>
+                    <label for="q1l2" style="font-weight: normal;"><input type="radio" name="q1" id="icheck1"><span
+                            id="q1icheck1"> Remember the spikiness of the head and the fill of the belly of the monster.
+                        </span></label><br>
+                    <label for="q1l3" style="font-weight: normal;"><input type="radio" name="q1" id="l2"><span
+                            id="q1l2">
+                            Compare the monster to the monster on the previous trial. </span></label><br>
+                    <br>
+                </fieldset>
+                <fieldset>
+                    <b>How do you respond in the memory task? </b><br>
+                    <label for="q2l1" style="font-weight: normal;"><input type="radio" name="q2" id="l1" /><span
+                            id="q2l1">
+                            Using keys 1-4 on the keyboard. </span></label><br>
+                    <label for="q2l2" style="font-weight: normal;"><input type="radio" name="q2" id="l2" /><span
+                            id="q2l2">
+                            Using the right and left mouse buttons </span></label><br>
+                    <label for="q2l3" style="font-weight: normal;"><input type="radio" name="q2" id="icheck2"> <span
+                            id="q2icheck2"> Using the sliders displayed on the screen </span></label><br>
+                    <br>
+                </fieldset>
+                <fieldset>
+                    <b>What is your goal in the <span id="secondTaskName1"></span> task? </b><br>
+                    <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l1"><span
+                            id="q3l1">
+                            Remember the color of the monster. </span></label><br>
+                    <label for="q3l2" style="font-weight: normal;"><input type="radio" name="q3" id="l2"><span
+                            id="q3l2"></span> Reproduce the spikiness of the head and the fill of the belly of the
+                        monster
+                        using sliders. </span></label><br>
+                    <label for="q3l3" style="font-weight: normal;"><input type="radio" name="q3" id="icheck3"><span
+                            id="q3icheck3"> </span></label><br>
+                    <br>
+                </fieldset>
+                <fieldset>
+                    <b>How do you respond in the <span id="secondTaskName2"></span> task? </b><br>
+                    <label for="q4l1" style="font-weight: normal;"><input type="radio" name="q4" id="l1" /><span
+                            id="q4l1">
+                            Using the sliders displayed on the screen.
+                        </span></label><br>
+                    <label for="q4l2" style="font-weight: normal;"><input type="radio" name="q4" id="l2" /><span
+                            id="q4l2">
+                            Using the right and left mouse buttons </span></label><br>
+                    <label for="q4l3" style="font-weight: normal;"><input type="radio" name="q4" id="icheck4"> <span
+                            id="q4icheck4"> Using the digit keys on the keyboard
+                        </span></label><br>
+                    <br>
+                </fieldset>
+                <fieldset>
+                    <b> How long is the experiment going to last approximately? </b><br>
+                    <label for="q5l1" style="font-weight: normal;"><input type="radio" name="q5" id="l1"><span
+                            id="q5l1">
+                            Roughly 10 minutes </span></label><br>
+                    <label for="q5l2" style="font-weight: normal;"><input type="radio" name="q5" id='l2'><span
+                            id="q5l2">
+                            Roughly 40 minutes </span></label><br>
+                    <label for="q5l3" style="font-weight: normal;"><input type="radio" name="q5" id='icheck5'><span
+                            id="q5icheck5">
+                            Roughly 90 minutes </span></label><br>
+                    <label for="q5l4" style="font-weight: normal;"><input type="radio" name="q5" id='l3'><span
+                            id="q5l3">
+                            Roughly 200 minutes </span></label><br>
+                </fieldset>
+            </fieldset>
+            <br>
+            <script>
+                if (document.getElementById("n_categories").innerHTML == 1) {
+                    secondTaskName = "similarity";
+                    secondTask = " Compare the monster to the monster on the previous trial.";
+                } else {
+                    secondTaskName = "categorization";
+                    secondTask = " Say what tribe/category a monster is from.";
+                }
+                document.getElementById("secondTaskName1").innerHTML = secondTaskName;
+                document.getElementById("secondTaskName2").innerHTML = secondTaskName;
+                document.getElementById("q3icheck3").innerHTML = secondTask;
+            </script>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2b', 'page2')" ;>
+                Back </button>
+            <button type="button" name="button" class="default_button" ; onclick="instructioncheck('page2b', 'page3')"
+                ;> <span id="check">Check Answers </span>
+            </button>
+        </div>
+
+        <div id="page3" style="display:none">
+            <h1>Ready for the memory task?</h1>
+            <p>If you feel prepared to start, please press the button below. <br>
+                Remember the spikiness of the monster's head and
+                the fill of the monster's belly. Try hard! <br>You are presented
+                with a monster only for a short period of time on every trial. <br>
+                After that, you are required to adjust two sliders to reconstruct
+                the head and the belly of the monster. <br>
+                You are given three practice trials to get used to the procedure. <br>
+                These trials are not going to be used to calculate you bonus payment.
+            </p>
+
+            <button type="button" name="button" class="default_button" ; onclick="next_item_cr('page3')" ;> Start
+                Practice Trials </button>
+        </div>
+
+        <div id="page3.1" style="display:none">
+            <h1>Practice is Over</h1>
+            <p>The practice trials are now over. Press the button below to start with the Memory Task.
+            </p>
+
+            <button type="button" name="button" class="default_button" ; onclick="next_item_cr('page3.1')" ;> Start
+                Memory Task </button>
+
+        </div>
+
+        <div id="page4" style="display:none">
+
+            <div class="present_stimulus">
+                <img id="background_displayed_1" src="stimuli/mask.png" height="300px">
+            </div><br>
+            <div class="present_stimulus">
+                <img height="300px" id="selected_monster">
+            </div></br>
+
+            <div class="slidecontainer1">
+                <input type="range" min="1" max="100" class="slider" id="myRange1" value=50>
+                <p style="text-align: center">Head <span id="demo1"></span></p>
+            </div>
+
+            <div class="slidecontainer2">
+                <input type="range" min="1" max="100" class="slider" id="myRange2" value=50>
+                <p style="text-align: center">Belly<span id="demo2"></span></p>
+            </div>
+
+            <script>
+                // randomly select a starting stimulus on each trial
+                let x = slide_adjust();
+                var val1 = Math.ceil(Math.random() * 100);
+                var val2 = Math.ceil(Math.random() * 100);
+                let stimulus_id = "./stimuli/stimulus[" + val1 + "," + val2 + "].png";
+                document.getElementById("selected_monster").src = stimulus_id;
+                document.getElementById("myRange1_start").value = val1;
+                document.getElementById("myRange2_start").value = val2;
+            </script>
+            <button type="button" name="button" class="cr_button" ; onclick="my_link()" ;> Submit Response</button>
+        </div>
+        <br>
+
+        <div id="page5" style="display:none;">
+
+            <div class="present_stimulus">
+                <img id="background_displayed_2" src="stimuli/mask.png" height="300px">
+            </div><br>
+            <div class="present_stimulus">
+                <img id="item_displayed_2" height="300px">
+            </div><br>
+
+        </div>
+        <br>
+
+        <div id="page6" style="display:none">
+            <h1>
+                Well done! That was it for part 1!
+            </h1>
+            <p>
+                By clicking on the button below, you get to the second part of the study
+            </p>
+            <button type="button" name="button" class="default_button" ;
+                onclick="route_categorization(parseInt(document.getElementById('condition_id').innerHTML))" ;>
+                Instructions </button>
+        </div>
+
+        <div id="page7" style="display:none">
+            <h1>
+                Part two of the study
+            </h1>
+            <p>
+                Remember that the monsters come from different tribes.<br>
+                In the second part, your task is to categorize the monsters into <span id="myText"></span>
+                categories.<br>
+            </p>
+            <p class="category_instruction"></p>
+            <p>
+                <br>
+                There will be four blocks of trials after the target-training phase. Between the blocks you can take a
+                break if you want, but the experiment continues after 1 min at the latest.<br>
+                Please leave your hands on the keyboard while responding in a block.<br><br>
+                Try to use the feedack to sharpen your understanding of the categories and the border between them.<br>
+                In the beginning, it won't be an easy task, but no worries, you will get better with practice!
+            </p>
+            <script>
+                (() => {
+                    document.getElementById("myText").innerHTML = document.getElementById("n_categories").innerHTML;
+                })();
+            </script>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page7', 'page8')" ;> Start
+                Categorization</button>
+        </div>
+
+        <div id="page7b" style="display:none">
+            <h1>
+                Part two of the study
+            </h1>
+            <p>
+                In the second part, your task is to judge how similar the current monster is to the monster on the
+                previous trial.<br>
+                <b>Responding:</b><br>
+                You can use the number keys on your keyboard to give a response in the task.<br>
+                "1" relates to not similar at all to the monster presented on the previous trial<br>
+                "4" relates to very similar to the monster presented on the previous trial<br><br>
+                There is no option to relate the monster on the first trial to a previous monster.<br>
+                You can respond with any key from 1-4 on the first trial.<br><br>
+                <b>Please try to respond within 3 seconds as accurately as possible.</b> You will get feedback to
+                respond faster if you respond
+                too slowly!<br>
+            </p>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page7b', 'page8')" ;>
+                Start
+                Similarity Judgments</button>
+        </div>
+
+        <div id="trial_nr_cat" style="display:none">0</div>
+        <div id="rt" style="display:none">0</div>
+        <div id="key_id" style="display:none">0</div>
+
+        <div id="page8" style="display:none">
+            <h1>
+                Part 2 of the study!
+            </h1>
+            <p>
+                By clicking on the button below, you start the task of part 2.
+            </p>
+            <button type="button" name="button" class="default_button" ; onclick="next_item_cat('page8', 0)" ;> Start
+                Task </button>
+        </div>
+
+        <div id="page9" style="display:none;">
+            <div class="cat_feedback_neg" style="color:red; font-size:30px">
+                <p id="feedback_cat_wrong"></p>
+            </div>
+            <div class="cat_feedback_pos" style="color:green; font-size:30px">
+                <p id="feedback_cat_true"></p>
+            </div>
+            <div class="present_stimulus">
+                <img id="background_displayed_3" src="stimuli/mask.png" height="300px">
+            </div><br>
+            <div class="present_stimulus">
+                <img id="item_displayed_cat" height="300px" src="stimuli/mask.png">
+            </div><br>
+
+        </div>
+
+        <div id="page10" style="display:none;">
+            <h1>Time for a break!</h1>
+            <h2 id="progress"></h2>
+            <div id="cat_continued" style="display:none">0</div>
+            <div id="break_idx" style="display:none">0</div>
+            <button type="button" name="button" id="cat_button" ;
+                onclick="next_item_cat('page10', parseInt(document.getElementById('trial_nr_cat').innerHTML))" ;>
+                Continue
+            </button>
+            <script>
+                const element = document.getElementById("cat_button");
+                element.addEventListener("click", function () {
+                    document.getElementById("cat_continued").innerHTML = 1;
+                });
+            </script>
+
+            <body>
+                <div id="timeframe1" style="display:none">Experiment continues in <span id="time1"></span> minutes!
+                </div>
+                <div id="timeframe2" style="display:none">Experiment continues in <span id="time2"></span> minutes!
+                </div>
+                <div id="timeframe3" style="display:none">Experiment continues in <span id="time3"></span> minutes!
+                </div>
+                <div id="timeframe4" style="display:none">Experiment continues in <span id="time4"></span> minutes!
+                </div>
+            </body>
+
+        </div>
+
+        <div id="page10b" style="display:none;">
+            <h1>Target Examples</h1><br>
+            <p>The initial block with target category examples is now over.<br>
+                In the following, your task is to categorize monsters from all categories, including the
+                non-target category.</p>
+            <button type="button" name="button" class="default_button" ;
+                onclick="next_item_cat('page10b', parseInt(document.getElementById('trial_nr_cat').innerHTML))" ;>
+                Continue with all categories
+            </button>
+
+        </div>
+        <div id="page11" style="display:none">
+            <h1>
+                Very well done - That was it for part 2!<br>
+                You performed well enough and made it to part 3 of the study!
+            </h1>
+            <p>
+                By clicking on the button below, you get to part 3.
+            </p>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page11', 'page12')" ;>
+                Instructions
+                Memory Task </button>
+
+        </div>
+
+        <div id="trial_nr_cr2" style="display:none">0</div>
+        <div id="page12" style="display:none">
+            <h1>
+                Part 3 of the study!
+            </h1>
+            <p>
+                The third part is the final part of the study. It is again the memory task from part 1.<br>
+                That is, your task is again to remember the spikiness of the head and the fill of the belly of a monster
+                presented in a trial.<br>After presentation, use the two sliders to reproduce the monster just seen as
+                precisely as possible.<br>
+                By clicking on the button below, you start the third and last part of that study.
+            </p>
+            <button type="button" name="button" class="default_button" ; onclick="next_item_cr('page12')" ;> Start
+                Memory Task </button>
+        </div>
+
+        <div id="page13" style="display:none">
+            <h1>
+                Bonus Payment<br>
+            </h1>
+
+            <p>
+                In addition to the base payment of £7.00 you earn a bonus of £<span id="total_bonus"></span>
+                .<br>
+                Your bonus in the memory task is £<span id="cr_bonus"></span>.<br>
+                Your bonus in the second task is £<span id="cat_bonus"></span><br><br>
+                Please be patient! The payments for your participation will be paid within the next few days.<br>
+            </p>
+
+            <br>
+            <h2>Please do not forget to click the button below to get re-directed
+                to the prolific webpage</h2>
+            <p>Your successful completion of the study is only registered on your prolific account
+                after you have been redirected to the prolific webpage</p>
+
+            <button type="button" name="button" class="default_button" ; onclick="redirect_to_prolific()" ;> Return to
+                Prolific </button>
+
+        </div>
+
+        <div id="page14" style="display:none">
+            <h1>Base Payment<br></h1>
+
+            <h2>Thanks for your participation in our study!</h2>
+
+            <p>
+                You receive the base payment of £7.00.
+                You did not make it to the third part of the study because your performance was below the predefined
+                thresholds.
+                Your overall categorization accuracy is <span id="cat_accuracy_overall"></span>.<br>
+                Your categorization accuracy over the last <span id="n_trials_cat_lag"></span> trials is <span
+                    id="cat_accuracy_lag"></span>.<br>
+                Please be patient! The base payment for your participation will be paid within the next few days.
+            </p>
+
+            <br>
+            <h2>Please do not forget to click the button below to get re-directed
+                to the prolific webpage.</h2>
+            <p>Your successful completion of the study is only registered on your prolific account
+                after you have been redirected to the prolific webpage</p>
+
+            <button type="button" name="button" class="default_button" ; onclick="redirect_to_prolific()" ;> Return to
+                Prolific </button>
+
+        </div>
+
+    </div>
+</body>
+
+</html>
