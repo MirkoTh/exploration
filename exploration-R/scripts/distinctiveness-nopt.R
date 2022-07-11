@@ -1,7 +1,7 @@
 library(tidyverse)
 library(rutils)
 
-l_utils <- c("exploration-R/utils/utils.R")
+l_utils <- c("utils/utils.R")
 walk(l_utils, source)
 
 n_options_max <- 4
@@ -59,13 +59,15 @@ ggplot(tbl_setsize, aes(trial_id, as.numeric(as.character(option_selected)), gro
 
 # plot discriminability of last three items, which we are going to ask people for
 tbl_last_3 <- tbl_setsize %>% filter(trial_id_option_bw <= 3)
+tbl_last_6 <- tbl_setsize %>% filter(trial_id_option_bw <= 6)
+
 ggplot(
-  tbl_setsize %>% filter(option_selected == 1) %>% mutate(
+  tbl_setsize %>%  mutate(#filter(option_selected == 1) %>%
     setsize = str_c("Set Size = ", setsize)
-  ) , aes(trial_id, discriminability, group = condition)) +
-  geom_line(aes(color = condition)) +
+  ) , aes(trial_id, discriminability, group = option_selected)) +
+  geom_line(aes(color = option_selected)) +
   geom_point(color = "white", size = 3) +
-  geom_point(aes(color = condition)) +
+  geom_point(aes(color = option_selected)) +
   facet_wrap(setsize ~ condition) +
   theme_bw() +
   scale_color_brewer(palette = "Set1", guide = "none") +
@@ -77,7 +79,7 @@ ggplot(
   )
 
 pd <- position_dodge(width = .95)
-grouped_agg(tbl_last_3  %>% mutate(
+grouped_agg(tbl_last_6  %>% mutate(
   option_selected = str_c("Response Option = ", option_selected)
 ), c(condition, option_selected), discriminability) %>%
   ggplot(aes(condition, mean_discriminability, group = option_selected)) +

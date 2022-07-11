@@ -87,7 +87,7 @@
             <br><br>
 
             <button id="consent_button" type="button" name="button" id="buttonConsentForm" class="default_button"
-                onclick="setup_experiment()"> Progress to Informed Consent</button><br>
+                onclick="setup_and_proceed()"> Progress to Informed Consent</button><br>
         </div>
 
         <div id="page1" style="display:none;">
@@ -298,7 +298,7 @@
                 </fieldset>
             </fieldset>
             <br>
-            <script>
+            <!--             <script>
                 if (document.getElementById("n_categories").innerHTML == 1) {
                     secondTaskName = "similarity";
                     secondTask = " Compare the monster to the monster on the previous trial.";
@@ -309,7 +309,7 @@
                 document.getElementById("secondTaskName1").innerHTML = secondTaskName;
                 document.getElementById("secondTaskName2").innerHTML = secondTaskName;
                 document.getElementById("q3icheck3").innerHTML = secondTask;
-            </script>
+            </script> -->
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page2b', 'page2')" ;>
                 Back </button>
             <button type="button" name="button" class="default_button" ; onclick="instructioncheck('page2b', 'page3')"
@@ -363,7 +363,7 @@
                 <p style="text-align: center">Belly<span id="demo2"></span></p>
             </div>
 
-            <script>
+            <!--             <script>
                 // randomly select a starting stimulus on each trial
                 let x = slide_adjust();
                 var val1 = Math.ceil(Math.random() * 100);
@@ -372,7 +372,7 @@
                 document.getElementById("selected_monster").src = stimulus_id;
                 document.getElementById("myRange1_start").value = val1;
                 document.getElementById("myRange2_start").value = val2;
-            </script>
+            </script> -->
             <button type="button" name="button" class="cr_button" ; onclick="my_link()" ;> Submit Response</button>
         </div>
         <br>
@@ -422,12 +422,12 @@
                 Try to use the feedack to sharpen your understanding of the categories and the border between them.<br>
                 In the beginning, it won't be an easy task, but no worries, you will get better with practice!
             </p>
-            <script>
+            <!--             <script>
                 (() => {
                     document.getElementById("myText").innerHTML = document.getElementById("n_categories").innerHTML;
                 })();
             </script>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page7', 'page8')" ;> Start
+ --> <button type="button" name="button" class="default_button" ; onclick="clickStart('page7', 'page8')" ;> Start
                 Categorization</button>
         </div>
 
