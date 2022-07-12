@@ -69,22 +69,30 @@
     height: 30px;
 }
 
+.present_bandit_0 {
+    position: absolute;
+    top: 5%;
+    left: 20%;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    border: 3px;
+    border-style: solid;
+    border-color: #ffffff00;
+    padding: 1em;
+}
+
 .present_bandit_1 {
     position: absolute;
     top: 5%;
-    left: 44.725%;
-    width: 200px;
-    height: 300px;
+    right: 20%;
+    width: 100px;
+    height: 100px;
     text-align: center;
-}
-
-.present_bandit_2 {
-    position: absolute;
-    top: 5%;
-    right: 44.725%;
-    width: 200px;
-    height: 300px;
-    text-align: center;
+    border: 3px;
+    border-style: solid;
+    border-color: #ff260000;
+    padding: 1em
 }
 
 .cat_feedback_neg {

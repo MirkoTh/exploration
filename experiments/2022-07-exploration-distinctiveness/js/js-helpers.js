@@ -1,3 +1,24 @@
+var practice_info;
+var trial_info;
+var experiment_info;
+var display_info;
+var condition_id;
+var n_categories;
+var participant_id;
+var setup_expt;
+var instruction_category;
+var stimulus_crp_trial;
+var stimulus_cr1_trial;
+var stimulus_cr2_trial;
+var stimulus_cat_trial;
+var category_id;
+var category_name;
+var stimulus_vals;
+var total_trials0;
+var total_trials1;
+var total_trials2;
+
+
 if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
     var participant_id = getQueryVariable('PROLIFIC_PID');
 }
@@ -47,8 +68,8 @@ function setup_experiment() {
         "n_vals": 24,
         "n_forced_choice": 12,
         "sequences_forced_choices": {
-            "massed": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]],
-            "interleaved": [[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]]
+            "massed": [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+            "interleaved": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
         }
     }
     experiment_info["n_trials"] = (
@@ -57,18 +78,19 @@ function setup_experiment() {
     )
 
     // display info
-    const display_info = {
+    var display_info = {
         iti: 500,
         presentation: 1000,
     }
 
     // practice info
-    const practice_info = {
+    var practice_info = {
         "memory_test": [],
+        "location_test": [],
         "horizon": [],
         "distinctiveness": [],
+        "vals_bandit_0": [],
         "vals_bandit_1": [],
-        "vals_bandit_2": [],
     }
 
     // trial info
@@ -77,12 +99,14 @@ function setup_experiment() {
         "horizon_prep": [],
         "distinctiveness_prep": [],
         "sequence_forced_choices_prep": [],
+        "location_test_prep": [],
         "memory_test": [],
         "horizon": [],
         "distinctiveness": [],
         "sequence_forced_choices": [],
-        "vals_bandit_1": [],
-        "vals_bandit_2": []
+        "location_test": [],
+        "vals_bandit_0": [],
+        "vals_bandit_1": []
     };
 
     // loop over three within-participant variables
@@ -96,7 +120,8 @@ function setup_experiment() {
                         trial_info["memory_test_prep"][idx] = mem[1];
                         trial_info["horizon_prep"][idx] = hor[1];
                         trial_info["distinctiveness_prep"][idx] = dis[1];
-                        trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]][loc[1]];
+                        trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
+                        trial_info["location_test"][idx] = loc[1];
                         idx += 1;
                     }
                 }
@@ -104,44 +129,44 @@ function setup_experiment() {
         }
     };
 
-
     // shuffle all the generated trials randomly
     shuffle_trials = Array(experiment_info["n_trials"]).fill().map((element, index) => index);
     shuffle_trials = append_randomized_arrays(shuffle_trials, 1);
     for (let idx = 0; idx < experiment_info["n_trials"]; idx++) {
         trial_info["sequence_forced_choices"][idx] = trial_info["sequence_forced_choices_prep"][shuffle_trials[idx]];
         trial_info["memory_test"][idx] = trial_info["memory_test_prep"][shuffle_trials[idx]];
+        trial_info["location_test"][idx] = trial_info["location_test_prep"][shuffle_trials[idx]];
         trial_info["horizon"][idx] = trial_info["horizon_prep"][shuffle_trials[idx]];
         trial_info["distinctiveness"][idx] = trial_info["distinctiveness_prep"][shuffle_trials[idx]];
-        trial_info["vals_bandit_1"][idx] = Array(experiment_info["n_vals"]).fill().map(
+        trial_info["vals_bandit_0"][idx] = Array(experiment_info["n_vals"]).fill().map(
             () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
         );
-        trial_info["vals_bandit_2"][idx] = Array(experiment_info["n_vals"]).fill().map(
+        trial_info["vals_bandit_1"][idx] = Array(experiment_info["n_vals"]).fill().map(
             () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
         );
     }
 
-
-
     // fill practice such that all values of variables seen once
     // first practice trial
     practice_info["memory_test"][0] = true;
+    practice_info["location_test"][0] = 0;
     practice_info["horizon"][0] = 12;
     practice_info["distinctiveness"][0] = "massed";
-    practice_info["vals_bandit_1"][0] = Array(experiment_info["n_vals"]).fill().map(
+    practice_info["vals_bandit_0"][0] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
     );
-    practice_info["vals_bandit_2"][0] = Array(experiment_info["n_vals"]).fill().map(
+    practice_info["vals_bandit_1"][0] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
     );
     // second practice trial
     practice_info["memory_test"][1] = false;
+    practice_info["location_test"][1] = 1;
     practice_info["horizon"][1] = 1;
     practice_info["distinctiveness"][1] = "interleaved";
-    practice_info["vals_bandit_1"][1] = Array(experiment_info["n_vals"]).fill().map(
+    practice_info["vals_bandit_0"][1] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
     );
-    practice_info["vals_bandit_2"][1] = Array(experiment_info["n_vals"]).fill().map(
+    practice_info["vals_bandit_1"][1] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
     );
 
@@ -155,9 +180,14 @@ function setup_experiment() {
     return obj_setup_expt
 }
 
+
 function setup_and_proceed() {
-    setup_experiment()
-    clickStart('page0', 'page1')
+    setup_expt = setup_experiment()
+    experiment_info = setup_expt["experiment_info"]
+    display_info = setup_expt["display_info"]
+    practice_info = setup_expt["practice_info"]
+    trial_info = setup_expt["trial_info"]
+    clickStart('page0', 'page3')
 }
 
 
@@ -197,13 +227,13 @@ async function display_forced_choices(old) {
     part = parseInt(document.getElementById("part_experiment").innerHTML)
     if (part == 0) { // practice
         i = parseInt(document.getElementById("trial_nr_practice").innerHTML)
+        vals_bandit_0 = practice_info["vals_bandit_0"][i]
         vals_bandit_1 = practice_info["vals_bandit_1"][i]
-        vals_bandit_2 = practice_info["vals_bandit_2"][i]
     }
     if (part == 1) { // experimental trials
         i = parseInt(document.getElementById("trial_nr_main").innerHTML)
+        vals_bandit_0 = trial_info["vals_bandit_0"][i]
         vals_bandit_1 = trial_info["vals_bandit_1"][i]
-        vals_bandit_2 = trial_info["vals_bandit_2"][i]
     }
     clickStart(old, 'page5')
 
@@ -212,17 +242,50 @@ async function display_forced_choices(old) {
     // present stimuli and mask
     await sleep(setup_expt["display_info"]["iti"])
 
-    for (let item_id = 0; item_id < experiment_info["n_forced_choice"]; item_id++) {
-        current_option = trial_info["sequence_forced_choices_prep"][i][item_id]
-        value_display = "vals_bandit_" + current_option
-        location_display = "value_displayed_" + current_option
-        document.getElementById(location_display).innerHTML = trial_info[value_display][item_id]
-        await sleep(setup_expt["display_info"]["presentation"])
-    }
+
+    var item_id = 0;
+
+
+    display_option = cue_location(i, item_id)
+    display_option.onclick = function () { next_value(i, item_id) }
 
     // increase trial nr by 1
-    document.getElementById("time_var").innerHTML = Date.now()
-    clickStart("page5", "page4")
+    /* update_trial_counter(part, i);
+    document.getElementById("time_var").innerHTML = Date.now();
+    clickStart("page5", "page4"); */
+}
+
+function cue_location(i, item_id) {
+    current_option = trial_info["sequence_forced_choices"][i][item_id]
+    location_display = "value_displayed_" + current_option;
+    display_option = document.getElementById(location_display);
+    display_option.style.background = "#26dabcde";
+    display_option.innerHTML = "?"
+    return (display_option)
+}
+
+async function next_value(i, item_id) {
+    if (item_id < experiment_info["n_forced_choice"]) {
+        // read out current choice value
+        current_option = trial_info["sequence_forced_choices"][i][item_id]
+        value_display = "vals_bandit_" + current_option
+        location_display = "value_displayed_" + current_option
+        display_option = document.getElementById(location_display);
+        // remove cued background color, display value, and remove it again
+        display_option.style.background = "white";
+        display_option.innerHTML = trial_info[value_display][i][item_id];
+        await sleep(display_info["presentation"]);
+        display_option.innerHTML = "";
+        // increase choice counter by one
+        item_id += 1;
+        display_option = cue_location(i, item_id);
+        display_option.onclick = function () {
+            next_value(i, item_id)
+        }
+    } else if (item_id >= experiment_info["n_forced_choice"]) {
+        clickStart("page5", "page4");
+    }
+
 }
 
 
@@ -769,23 +832,6 @@ function saveConditions(filedata) {
     var filename = "rotate-conditions.json";
     $.post("overwrite_data.php", { postresult: filedata + "\n", postfile: filename })
 }
-
-
-var condition_id;
-var n_categories;
-var participant_id;
-var setup_expt;
-var instruction_category;
-var stimulus_crp_trial;
-var stimulus_cr1_trial;
-var stimulus_cr2_trial;
-var stimulus_cat_trial;
-var category_id;
-var category_name;
-var stimulus_vals;
-var total_trials0;
-var total_trials1;
-var total_trials2;
 
 
 function set_main_vars(condition_id) {
