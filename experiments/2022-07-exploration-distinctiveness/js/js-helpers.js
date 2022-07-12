@@ -239,7 +239,7 @@ async function display_forced_choices(old) {
 
     var item_id = 0;
     display_option = cue_location(i, item_id, part)
-    display_option.onclick = function () { next_value(i, item_id, part) }
+    display_option.onclick = function () { next_value_forced(i, item_id, part) }
 }
 
 function cue_location(i, item_id, part) {
@@ -255,7 +255,14 @@ function cue_location(i, item_id, part) {
     return (display_option)
 }
 
-async function next_value(i, item_id, part) {
+
+// todos
+/* decide on each trial whether memory test on not
+loop over choices of differnet horizons in each trial
+add some nice slot machines as pictures below the numbers
+ */
+
+async function next_value_forced(i, item_id, part) {
     if (part == 0) {
         current_info = practice_info;
     } else if (part == 1) {
@@ -273,21 +280,28 @@ async function next_value(i, item_id, part) {
     display_option.innerHTML = "";
     // increase choice counter by one
     item_id += 1;
+    // display another item or go to the memory test
     if (item_id < 2) {//experiment_info["n_forced_choice"] - 1) {
-        display_option = cue_location(i, item_id);
+        display_option = cue_location(i, item_id, part);
         display_option.onclick = function () {
-            next_value(i, item_id)
+            next_value_forced(i, item_id, part)
         }
     } else {//if (item_id == experiment_info["n_forced_choice"] - 1) {
         // increase trial nr by 1
         update_trial_counter(part, i);
         document.getElementById("time_var").innerHTML = Date.now();
-        cue_memory_responses(current_info["location_test"][i]);
+        if (current_info["memory_test"][i] == true) {
+            cue_memory_responses(current_info["location_test"][i]);
+        } else {
+            display_free_choices("page5")
+        }
     }
 }
 
 function cue_memory_responses(i) {
     document.getElementById("mem_response").value = "";
+    document.getElementById("response_displayed_0").innerHTML = "";
+    document.getElementById("response_displayed_1").innerHTML = "";
     clickStart("page5", "page6")
     location_display = "response_displayed_" + i;
     display_option = document.getElementById(location_display);
@@ -301,7 +315,64 @@ function clean_and_proceed() {
     // input field is wiped again
     document.getElementById("mem_response").value = "";
     console.log("given responses were: " + x)
-    display_forced_choices('page6')
+    display_free_choices('page6', 12)
+}
+
+async function next_value_free(i, item_id, part, current_info) {
+
+    // read out current choice value
+    current_option = current_info["sequence_forced_choices"][i][item_id]
+    value_display = "vals_bandit_" + current_option
+    location_display = "value_displayed_" + current_option
+    display_option = document.getElementById(location_display);
+    // remove cued background color, display value, and remove it again
+    display_option.style.background = "white";
+    display_option.innerHTML = current_info[value_display][i][item_id];
+    await sleep(display_info["presentation"]);
+    display_option.style.background = "#26dabcde";
+    display_option.innerHTML = "?";
+    item_id += 1;
+    return (item_id)
+}
+
+
+async function display_free_choices(old, item_id) {
+
+    part = parseInt(document.getElementById("part_experiment").innerHTML)
+    if (part == 0) { // practice
+        i = parseInt(document.getElementById("trial_nr_practice").innerHTML)
+    }
+    if (part == 1) { // experimental trials
+        i = parseInt(document.getElementById("trial_nr_main").innerHTML)
+    }
+
+    if (part == 0) {
+        current_info = practice_info;
+    } else if (part == 1) {
+        current_info = trial_info;
+    }
+
+    clickStart(old, "page5");
+
+    if (item_id <= current_info["horizon"] + 11) {
+        display_option_a = document.getElementById("response_displayed_0");
+        display_option_b = document.getElementById("response_displayed_1");
+        display_option_a.innerHTML = "?"
+        display_option_b.innerHTML = "?"
+        display_option_a.style.background = "#26dabcde";
+        display_option_b.style.background = "#26dabcde";
+        display_option_a.onclick(function () {
+            item_id = next_value_free(i, item_id, part, current_info)
+        });
+        display_option_b.onclick(function () {
+            item_id = next_value_free(i, item_id, part, current_info)
+        });
+        document.getElementById("n_remaining_choices").innerHTML = (current_info["horizon"] + 11) - item_id
+    } else {
+        clickStart("page5", "page7")
+    }
+
+
 }
 
 async function log_response(rt, i, part, stimulus_ids) {
@@ -371,6 +442,7 @@ async function my_link() {
 
 function update_trial_counter(part, i) {
     var i_new = i + 1
+    console.log("part to be updated = " + part)
     switch (part) {
         case 0:
             document.getElementById("trial_nr_practice").innerHTML = i_new
