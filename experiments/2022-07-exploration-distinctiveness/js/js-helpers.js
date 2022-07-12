@@ -91,6 +91,7 @@ function setup_experiment() {
         "distinctiveness": [],
         "vals_bandit_0": [],
         "vals_bandit_1": [],
+        "sequence_forced_choices": [],
     }
 
     // trial info
@@ -121,7 +122,7 @@ function setup_experiment() {
                         trial_info["horizon_prep"][idx] = hor[1];
                         trial_info["distinctiveness_prep"][idx] = dis[1];
                         trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
-                        trial_info["location_test"][idx] = loc[1];
+                        trial_info["location_test_prep"][idx] = loc[1];
                         idx += 1;
                     }
                 }
@@ -158,6 +159,7 @@ function setup_experiment() {
     practice_info["vals_bandit_1"][0] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
     );
+    practice_info["sequence_forced_choices"][0] = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
     // second practice trial
     practice_info["memory_test"][1] = false;
     practice_info["location_test"][1] = 1;
@@ -169,6 +171,8 @@ function setup_experiment() {
     practice_info["vals_bandit_1"][1] = Array(experiment_info["n_vals"]).fill().map(
         () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
     );
+    practice_info["sequence_forced_choices"][1] = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1];
+
 
     var obj_setup_expt;
     obj_setup_expt = {
@@ -223,40 +227,27 @@ function sleep(ms) {
 async function display_forced_choices(old) {
     // old refers to page to be switched away from
     // i refers to the current trial to be displayed
-
     part = parseInt(document.getElementById("part_experiment").innerHTML)
     if (part == 0) { // practice
         i = parseInt(document.getElementById("trial_nr_practice").innerHTML)
-        vals_bandit_0 = practice_info["vals_bandit_0"][i]
-        vals_bandit_1 = practice_info["vals_bandit_1"][i]
     }
     if (part == 1) { // experimental trials
         i = parseInt(document.getElementById("trial_nr_main").innerHTML)
-        vals_bandit_0 = trial_info["vals_bandit_0"][i]
-        vals_bandit_1 = trial_info["vals_bandit_1"][i]
     }
+
     clickStart(old, 'page5')
 
-    stim_path_mask = "stimuli/mask.png"
-
-    // present stimuli and mask
-    await sleep(setup_expt["display_info"]["iti"])
-
-
     var item_id = 0;
-
-
-    display_option = cue_location(i, item_id)
-    display_option.onclick = function () { next_value(i, item_id) }
-
-    // increase trial nr by 1
-    /* update_trial_counter(part, i);
-    document.getElementById("time_var").innerHTML = Date.now();
-    clickStart("page5", "page4"); */
+    display_option = cue_location(i, item_id, part)
+    display_option.onclick = function () { next_value(i, item_id, part) }
 }
 
-function cue_location(i, item_id) {
-    current_option = trial_info["sequence_forced_choices"][i][item_id]
+function cue_location(i, item_id, part) {
+    if (part == 0) { // practice
+        current_option = practice_info["sequence_forced_choices"][i][item_id]
+    } else if (part == 1) {
+        current_option = trial_info["sequence_forced_choices"][i][item_id]
+    }
     location_display = "value_displayed_" + current_option;
     display_option = document.getElementById(location_display);
     display_option.style.background = "#26dabcde";
@@ -264,30 +255,54 @@ function cue_location(i, item_id) {
     return (display_option)
 }
 
-async function next_value(i, item_id) {
-    if (item_id < experiment_info["n_forced_choice"]) {
-        // read out current choice value
-        current_option = trial_info["sequence_forced_choices"][i][item_id]
-        value_display = "vals_bandit_" + current_option
-        location_display = "value_displayed_" + current_option
-        display_option = document.getElementById(location_display);
-        // remove cued background color, display value, and remove it again
-        display_option.style.background = "white";
-        display_option.innerHTML = trial_info[value_display][i][item_id];
-        await sleep(display_info["presentation"]);
-        display_option.innerHTML = "";
-        // increase choice counter by one
-        item_id += 1;
+async function next_value(i, item_id, part) {
+    if (part == 0) {
+        current_info = practice_info;
+    } else if (part == 1) {
+        current_info = trial_info;
+    }
+    // read out current choice value
+    current_option = current_info["sequence_forced_choices"][i][item_id]
+    value_display = "vals_bandit_" + current_option
+    location_display = "value_displayed_" + current_option
+    display_option = document.getElementById(location_display);
+    // remove cued background color, display value, and remove it again
+    display_option.style.background = "white";
+    display_option.innerHTML = current_info[value_display][i][item_id];
+    await sleep(display_info["presentation"]);
+    display_option.innerHTML = "";
+    // increase choice counter by one
+    item_id += 1;
+    if (item_id < 2) {//experiment_info["n_forced_choice"] - 1) {
         display_option = cue_location(i, item_id);
         display_option.onclick = function () {
             next_value(i, item_id)
         }
-    } else if (item_id >= experiment_info["n_forced_choice"]) {
-        clickStart("page5", "page4");
+    } else {//if (item_id == experiment_info["n_forced_choice"] - 1) {
+        // increase trial nr by 1
+        update_trial_counter(part, i);
+        document.getElementById("time_var").innerHTML = Date.now();
+        cue_memory_responses(current_info["location_test"][i]);
     }
-
 }
 
+function cue_memory_responses(i) {
+    document.getElementById("mem_response").value = "";
+    clickStart("page5", "page6")
+    location_display = "response_displayed_" + i;
+    display_option = document.getElementById(location_display);
+    display_option.innerHTML = "?"
+    display_option.style.background = "#26dabcde";
+}
+
+function clean_and_proceed() {
+    // x can be used to save data
+    var x = document.getElementById("mem_response").value;
+    // input field is wiped again
+    document.getElementById("mem_response").value = "";
+    console.log("given responses were: " + x)
+    display_forced_choices('page6')
+}
 
 async function log_response(rt, i, part, stimulus_ids) {
     var x1_true = parseFloat(setup_expt["stimulus_info"]["x1_x2"][stimulus_ids[i]][0])

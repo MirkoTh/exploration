@@ -380,7 +380,7 @@
         <div id="page5" style="display:none;">
 
             <div class="present_bandit_0">
-                <p id="value_displayed_0" height="300px">/p>
+                <p id="value_displayed_0" height="300px"></p>
             </div><br>
             <div class="present_bandit_1">
                 <p id="value_displayed_1" height="300px"></p>
@@ -390,15 +390,15 @@
         <br>
 
         <div id="page6" style="display:none">
-            <h1>
-                Well done! That was it for part 1!
-            </h1>
-            <p>
-                By clicking on the button below, you get to the second part of the study
-            </p>
-            <button type="button" name="button" class="default_button" ;
-                onclick="route_categorization(parseInt(document.getElementById('condition_id').innerHTML))" ;>
-                Instructions </button>
+            <div class="present_bandit_0">
+                <p id="response_displayed_0" height="300px">/p>
+            </div><br>
+            <div class="present_bandit_1">
+                <p id="response_displayed_1" height="300px"></p>
+            </div><br>
+            <input type="text" id="mem_response" size="15" class="respond_mem">
+            <button type="button" , class="response_button" , onclick="clean_and_proceed()">Submit Response &
+                Start Next Trial</button>
         </div>
 
         <div id="page7" style="display:none">
