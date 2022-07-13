@@ -339,7 +339,6 @@ function clean_and_proceed() {
     display_free_choices('page6', 12)
 }
 
-// save free choice responses
 // display cumulative value on free-choice items
 
 
@@ -365,6 +364,7 @@ function process_memory_responses() {
             count_redundant += 1;
         }
     }
+    log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique)
 }
 
 function log_memory_responses(count_accuracy, count_redundant, responses_unique) {
@@ -398,8 +398,27 @@ async function next_value_free(i, item_id, current_info, pos) {
     await sleep(display_info["presentation"]);
     display_option.style.background = "#26dabcde";
     display_option.innerHTML = "?";
+    log_choice(item_id, pos)
     item_id += 1;
     display_free_choices("page5", item_id)
+}
+
+function log_choice(item_id, choice) {
+    var [part, i, current_info] = progress_in_experiment();
+    var data_store = {
+        participant_id: participant_id,
+        session: part,
+        trial_id: i,
+        item_id: item_id,
+        choice: choice,
+        var_distinct: current_info["distinctiveness"][i],
+        var_horizon: current_info["horizon"][i],
+        var_memtest: current_info["memory_test"][i],
+        var_loctest: current_info["location_test"][i],
+        items_left: current_info["vals_bandit_0"][i][item_id],
+        items_right: current_info["vals_bandit_1"][i][item_id],
+    }
+    saveData(JSON.stringify(data_store), "choice");
 }
 
 
