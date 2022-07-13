@@ -336,6 +336,7 @@ function clean_and_proceed() {
     process_memory_responses();
     // input field is wiped again
     document.getElementById("mem_response").value = "";
+    document.getElementById("cumulative_value").innerHTML = 0;
     display_free_choices('page6', 12)
 }
 
@@ -394,7 +395,10 @@ async function next_value_free(i, item_id, current_info, pos) {
     display_option = document.getElementById(location_display);
     // remove cued background color, display value, and remove it again
     display_option.style.background = "white";
-    display_option.innerHTML = current_info[value_display][i][item_id];
+    var chosen_value = current_info[value_display][i][item_id];
+    display_option.innerHTML = chosen_value;
+    document.getElementById("cumulative_value").innerHTML = parseInt(document.getElementById("cumulative_value").innerHTML) + parseInt(chosen_value);
+    document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = " + document.getElementById("cumulative_value").innerHTML
     await sleep(display_info["presentation"]);
     display_option.style.background = "#26dabcde";
     display_option.innerHTML = "?";
@@ -428,6 +432,7 @@ async function display_free_choices(old, item_id) {
 
     clickStart(old, "page5");
 
+    document.getElementById("cumulative_value_str").style.display = "block";
     if (item_id <= current_info["horizon"][i] + 11) {
         format_both_options("question")
         display_option_a.onclick = function () {
@@ -449,6 +454,7 @@ async function display_free_choices(old, item_id) {
     } else {
         document.getElementById("n_remaining_choices").style.color = "black"
         document.getElementById("n_remaining_choices").style.display = "none"
+        document.getElementById("cumulative_value_str").style.display = "none";
         update_trial_counter(part, i);
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
             // practice is over
