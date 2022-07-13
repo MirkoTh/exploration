@@ -65,7 +65,8 @@
     position: absolute;
     top: 500px;
     left: 20%;
-    height: 45px;
+    height: 80px;
+    font-size: 115%
 }
 
 .response_button {
@@ -73,7 +74,8 @@
     top: 500px;
     left: 46%;
     width: 250px;
-    height: 45px;
+    height: 80px;
+    font-size: 115%;
 }
 
 .cr_button {
@@ -87,7 +89,7 @@
 .present_bandit_0 {
     position: absolute;
     top: 5%;
-    left: 20%;
+    left: 30%;
     width: 100px;
     height: 100px;
     text-align: center;
@@ -100,7 +102,7 @@
 .present_bandit_1 {
     position: absolute;
     top: 5%;
-    right: 20%;
+    right: 30%;
     width: 100px;
     height: 100px;
     align-self: center;
@@ -114,7 +116,7 @@
 .present_slotmachine_0 {
     position: absolute;
     top: 25%;
-    left: 18%;
+    left: 28%;
     width: 100px;
     height: 100px;
     text-align: center;
@@ -125,7 +127,7 @@
 .present_slotmachine_1 {
     position: absolute;
     top: 25%;
-    right: 22%;
+    right: 32%;
     width: 100px;
     height: 100px;
     text-align: center;
