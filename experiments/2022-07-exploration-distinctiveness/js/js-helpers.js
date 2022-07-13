@@ -367,18 +367,22 @@ async function display_free_choices(old, item_id) {
         display_option_b.onclick = function () {
             next_value_free(i, item_id, current_info, 1)
         };
-        document.getElementById("n_remaining_choices").innerHTML = (current_info["horizon"] + 11) - item_id
+        document.getElementById("n_remaining_choices").style.display = "block"
+        document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + ((current_info["horizon"][i] + 11) - item_id + 1)
     } else {
         update_trial_counter(part, i);
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
             // practice is over
+            document.getElementById("n_remaining_choices").style.display = "none"
             format_both_options("reset")
             clickStart("page5", "page8")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
             // experiment is over
+            document.getElementById("n_remaining_choices").style.display = "none"
             clickStart("page5", "page9")
         } else {
             // next trial
+            document.getElementById("n_remaining_choices").style.display = "none"
             format_both_options("reset")
             clickStart("page5", "page7")
         }
