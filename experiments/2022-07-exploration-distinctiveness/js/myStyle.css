@@ -97,17 +97,39 @@
     padding: 1em;
 }
 
-
 .present_bandit_1 {
     position: absolute;
     top: 5%;
     right: 20%;
     width: 100px;
     height: 100px;
+    align-self: center;
     text-align: center;
     border: 3px;
     border-style: solid;
     border-color: #ff260000;
+    padding: 1em
+}
+
+.present_slotmachine_0 {
+    position: absolute;
+    top: 25%;
+    left: 18%;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    align-self: center;
+    padding: 1em
+}
+
+.present_slotmachine_1 {
+    position: absolute;
+    top: 25%;
+    right: 22%;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    align-self: center;
     padding: 1em
 }
 

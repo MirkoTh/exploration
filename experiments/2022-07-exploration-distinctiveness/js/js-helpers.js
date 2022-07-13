@@ -241,9 +241,6 @@ async function display_forced_choices(old, part_experiment = null) {
     clickStart(old, 'page5')
 
     var item_id = 0;
-    console.log("i = " + i)
-    console.log("item_id = " + item_id)
-    console.log("part = " + part)
     display_option = cue_location(i, item_id, part)
     display_option.onclick = function () { next_value_forced(i, item_id, part) }
 }
@@ -319,14 +316,12 @@ function clean_and_proceed() {
     var x = document.getElementById("mem_response").value;
     // input field is wiped again
     document.getElementById("mem_response").value = "";
-    console.log("given responses were: " + x)
     display_free_choices('page6', 12)
 }
 
 
 async function next_value_free(i, item_id, current_info, pos) {
     // read out current choice value
-    console.log("item_id = " + item_id)
     value_display = "vals_bandit_" + pos
     location_display = "value_displayed_" + pos
     display_option = document.getElementById(location_display);
@@ -367,22 +362,29 @@ async function display_free_choices(old, item_id) {
         display_option_b.onclick = function () {
             next_value_free(i, item_id, current_info, 1)
         };
+        var n_remaining = ((current_info["horizon"][i] + 11) - item_id + 1);
         document.getElementById("n_remaining_choices").style.display = "block"
-        document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + ((current_info["horizon"][i] + 11) - item_id + 1)
+        document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
+        if (n_remaining == 1) {
+            document.getElementById("n_remaining_choices").style.color = "red"
+        } else if (n_remaining <= 6) {
+            document.getElementById("n_remaining_choices").style.color = "orange"
+        } else {
+            document.getElementById("n_remaining_choices").style.color = "green"
+        }
     } else {
+        document.getElementById("n_remaining_choices").style.color = "black"
+        document.getElementById("n_remaining_choices").style.display = "none"
         update_trial_counter(part, i);
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
             // practice is over
-            document.getElementById("n_remaining_choices").style.display = "none"
             format_both_options("reset")
             clickStart("page5", "page8")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
             // experiment is over
-            document.getElementById("n_remaining_choices").style.display = "none"
             clickStart("page5", "page9")
         } else {
             // next trial
-            document.getElementById("n_remaining_choices").style.display = "none"
             format_both_options("reset")
             clickStart("page5", "page7")
         }
@@ -474,7 +476,6 @@ async function my_link() {
 
 function update_trial_counter(part, i) {
     var i_new = i + 1
-    console.log("part to be updated = " + part)
     switch (part) {
         case 0:
             document.getElementById("trial_nr_practice").innerHTML = i_new
@@ -594,7 +595,6 @@ async function handle_response(e) {
             cat_accuracies = calculate_categorization_accuracy(responses_cat_trial, setup_expt["experiment_info"]["n_trial_categorization_lag"])
             document.getElementById("cat_accuracy_overall").innerHTML = Math.round(100 * cat_accuracies[0]) + "%";
             document.getElementById("cat_accuracy_lag").innerHTML = Math.round(100 * cat_accuracies[1]) + "%";
-            console.log("categorization accuracies are: " + cat_accuracies)
             if (
                 cat_accuracies[0] >= setup_expt["experiment_info"]["thx_cat_overall"] ||
                 cat_accuracies[1] >= setup_expt["experiment_info"]["thx_cat_lag"] ||
@@ -652,8 +652,6 @@ function calculate_categorization_accuracy(responses_cat_trial, lag) {
     prop_correct_overall = ((parseFloat(sum_correct) / parseFloat(n_responses)))
     sum_correct_lag = responses_cat_trial.slice(n_responses - lag, n_responses).reduce((a, b) => a + b, 0)
     prop_correct_lag = ((parseFloat(sum_correct_lag) / parseFloat(lag)))
-    console.log("calculated average is: " + prop_correct_overall)
-    console.log("calculated average 'lag' is: " + prop_correct_lag)
     cat_accuracies = [prop_correct_overall, prop_correct_lag]
     return cat_accuracies
 }
@@ -920,7 +918,6 @@ function condition_and_ncategories() {
     var n_categories = [1, 2, 4][(condition_id % n_different_categories)] // similarity, ellipse, & squares
     condition_id = 3
     n_categories = 4
-    console.log("nr categories = " + n_categories)
     document.getElementById("condition_id").innerHTML = condition_id
     document.getElementById("n_categories").innerHTML = n_categories
     if (n_categories == 1) {

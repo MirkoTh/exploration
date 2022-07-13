@@ -63,7 +63,7 @@
     <div id="myRange1_start" style="display:none">-1</div>
     <div id="myRange2_start" style="display:none">-1</div>
     <div id="n_trials_cat_lag" style="display:none">-1</div>
-    <div id="n_remaining_choices" style="display:none">-1</div>
+    <div id="n_remaining_choices" style="display:none; font-size: 20px;">-1</div>
 
     <div class='centeredtext'>
 
@@ -373,12 +373,18 @@
         <div id="page5" style="display:none;">
 
             <div class="present_bandit_0">
-                <p id="value_displayed_0" height="300px"></p>
+                <p id="value_displayed_0" height="100px"></p>
             </div><br>
             <div class="present_bandit_1">
-                <p id="value_displayed_1" height="300px"></p>
+                <p id="value_displayed_1" height="100px"></p>
             </div><br>
 
+            <div class="present_slotmachine_0">
+                <img id="slotmachine_0" src="stimuli/slotmachine-l.jpg" height="100px">
+            </div><br>
+            <div class="present_slotmachine_1">
+                <img id="slotmachine_1" src="stimuli/slotmachine-r.jpg" height="100px">
+            </div><br>
         </div>
         <br>
 
@@ -388,6 +394,12 @@
             </div><br>
             <div class="present_bandit_1">
                 <p id="response_displayed_1" height="300px"></p>
+            </div><br>
+            <div class="present_slotmachine_0">
+                <img id="slotmachine_r_0" src="stimuli/slotmachine-l.jpg" height="100px">
+            </div><br>
+            <div class="present_slotmachine_1">
+                <img id="slotmachine_r_1" src="stimuli/slotmachine-r.jpg" height="100px">
             </div><br>
             <input type="text" id="mem_response" size="15" class="respond_mem">
             <button type="button" , class="response_button" , onclick="clean_and_proceed()">Submit Response &
