@@ -64,7 +64,7 @@ function setup_experiment() {
         "n_trials_practice": 2, // 1. memory test + horizon 12 + massed; 2. no memory test + horizon 1 + interleaved
         "n_trials_per_condition": 3,
         "bandit_means": [10, 20],
-        "bandit_sd": [40],
+        "bandit_sd": [20],
         "n_vals": 24,
         "n_forced_choice": 12,
         "sequences_forced_choices": {
@@ -223,13 +223,7 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
-async function display_forced_choices(old, part_experiment = null) {
-    // old refers to page to be switched away from
-    // i refers to the current trial to be displayed
-    if (part_experiment != null) {
-        document.getElementById("part_experiment").innerHTML = part_experiment;
-    }
+function progress_in_experiment() {
     part = parseInt(document.getElementById("part_experiment").innerHTML)
     if (part == 0) { // practice
         i = parseInt(document.getElementById("trial_nr_practice").innerHTML)
@@ -237,6 +231,22 @@ async function display_forced_choices(old, part_experiment = null) {
     if (part == 1) { // experimental trials
         i = parseInt(document.getElementById("trial_nr_main").innerHTML)
     }
+    if (part == 0) {
+        current_info = practice_info;
+    } else if (part == 1) {
+        current_info = trial_info;
+    }
+    return [part, i, current_info]
+}
+
+
+async function display_forced_choices(old, part_experiment = null) {
+    // old refers to page to be switched away from
+    // i refers to the current trial to be displayed
+    if (part_experiment != null) {
+        document.getElementById("part_experiment").innerHTML = part_experiment;
+    }
+    var [part, i, current_info] = progress_in_experiment();
 
     clickStart(old, 'page5')
 
@@ -259,12 +269,6 @@ function cue_location(i, item_id, part) {
 }
 
 
-// todos
-/* decide on each trial whether memory test on not
-loop over choices of differnet horizons in each trial
-add some nice slot machines as pictures below the numbers
- */
-
 async function next_value_forced(i, item_id, part) {
     if (part == 0) {
         current_info = practice_info;
@@ -284,12 +288,12 @@ async function next_value_forced(i, item_id, part) {
     // increase choice counter by one
     item_id += 1;
     // display another item or go to the memory test
-    if (item_id < 2) {//experiment_info["n_forced_choice"] - 1) {
+    if (item_id < 4) {//experiment_info["n_forced_choice"] - 1) {//
         display_option = cue_location(i, item_id, part);
         display_option.onclick = function () {
             next_value_forced(i, item_id, part)
         }
-    } else {//if (item_id == experiment_info["n_forced_choice"] - 1) {
+    } else {//if (item_id == experiment_info["n_forced_choice"] - 1) {//
         // increase trial nr by 1
         document.getElementById("time_var").innerHTML = Date.now();
         if (current_info["memory_test"][i] == true) {
@@ -313,10 +317,37 @@ function cue_memory_responses(i) {
 
 function clean_and_proceed() {
     // x can be used to save data
-    var x = document.getElementById("mem_response").value;
+    save_memory_responses();
     // input field is wiped again
     document.getElementById("mem_response").value = "";
     display_free_choices('page6', 12)
+}
+
+// check that the same number is not sampled twice on a given trial 
+function save_memory_responses() {
+    var [part, i, current_info] = progress_in_experiment();
+
+    var mem_response = document.getElementById("mem_response").value;
+    var mem_response_trim = mem_response.trim();
+    var mem_response_split = mem_response_trim.split(",");
+    var mem_response_split_unique = [...new Set(mem_response_split)];
+    var side_tested = current_info["location_test"][i]
+    var vals_shown = "vals_bandit_" + side_tested;
+    var shown_list_all = current_info[vals_shown][i].slice(0, experiment_info["n_forced_choice"]);
+    var shown_list_mask = current_info["sequence_forced_choices"][i].map(item => item == side_tested)
+    var shown_list = shown_list_all.filter((item, i) => shown_list_mask[i])
+
+    var count_accuracy = 0;
+    var count_redundant = 0;
+    for (const response of mem_response_split_unique) {
+        if (shown_list.includes(parseInt(response))) {
+            count_accuracy += 1;
+        } else {
+            count_redundant += 1;
+        }
+    }
+    console.log("nr. correctly recalled items: " + count_accuracy)
+    console.log("nr. redundantly recalled items: " + count_redundant)
 }
 
 
@@ -338,19 +369,7 @@ async function next_value_free(i, item_id, current_info, pos) {
 
 async function display_free_choices(old, item_id) {
 
-    part = parseInt(document.getElementById("part_experiment").innerHTML)
-    if (part == 0) { // practice
-        i = parseInt(document.getElementById("trial_nr_practice").innerHTML)
-    }
-    if (part == 1) { // experimental trials
-        i = parseInt(document.getElementById("trial_nr_main").innerHTML)
-    }
-
-    if (part == 0) {
-        current_info = practice_info;
-    } else if (part == 1) {
-        current_info = trial_info;
-    }
+    var [part, i, current_info] = progress_in_experiment();
 
     clickStart(old, "page5");
 
