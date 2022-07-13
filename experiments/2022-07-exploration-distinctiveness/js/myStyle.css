@@ -57,8 +57,9 @@
 }
 
 .default_button {
-    height: 30px;
-    font-size: 80%;
+    height: 60px;
+    width: 250px;
+    font-size: 100%;
 }
 
 .respond_mem {

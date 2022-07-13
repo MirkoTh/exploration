@@ -337,7 +337,7 @@ function clean_and_proceed() {
     // input field is wiped again
     document.getElementById("mem_response").value = "";
     document.getElementById("cumulative_value").innerHTML = 0;
-    display_free_choices('page6', 12)
+    display_free_choices('page6', experiment_info["n_vals"] / 2)
 }
 
 // display cumulative value on free-choice items
@@ -433,7 +433,7 @@ async function display_free_choices(old, item_id) {
     clickStart(old, "page5");
 
     document.getElementById("cumulative_value_str").style.display = "block";
-    if (item_id <= current_info["horizon"][i] + 11) {
+    if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
         format_both_options("question")
         display_option_a.onclick = function () {
             next_value_free(i, item_id, current_info, 0)
@@ -441,7 +441,7 @@ async function display_free_choices(old, item_id) {
         display_option_b.onclick = function () {
             next_value_free(i, item_id, current_info, 1)
         };
-        var n_remaining = ((current_info["horizon"][i] + 11) - item_id + 1);
+        var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
         document.getElementById("n_remaining_choices").style.display = "block"
         document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
         if (n_remaining == 1) {
