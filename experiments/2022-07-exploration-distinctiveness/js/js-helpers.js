@@ -54,22 +54,38 @@ function randn_bm() {
 }
 
 
+// only accept unique set of samples
+// same numbers should not appear twice on a given bandit
+function random_normal_samples_unique(m, sd, n_numbers) {
+    var all_same = 0;
+    var arr_test = [0, 1];
+    var numbers_sampled;
+    while (all_same < n_numbers) {
+        numbers_sampled = Array(n_numbers).fill().map(
+            () => Math.round(randn_bm() * sd + m)
+        );
+        all_same = [...new Set(numbers_sampled)].length;
+    }
+    return (numbers_sampled)
+}
+
+
 function setup_experiment() {
     // experiment information
     var experiment_info = {
         "var_mem_test": [true, false],
-        "var_horizon": [1, 12],
+        "var_horizon": [1, 8],
         "var_distinct": ["massed", "interleaved"],
         "var_location_test": [0, 1],
         "n_trials_practice": 2, // 1. memory test + horizon 12 + massed; 2. no memory test + horizon 1 + interleaved
         "n_trials_per_condition": 3,
         "bandit_means": [10, 20],
         "bandit_sd": [20],
-        "n_vals": 24,
-        "n_forced_choice": 12,
+        "n_vals": 16,
+        "n_forced_choice": 8,
         "sequences_forced_choices": {
-            "massed": [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-            "interleaved": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+            "massed": [0, 0, 0, 0, 1, 1, 1, 1],
+            "interleaved": [0, 1, 0, 1, 0, 1, 0, 1]
         }
     }
     experiment_info["n_trials"] = (
@@ -139,11 +155,11 @@ function setup_experiment() {
         trial_info["location_test"][idx] = trial_info["location_test_prep"][shuffle_trials[idx]];
         trial_info["horizon"][idx] = trial_info["horizon_prep"][shuffle_trials[idx]];
         trial_info["distinctiveness"][idx] = trial_info["distinctiveness_prep"][shuffle_trials[idx]];
-        trial_info["vals_bandit_0"][idx] = Array(experiment_info["n_vals"]).fill().map(
-            () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
+        trial_info["vals_bandit_0"][idx] = random_normal_samples_unique(
+            experiment_info["bandit_means"][0], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
-        trial_info["vals_bandit_1"][idx] = Array(experiment_info["n_vals"]).fill().map(
-            () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
+        trial_info["vals_bandit_1"][idx] = random_normal_samples_unique(
+            experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
     }
 
@@ -151,27 +167,27 @@ function setup_experiment() {
     // first practice trial
     practice_info["memory_test"][0] = true;
     practice_info["location_test"][0] = 0;
-    practice_info["horizon"][0] = 12;
+    practice_info["horizon"][0] = experiment_info["var_horizon"][1];
     practice_info["distinctiveness"][0] = "massed";
-    practice_info["vals_bandit_0"][0] = Array(experiment_info["n_vals"]).fill().map(
-        () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
+    practice_info["vals_bandit_0"][0] = random_normal_samples_unique(
+        experiment_info["bandit_means"][0], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
-    practice_info["vals_bandit_1"][0] = Array(experiment_info["n_vals"]).fill().map(
-        () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
+    practice_info["vals_bandit_1"][0] = random_normal_samples_unique(
+        experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
-    practice_info["sequence_forced_choices"][0] = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
+    practice_info["sequence_forced_choices"][0] = experiment_info["sequences_forced_choices"]["massed"];
     // second practice trial
     practice_info["memory_test"][1] = false;
     practice_info["location_test"][1] = 1;
-    practice_info["horizon"][1] = 1;
+    practice_info["horizon"][1] = experiment_info["var_horizon"][0];
     practice_info["distinctiveness"][1] = "interleaved";
-    practice_info["vals_bandit_0"][1] = Array(experiment_info["n_vals"]).fill().map(
-        () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][0])
+    practice_info["vals_bandit_0"][1] = random_normal_samples_unique(
+        experiment_info["bandit_means"][0], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
-    practice_info["vals_bandit_1"][1] = Array(experiment_info["n_vals"]).fill().map(
-        () => Math.round(randn_bm() * experiment_info["bandit_sd"] + experiment_info["bandit_means"][1])
+    practice_info["vals_bandit_1"][1] = random_normal_samples_unique(
+        experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
-    practice_info["sequence_forced_choices"][1] = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1];
+    practice_info["sequence_forced_choices"][1] = experiment_info["sequences_forced_choices"]["interleaved"];
 
 
     var obj_setup_expt;
@@ -323,7 +339,11 @@ function clean_and_proceed() {
     display_free_choices('page6', 12)
 }
 
-// check that the same number is not sampled twice on a given trial 
+// check that the same number is not sampled twice on a given trial
+// save memory responses
+// save free choice responses
+
+
 function save_memory_responses() {
     var [part, i, current_info] = progress_in_experiment();
 
