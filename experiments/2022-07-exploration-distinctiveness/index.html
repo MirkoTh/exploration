@@ -330,20 +330,12 @@
                 These trials are not going to be used to calculate you bonus payment.
             </p>
 
-            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page3')" ;>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page3', 0)" ;>
                 Start
                 Practice Trials </button>
         </div>
 
-        <div id="page3.1" style="display:none">
-            <h1>Practice is Over</h1>
-            <p>The practice trials are now over. Press the button below to start with the Memory Task.
-            </p>
 
-            <button type="button" name="button" class="default_button" ; onclick="next_item_cr('page3.1')" ;> Start
-                Memory Task </button>
-
-        </div>
 
         <div id="page4" style="display:none">
 
@@ -403,9 +395,25 @@
         </div>
 
         <div id="page7" style="display:none">
-            <button type="button" , class="cr_button" , onclick="display_forced_choices('page7')">Submit Response &
-                Start Next Trial</button>
+            <button type="button" , class="cr_button" , onclick="display_forced_choices('page7')"> Start Next
+                Trial</button>
         </div>
+
+        <div id="page8" style="display:none">
+            <h1>Practice is Over</h1>
+            <p>The practice trials are now over. Press the button below to start with the Memory Task.
+            </p>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page8', 1)" ;>
+                Start Memory Task </button>
+        </div>
+
+        <div id="page9" style="display:none">
+            <h1>You completed the study</h1>
+            <p>Thank you a very much for participating in our study!</p>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page8', 1)" ;>
+                Back to prolific </button>
+        </div>
+
 
         <div id="page7.1" style="display:none">
             <h1>
