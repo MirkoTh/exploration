@@ -275,8 +275,8 @@ async function display_forced_choices(old, part_experiment = null) {
 
     var item_id = 0;
     display_option = cue_location(i, item_id, part)
-    //display_option.onclick = function () { next_value_forced(i, item_id, part) }
-    display_option.addEventListener("click", function () { next_value_forced(i, item_id, part), { once: true } })
+    display_option.onclick = function () { next_value_forced(i, item_id, part) }
+    //display_option.addEventListener("click", function () { next_value_forced(i, item_id, part), { once: true } })
 }
 
 function cue_location(i, item_id, part) {
@@ -345,7 +345,7 @@ function clean_and_proceed() {
     // input field is wiped again
     document.getElementById("mem_response").value = "";
     document.getElementById("cumulative_value").innerHTML = 0;
-    display_free_choices('page6', experiment_info["n_vals"] / 2)
+    display_free_choices('page7', experiment_info["n_vals"] / 2)
 }
 
 // display cumulative value on free-choice items
@@ -376,6 +376,7 @@ function process_memory_responses() {
     log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique)
 }
 
+
 function log_memory_responses(count_accuracy, count_redundant, responses_unique) {
     var [part, i, current_info] = progress_in_experiment();
     var data_store = {
@@ -396,43 +397,6 @@ function log_memory_responses(count_accuracy, count_redundant, responses_unique)
     saveData(JSON.stringify(data_store), "memory");
 }
 
-async function next_value_free(i, item_id, current_info, pos) {
-    // read out current choice value
-    value_display = "vals_bandit_" + pos
-    location_display = "value_displayed_" + pos
-    display_option = document.getElementById(location_display);
-    // remove cued background color, display value, and remove it again
-    display_option.style.background = "white";
-    var chosen_value = current_info[value_display][i][item_id];
-    display_option.innerHTML = chosen_value;
-    document.getElementById("cumulative_value").innerHTML = parseInt(document.getElementById("cumulative_value").innerHTML) + parseInt(chosen_value);
-    document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = " + document.getElementById("cumulative_value").innerHTML
-    await sleep(display_info["presentation"]);
-    display_option.style.background = "#26dabcde";
-    display_option.innerHTML = "?";
-    log_choice(item_id, pos)
-    item_id += 1;
-    display_free_choices("page6", item_id)
-}
-
-function log_choice(item_id, choice) {
-    var [part, i, current_info] = progress_in_experiment();
-    var data_store = {
-        participant_id: participant_id,
-        session: part,
-        trial_id: i,
-        item_id: item_id,
-        choice: choice,
-        var_distinct: current_info["distinctiveness"][i],
-        var_horizon: current_info["horizon"][i],
-        var_memtest: current_info["memory_test"][i],
-        var_loctest: current_info["location_test"][i],
-        items_left: current_info["vals_bandit_0"][i][item_id],
-        items_right: current_info["vals_bandit_1"][i][item_id],
-    }
-    saveData(JSON.stringify(data_store), "choice");
-}
-
 
 async function display_free_choices(old, item_id) {
 
@@ -442,9 +406,10 @@ async function display_free_choices(old, item_id) {
 
     document.getElementById("cumulative_value_str").style.display = "block";
     if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
-        format_both_options("question")
-        display_option_a.addEventListener("click", function () { next_value_free(i, item_id, current_info, 0), { once: true } })
-        display_option_b.addEventListener("click", function () { next_value_free(i, item_id, current_info, 1), { once: true } })
+        [display_option_a, display_option_b] = format_both_options("question");
+
+        display_option_a.onclick = function () { next_value_free(i, item_id, current_info, 0) }
+        display_option_b.onclick = function () { next_value_free(i, item_id, current_info, 1) }
         var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
         document.getElementById("n_remaining_choices").style.display = "block"
         document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
@@ -461,19 +426,50 @@ async function display_free_choices(old, item_id) {
         document.getElementById("cumulative_value_str").style.display = "none";
         update_trial_counter(part, i);
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
+            console.log("practice is over")
             // practice is over
             format_both_options("reset")
-            clickStart("page6", "page8")
-        } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
-            // experiment is over
             clickStart("page6", "page9")
+        } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
+            console.log("experiment is over")
+            // experiment is over
+            clickStart("page6", "page10")
         } else {
+            console.log("next trial is upcoming")
             // next trial
             format_both_options("reset")
             clickStart("page6", "page8")
         }
     }
 }
+
+
+async function next_value_free(i, item_id, current_info, pos) {
+    // read out current choice value
+    var clickflag = parseInt(document.getElementById("block_responding").innerHTML);
+    if (clickflag == 0) {
+        document.getElementById("block_responding").innerHTML = 1;
+        value_display = "vals_bandit_" + pos
+        location_display = "value_displayed_" + pos
+        display_option = document.getElementById(location_display);
+        // remove cued background color, display value, and remove it again
+        display_option.style.background = "white";
+        var chosen_value = current_info[value_display][i][item_id];
+        display_option.innerHTML = chosen_value;
+
+        document.getElementById("cumulative_value").innerHTML = parseInt(document.getElementById("cumulative_value").innerHTML) + parseInt(chosen_value);
+        document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = " + parseInt(document.getElementById("cumulative_value").innerHTML)
+
+        await sleep(display_info["presentation"]);
+        display_option.style.background = "#26dabcde";
+        display_option.innerHTML = "?";
+        log_choice(item_id, pos)
+        item_id += 1;
+        document.getElementById("block_responding").innerHTML = 0;
+        display_free_choices("page6", item_id)
+    }
+}
+
 
 function format_both_options(direction) {
     if (direction == "reset") {
@@ -491,6 +487,28 @@ function format_both_options(direction) {
         display_option_a.style.background = "#26dabcde";
         display_option_b.style.background = "#26dabcde";
     }
+    return [display_option_a, display_option_b]
+}
+
+// store rts
+// fix counter running several times instead of once
+
+function log_choice(item_id, choice) {
+    var [part, i, current_info] = progress_in_experiment();
+    var data_store = {
+        participant_id: participant_id,
+        session: part,
+        trial_id: i,
+        item_id: item_id,
+        choice: choice,
+        var_distinct: current_info["distinctiveness"][i],
+        var_horizon: current_info["horizon"][i],
+        var_memtest: current_info["memory_test"][i],
+        var_loctest: current_info["location_test"][i],
+        items_left: current_info["vals_bandit_0"][i][item_id],
+        items_right: current_info["vals_bandit_1"][i][item_id],
+    }
+    saveData(JSON.stringify(data_store), "choice");
 }
 
 

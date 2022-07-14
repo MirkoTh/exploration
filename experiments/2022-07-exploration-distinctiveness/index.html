@@ -65,6 +65,8 @@
     <div id="n_remaining_choices" style="display:none; font-size: 20px;">-1</div>
     <div id="cumulative_value" style="display:none; font-size: 20px;">0</div>
     <div id="cumulative_value_str" style="display:none; font-size: 20px;">0</div>
+    <div id="block_responding" style="display:none;">0</div>
+
 
 
     <div class='centeredtext'>
@@ -181,14 +183,14 @@
                 class="present_slotmachine_1_instruction"></img>
 
             <br><br><br><br><br><br><br>
-            Each slot machine tends to pay out about the same amount of reward on average, but there is
+            Each slot machine tends to pay out about the same amount of reward on average during one game, but there is
             variability in the reward on any given play.<br>
             For example, the average reward for the bandit on the right might be 50 points, but on the
             first play we might see a reward of 38 points because of the variability ...<br>
             ... on the second play we might get 56 points ...<br>
             ... if we open a third box on the right we might get 51 points this time ...<br>
             ... and so on, such that if we were to play the right bandit 10 times in a row we might see
-            these rewards ...<br>
+            these rewards ...<br><br>
             Both slot machines will have the same kind of variability and this variability will stay constant
             throughout the experiment.<br>
             One of the bandits will always have a higher average reward and hence is the better
@@ -196,8 +198,8 @@
 
             <button type="button" name="bbutton" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
             </button>
-            <!-- page2b -->
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page3')" ;>
+            <!-- page3 -->
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page5')" ;>
                 Responding Instructions
             </button>
         </div>
@@ -216,9 +218,10 @@
             machine to be chosen.<br>
             <br>
 
-            <b>2. A memory recall phase</b>. A friend who wants to play with you comes along.<br>
+            <b>2. A memory recall phase</b>. Occasionally, a friend who wants to play with you comes along.<br>
             She already knows one of the slot machines very well but unfortunately not the other. She asks you about the
-            rewards of the latter. Try to help her!
+            rewards of the latter. Try to help her!<br>
+            Sometimes, the recall phase is skipped and you are directly confronted with phase 3.
             <br><br>
 
             <b>3. A choice phase</b> during which you choose yourself between the two slot machines.<br>
@@ -284,7 +287,7 @@
                     <br>
                 </fieldset>
                 <fieldset>
-                    <b>What is your goal in the first part / the instructed phase? </b><br>
+                    <b>What is your task in the first part / the instructed phase? </b><br>
                     <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l1"><span
                             id="q3l1">
                             Inform your friend about the previously received rewards from one of the slot machines.
@@ -385,22 +388,23 @@
         </div>
 
         <div id="page8" style="display:none">
-            <button type="button" , class="response_button" , onclick="display_forced_choices('page7')"> Start Next
+            <button type="button" , class="response_button" , onclick="display_forced_choices('page8')"> Start Next
                 Trial</button>
         </div>
 
-        <div id="page8" style="display:none">
+        <div id="page9" style="display:none">
             <h1>Practice is Over</h1>
-            <p>The practice trials are now over. Press the button below to start with the Memory Task.
+            <p>The practice trials are now over. Press the button below to start with the main part of the study.
             </p>
-            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page8', 1)" ;>
-                Start Memory Task </button>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page9', 1)" ;>
+                Start Main Study </button>
         </div>
 
-        <div id="page9" style="display:none">
+        <div id="page10" style="display:none">
             <h1>You completed the study</h1>
             <p>Thank you a very much for participating in our study!</p>
-            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page8', 1)" ;>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page10', 1)"
+                ;>
                 Back to prolific </button>
         </div>
 
@@ -458,7 +462,7 @@
         <div id="rt" style="display:none">0</div>
         <div id="key_id" style="display:none">0</div>
 
-        <div id="page8" style="display:none">
+        <div id="page18" style="display:none">
             <h1>
                 Part 2 of the study!
             </h1>
@@ -469,7 +473,7 @@
                 Task </button>
         </div>
 
-        <div id="page9" style="display:none;">
+        <div id="page19" style="display:none;">
             <div class="cat_feedback_neg" style="color:red; font-size:30px">
                 <p id="feedback_cat_wrong"></p>
             </div>
@@ -485,7 +489,7 @@
 
         </div>
 
-        <div id="page10" style="display:none;">
+        <div id="page110" style="display:none;">
             <h1>Time for a break!</h1>
             <h2 id="progress"></h2>
             <div id="cat_continued" style="display:none">0</div>
@@ -514,7 +518,7 @@
 
         </div>
 
-        <div id="page10b" style="display:none;">
+        <div id="page101b" style="display:none;">
             <h1>Target Examples</h1><br>
             <p>The initial block with target category examples is now over.<br>
                 In the following, your task is to categorize monsters from all categories, including the
@@ -525,7 +529,7 @@
             </button>
 
         </div>
-        <div id="page11" style="display:none">
+        <div id="page111" style="display:none">
             <h1>
                 Very well done - That was it for part 2!<br>
                 You performed well enough and made it to part 3 of the study!
@@ -540,7 +544,7 @@
         </div>
 
         <div id="trial_nr_cr2" style="display:none">0</div>
-        <div id="page12" style="display:none">
+        <div id="page112" style="display:none">
             <h1>
                 Part 3 of the study!
             </h1>
@@ -555,7 +559,7 @@
                 Memory Task </button>
         </div>
 
-        <div id="page13" style="display:none">
+        <div id="page113" style="display:none">
             <h1>
                 Bonus Payment<br>
             </h1>
