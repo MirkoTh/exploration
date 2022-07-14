@@ -18,6 +18,10 @@ var total_trials0;
 var total_trials1;
 var total_trials2;
 
+// todos
+// add instructions
+// add questionnaire
+
 
 if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
     var participant_id = getQueryVariable('PROLIFIC_PID');
@@ -268,7 +272,8 @@ async function display_forced_choices(old, part_experiment = null) {
 
     var item_id = 0;
     display_option = cue_location(i, item_id, part)
-    display_option.onclick = function () { next_value_forced(i, item_id, part) }
+    //display_option.onclick = function () { next_value_forced(i, item_id, part) }
+    display_option.addEventListener("click", function () { next_value_forced(i, item_id, part), { once: true } })
 }
 
 function cue_location(i, item_id, part) {
@@ -435,12 +440,14 @@ async function display_free_choices(old, item_id) {
     document.getElementById("cumulative_value_str").style.display = "block";
     if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
         format_both_options("question")
-        display_option_a.onclick = function () {
-            next_value_free(i, item_id, current_info, 0)
-        };
-        display_option_b.onclick = function () {
-            next_value_free(i, item_id, current_info, 1)
-        };
+        // display_option_a.onclick = function () {
+        //     next_value_free(i, item_id, current_info, 0)
+        // };
+        display_option_a.addEventListener("click", function () { next_value_free(i, item_id, current_info, 0), { once: true } })
+        // display_option_b.onclick = function () {
+        //     next_value_free(i, item_id, current_info, 1)
+        // };
+        display_option_b.addEventListener("click", function () { next_value_free(i, item_id, current_info, 1), { once: true } })
         var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
         document.getElementById("n_remaining_choices").style.display = "block"
         document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
