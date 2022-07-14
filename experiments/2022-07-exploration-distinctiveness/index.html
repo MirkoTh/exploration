@@ -80,8 +80,8 @@
             at the Max Planck Institute for Biological Cybernetics in Tuebingen, Germany.<br><br>
 
             <span>
-                <img src="./stimuli/tuebingen.jpg" height="300px">
-                <img src="./stimuli/mpi.jpg" height="300px">
+                <img src="./stimuli/tuebingen.jpg" height="200px">
+                <img src="./stimuli/mpi.jpg" height="200px">
                 <figcaption style="font-size: 12px;">By Rabe! - Own work, CC BY-SA 3.0, <a
                         href=" https://commons.wikimedia.org/w/index.php?curid=33554043" target="_blank"> Source </a>
                 </figcaption>
@@ -169,7 +169,6 @@
                 to participate</button><br><br>
         </div>
         <div id="page2" style="display:none">
-            <br>
 
             <h1>Welcome to the study "Gamble with your friends"!</h1>
             <br>
@@ -177,12 +176,13 @@
             In a series of games you are interacting with two slot machines.<br>
             The slot machines look as follows:<br><br><br>
 
-            <img id="example-slotmachine-l" , src="stimuli/slotmachine-l.jpg"
-                class="present_slotmachine_0_instruction"></img>
-            <img id="example-slotmachine-r" , src="stimuli/slotmachine-r.jpg"
-                class="present_slotmachine_1_instruction"></img>
+            <span>
+                <img id="example-slotmachine-l" , height="100px" src="stimuli/slotmachine-l.jpg"></img>
+                <img id="example-slotmachine-r" , height="100px" src="stimuli/slotmachine-r.jpg"></img>
 
-            <br><br><br><br><br><br><br>
+            </span>
+
+            <br><br><br>
             Each slot machine tends to pay out about the same amount of reward on average during one game, but there is
             variability in the reward on any given play.<br>
             For example, the average reward for the bandit on the right might be 50 points, but on the
@@ -194,21 +194,17 @@
             Both slot machines will have the same kind of variability and this variability will stay constant
             throughout the experiment.<br>
             One of the bandits will always have a higher average reward and hence is the better
-            option to choose on average.</br><br>
+            option to choose on average.<br><br>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
+            </button>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page3')" ;>
+                Response Instruction
+            </button>
 
-            <button type="button" name="bbutton" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
-            </button>
-            <!-- page3 -->
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page5')" ;>
-                Responding Instructions
-            </button>
         </div>
 
         <div id="page3" style="display:none">
-            <br>
-
             <h1>Instructions How To Respond In The Task</h1>
-
 
             A given trial is separated into three phases:<br><br>
 
@@ -245,7 +241,6 @@
             Remember that you want to maximize your rewards on every trial!<br>
             <br>
 
-            </ol>
             <button type="button" name="bbutton" class="default_button" ; onclick="clickStart('page3', 'page2')" ;> Back
             </button>
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page3', 'page4')" ;>
@@ -336,15 +331,15 @@
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page3', 'page4')" ;>
                 Back </button>
             <button type="button" name="button" class="default_button" ;
-                onclick="instructioncheck('page4', 'page3', 'page5')" ;></button>
-            <span id="check">Check Answers </span>
+                onclick="instructioncheck('page4', 'page3', 'page5')" ;><span id="check"> Check Answers </span>
+            </button>
+
             </button>
         </div>
 
         <div id="page5" style="display:none;">
 
             <h1>Ready To Start?</h1>
-            <br>
             <p>By clicking the button below, you can start the two practice trials.</p>
             <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page5')" ;>
                 Start Practice Trials </button>

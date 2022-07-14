@@ -266,6 +266,10 @@ function progress_in_experiment() {
 async function display_forced_choices(old, part_experiment = null) {
     // old refers to page to be switched away from
     // i refers to the current trial to be displayed
+    // reset the reward counter
+    document.getElementById("cumulative_value").innerHTML = 0;
+    document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = 0";
+
     if (part_experiment != null) {
         document.getElementById("part_experiment").innerHTML = part_experiment;
     }
