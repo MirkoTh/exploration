@@ -257,54 +257,59 @@
                     answer
                     all of the questions correctly.</p>
                 <fieldset>
-                    <b>What is your goal in the memory task? </b><br>
+                    <b>What is your task in the third part of a given trial? </b><br>
                     <label for="q1l1" style="font-weight: normal;"><input type="radio" name="q1" id="l1"><span
                             id="q1l1">
-                            Remember the color of the monster. </span></label><br>
+                            Inform your friend about the previously received rewards from one of the slot machines.
+                        </span></label><br>
                     <label for="q1l2" style="font-weight: normal;"><input type="radio" name="q1" id="icheck1"><span
-                            id="q1icheck1"> Remember the spikiness of the head and the fill of the belly of the monster.
+                            id="q1icheck1"> Maximize the sum of your rewards.
                         </span></label><br>
                     <label for="q1l3" style="font-weight: normal;"><input type="radio" name="q1" id="l2"><span
                             id="q1l2">
-                            Compare the monster to the monster on the previous trial. </span></label><br>
+                            Only on green square is going to be highlighted. Click on that square. </span></label><br>
                     <br>
                 </fieldset>
                 <fieldset>
-                    <b>How do you respond in the memory task? </b><br>
+                    <b>How do you respond in the memory task when one slot machine is cued? </b><br>
                     <label for="q2l1" style="font-weight: normal;"><input type="radio" name="q2" id="l1" /><span
                             id="q2l1">
-                            Using keys 1-4 on the keyboard. </span></label><br>
+                            Recall the values in the order of their appearance. </span></label><br>
                     <label for="q2l2" style="font-weight: normal;"><input type="radio" name="q2" id="l2" /><span
                             id="q2l2">
-                            Using the right and left mouse buttons </span></label><br>
+                            Type in the values in any order; separate them using a whitespace.</span></label><br>
                     <label for="q2l3" style="font-weight: normal;"><input type="radio" name="q2" id="icheck2"> <span
-                            id="q2icheck2"> Using the sliders displayed on the screen </span></label><br>
+                            id="q2icheck2"> Type in the values in any order; separate them using a comma.
+                        </span></label><br>
                     <br>
                 </fieldset>
                 <fieldset>
-                    <b>What is your goal in the <span id="secondTaskName1"></span> task? </b><br>
+                    <b>What is your goal in the first part / the instructed phase? </b><br>
                     <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l1"><span
                             id="q3l1">
-                            Remember the color of the monster. </span></label><br>
+                            Inform your friend about the previously received rewards from one of the slot machines.
+                        </span></label><br>
                     <label for="q3l2" style="font-weight: normal;"><input type="radio" name="q3" id="l2"><span
-                            id="q3l2"></span> Reproduce the spikiness of the head and the fill of the belly of the
-                        monster
-                        using sliders. </span></label><br>
+                            id="q3l2"></span> Maximize the sum of your rewards.
+                        </span></label><br>
                     <label for="q3l3" style="font-weight: normal;"><input type="radio" name="q3" id="icheck3"><span
-                            id="q3icheck3"> </span></label><br>
+                            id="q3icheck3"> </span>Click on the greenly highlighted square containing a question mark
+                        (?).</span></label><br>
                     <br>
                 </fieldset>
                 <fieldset>
-                    <b>How do you respond in the <span id="secondTaskName2"></span> task? </b><br>
+                    <b>How do the two slot machines differ on a given trial? </b><br>
                     <label for="q4l1" style="font-weight: normal;"><input type="radio" name="q4" id="l1" /><span
                             id="q4l1">
-                            Using the sliders displayed on the screen.
+                            Both slot machines have the same expected value. They only differ in their variability.
                         </span></label><br>
                     <label for="q4l2" style="font-weight: normal;"><input type="radio" name="q4" id="l2" /><span
                             id="q4l2">
-                            Using the right and left mouse buttons </span></label><br>
+                            The expected values and the variabilities differ between the two slot
+                            machines.</span></label><br>
                     <label for="q4l3" style="font-weight: normal;"><input type="radio" name="q4" id="icheck4"> <span
-                            id="q4icheck4"> Using the digit keys on the keyboard
+                            id="q4icheck4"> The variability of the two slot machines stays the same over the study. Only
+                            the means differ.
                         </span></label><br>
                     <br>
                 </fieldset>
@@ -315,26 +320,34 @@
                             Roughly 10 minutes </span></label><br>
                     <label for="q5l2" style="font-weight: normal;"><input type="radio" name="q5" id='l2'><span
                             id="q5l2">
-                            Roughly 40 minutes </span></label><br>
+                            Roughly 15 minutes </span></label><br>
                     <label for="q5l3" style="font-weight: normal;"><input type="radio" name="q5" id='icheck5'><span
                             id="q5icheck5">
-                            Roughly 90 minutes </span></label><br>
+                            Roughly 60 minutes </span></label><br>
                     <label for="q5l4" style="font-weight: normal;"><input type="radio" name="q5" id='l3'><span
                             id="q5l3">
-                            Roughly 200 minutes </span></label><br>
+                            Roughly 120 minutes </span></label><br>
                 </fieldset>
             </fieldset>
             <br>
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page3', 'page4')" ;>
                 Back </button>
-            <button type="button" name="button" class="default_button" ; onclick="instructioncheck('page4', 'page5')"
-                ;></button>
+            <button type="button" name="button" class="default_button" ;
+                onclick="instructioncheck('page4', 'page3', 'page5')" ;></button>
             <span id="check">Check Answers </span>
             </button>
         </div>
 
-
         <div id="page5" style="display:none;">
+
+            <h1>Ready To Start?</h1>
+            <br>
+            <p>By clicking the button below, you can start the two practice trials.</p>
+            <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page5')" ;>
+                Start Practice Trials </button>
+        </div>
+
+        <div id="page6" style="display:none;">
 
             <div class="present_bandit_0">
                 <p id="value_displayed_0" height="200px" style="font-size:50px"></p>
@@ -352,7 +365,7 @@
         </div>
         <br>
 
-        <div id="page6" style="display:none">
+        <div id="page7" style="display:none">
             <div class="present_bandit_0">
                 <p id="response_displayed_0" height="200px" style="font-size:50px">/p>
             </div><br>
@@ -371,7 +384,7 @@
                 Start Next Trial</button>
         </div>
 
-        <div id="page7" style="display:none">
+        <div id="page8" style="display:none">
             <button type="button" , class="response_button" , onclick="display_forced_choices('page7')"> Start Next
                 Trial</button>
         </div>

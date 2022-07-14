@@ -271,7 +271,7 @@ async function display_forced_choices(old, part_experiment = null) {
     }
     var [part, i, current_info] = progress_in_experiment();
 
-    clickStart(old, 'page5')
+    clickStart(old, 'page6')
 
     var item_id = 0;
     display_option = cue_location(i, item_id, part)
@@ -323,7 +323,7 @@ async function next_value_forced(i, item_id, part) {
         if (current_info["memory_test"][i] == true) {
             cue_memory_responses(current_info["location_test"][i]);
         } else {
-            display_free_choices("page5", 12) // second arg should be item_id
+            display_free_choices("page6", experiment_info["n_vals"] / 2) // second arg should be item_id
         }
     }
 }
@@ -332,7 +332,7 @@ function cue_memory_responses(i) {
     document.getElementById("mem_response").value = "";
     document.getElementById("response_displayed_0").innerHTML = "";
     document.getElementById("response_displayed_1").innerHTML = "";
-    clickStart("page5", "page6")
+    clickStart("page6", "page7")
     location_display = "response_displayed_" + i;
     display_option = document.getElementById(location_display);
     display_option.innerHTML = "?"
@@ -412,7 +412,7 @@ async function next_value_free(i, item_id, current_info, pos) {
     display_option.innerHTML = "?";
     log_choice(item_id, pos)
     item_id += 1;
-    display_free_choices("page5", item_id)
+    display_free_choices("page6", item_id)
 }
 
 function log_choice(item_id, choice) {
@@ -438,25 +438,19 @@ async function display_free_choices(old, item_id) {
 
     var [part, i, current_info] = progress_in_experiment();
 
-    clickStart(old, "page5");
+    clickStart(old, "page6");
 
     document.getElementById("cumulative_value_str").style.display = "block";
     if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
         format_both_options("question")
-        // display_option_a.onclick = function () {
-        //     next_value_free(i, item_id, current_info, 0)
-        // };
         display_option_a.addEventListener("click", function () { next_value_free(i, item_id, current_info, 0), { once: true } })
-        // display_option_b.onclick = function () {
-        //     next_value_free(i, item_id, current_info, 1)
-        // };
         display_option_b.addEventListener("click", function () { next_value_free(i, item_id, current_info, 1), { once: true } })
         var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
         document.getElementById("n_remaining_choices").style.display = "block"
         document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
         if (n_remaining == 1) {
             document.getElementById("n_remaining_choices").style.color = "red"
-        } else if (n_remaining <= 6) {
+        } else if (n_remaining <= experiment_info["var_horizon"][1] / 2) {
             document.getElementById("n_remaining_choices").style.color = "orange"
         } else {
             document.getElementById("n_remaining_choices").style.color = "green"
@@ -469,14 +463,14 @@ async function display_free_choices(old, item_id) {
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
             // practice is over
             format_both_options("reset")
-            clickStart("page5", "page8")
+            clickStart("page6", "page8")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
             // experiment is over
-            clickStart("page5", "page9")
+            clickStart("page6", "page9")
         } else {
             // next trial
             format_both_options("reset")
-            clickStart("page5", "page7")
+            clickStart("page6", "page8")
         }
     }
 }
@@ -574,7 +568,7 @@ function changeColor(element, color) {
 
 var flag = 0;
 var instcounter = 0;
-function instructioncheck(pg, pg_prev) {
+function instructioncheck(pg, pg_prev, pg_succeed) {
     var ch1 = 0;
     var ch2 = 0;
     var ch3 = 0;
@@ -603,7 +597,7 @@ function instructioncheck(pg, pg_prev) {
     if ((checksum === criterion) && (flag == 2)) {
         //if correct, continue 
         //begintrial();
-        clickStart(pg, 'page3');
+        clickStart(pg, pg_succeed);
         // alert
         alert('Great, you have answered all of the questions correctly. The study will now start.');
     }
