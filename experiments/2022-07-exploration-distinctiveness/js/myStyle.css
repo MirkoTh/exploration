@@ -114,6 +114,28 @@
     padding: 1em;
 }
 
+.present_slotmachine_0_instruction {
+    position: absolute;
+    top: 30%;
+    left: 28%;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    align-self: center;
+    padding: 1em
+}
+
+.present_slotmachine_1_instruction {
+    position: absolute;
+    top: 30%;
+    right: 32%;
+    width: 100px;
+    height: 100px;
+    text-align: center;
+    align-self: center;
+    padding: 1em
+}
+
 .present_slotmachine_0 {
     position: absolute;
     top: 25%;

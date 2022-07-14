@@ -154,16 +154,19 @@ function setup_experiment() {
     shuffle_trials = Array(experiment_info["n_trials"]).fill().map((element, index) => index);
     shuffle_trials = append_randomized_arrays(shuffle_trials, 1);
     for (let idx = 0; idx < experiment_info["n_trials"]; idx++) {
+        if (shuffle_trials[idx] % 2 == 0) {
+            assign_mean = [0, 1]
+        } else { assign_mean = [1, 0] }
         trial_info["sequence_forced_choices"][idx] = trial_info["sequence_forced_choices_prep"][shuffle_trials[idx]];
         trial_info["memory_test"][idx] = trial_info["memory_test_prep"][shuffle_trials[idx]];
         trial_info["location_test"][idx] = trial_info["location_test_prep"][shuffle_trials[idx]];
         trial_info["horizon"][idx] = trial_info["horizon_prep"][shuffle_trials[idx]];
         trial_info["distinctiveness"][idx] = trial_info["distinctiveness_prep"][shuffle_trials[idx]];
         trial_info["vals_bandit_0"][idx] = random_normal_samples_unique(
-            experiment_info["bandit_means"][0], experiment_info["bandit_sd"], experiment_info["n_vals"]
+            experiment_info["bandit_means"][assign_mean[0]], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
         trial_info["vals_bandit_1"][idx] = random_normal_samples_unique(
-            experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
+            experiment_info["bandit_means"][assign_mean[1]], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
     }
 
@@ -211,7 +214,7 @@ function setup_and_proceed() {
     display_info = setup_expt["display_info"]
     practice_info = setup_expt["practice_info"]
     trial_info = setup_expt["trial_info"]
-    clickStart('page0', 'page3')
+    clickStart('page0', 'page1')
 }
 
 
