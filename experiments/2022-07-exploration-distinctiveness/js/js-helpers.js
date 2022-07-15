@@ -81,10 +81,11 @@ function setup_experiment() {
         "var_horizon": [1, 8],
         "var_distinct": ["massed", "interleaved"],
         "var_location_test": [0, 1],
+        "var_mean_shift": [-20, -10, 0, 10, 20],
         "n_trials_practice": 2, // 1. memory test + horizon 12 + massed; 2. no memory test + horizon 1 + interleaved
-        "n_trials_per_condition": 3,
-        "bandit_means": [10, 20],
-        "bandit_sd": [20],
+        "n_trials_per_condition": 1,
+        "bandit_means": [40, 60],
+        "bandit_sd": [10],
         "n_vals": 16,
         "n_forced_choice": 8,
         "sequences_forced_choices": {
@@ -92,10 +93,14 @@ function setup_experiment() {
             "interleaved": [0, 1, 0, 1, 0, 1, 0, 1]
         }
     }
-    experiment_info["n_trials"] = (
+    experiment_info["n_trials"] = ( // no memory test
         experiment_info["n_trials_per_condition"] * experiment_info["var_distinct"].length *
-        experiment_info["var_horizon"].length * experiment_info["var_mem_test"].length
-    )
+        experiment_info["var_horizon"].length * experiment_info["var_mean_shift"].length
+    ) + (
+            experiment_info["n_trials_per_condition"] * experiment_info["var_distinct"].length *
+            experiment_info["var_horizon"].length * experiment_info["var_location_test"].length *
+            experiment_info["var_mean_shift"].length
+        );
 
     // display info
     var display_info = {
@@ -112,6 +117,8 @@ function setup_experiment() {
         "vals_bandit_0": [],
         "vals_bandit_1": [],
         "sequence_forced_choices": [],
+        "mean_bandit_0": [],
+        "mean_bandit_1": [],
     }
 
     // trial info
@@ -121,13 +128,16 @@ function setup_experiment() {
         "distinctiveness_prep": [],
         "sequence_forced_choices_prep": [],
         "location_test_prep": [],
+        "mean_shift_prep": [],
         "memory_test": [],
         "horizon": [],
         "distinctiveness": [],
         "sequence_forced_choices": [],
         "location_test": [],
         "vals_bandit_0": [],
-        "vals_bandit_1": []
+        "vals_bandit_1": [],
+        "mean_bandit_0": [],
+        "mean_bandit_1": [],
     };
 
     // loop over three within-participant variables
@@ -136,14 +146,27 @@ function setup_experiment() {
     for (const mem of experiment_info["var_mem_test"].entries()) {
         for (const hor of experiment_info["var_horizon"].entries()) {
             for (const dis of experiment_info["var_distinct"].entries()) {
-                for (const loc of experiment_info["var_location_test"].entries()) {
+                for (const ms of experiment_info["var_mean_shift"].entries()) {
                     for (let rep = 0; rep < experiment_info["n_trials_per_condition"]; rep++) {
-                        trial_info["memory_test_prep"][idx] = mem[1];
-                        trial_info["horizon_prep"][idx] = hor[1];
-                        trial_info["distinctiveness_prep"][idx] = dis[1];
-                        trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
-                        trial_info["location_test_prep"][idx] = loc[1];
-                        idx += 1;
+                        if (mem[1] == false) {
+                            trial_info["memory_test_prep"][idx] = mem[1];
+                            trial_info["horizon_prep"][idx] = hor[1];
+                            trial_info["distinctiveness_prep"][idx] = dis[1];
+                            trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
+                            trial_info["location_test_prep"][idx] = null; // no test location because no memory test
+                            trial_info["mean_shift_prep"][idx] = ms[1];
+                            idx += 1;
+                        } else if (mem[1] == true) {
+                            for (const loc of experiment_info["var_location_test"].entries()) {
+                                trial_info["memory_test_prep"][idx] = mem[1];
+                                trial_info["horizon_prep"][idx] = hor[1];
+                                trial_info["distinctiveness_prep"][idx] = dis[1];
+                                trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
+                                trial_info["location_test_prep"][idx] = loc[1];
+                                trial_info["mean_shift_prep"][idx] = ms[1];
+                                idx += 1;
+                            }
+                        }
                     }
                 }
             }
@@ -155,20 +178,31 @@ function setup_experiment() {
     shuffle_trials = append_randomized_arrays(shuffle_trials, 1);
     for (let idx = 0; idx < experiment_info["n_trials"]; idx++) {
         if (shuffle_trials[idx] % 2 == 0) {
-            assign_mean = [0, 1]
-        } else { assign_mean = [1, 0] }
+            assign_mean = 0
+        } else { assign_mean = 1 }
+        var mean_0 = experiment_info["bandit_means"][assign_mean];
+        var mean_1 = experiment_info["bandit_means"][assign_mean] + trial_info["mean_shift_prep"][shuffle_trials[idx]];
+        var rand_mean_location = Math.random() >= .5 | 0;
+        if (rand_mean_location == true) {
+            bd_means = [mean_0, mean_1];
+        } else {
+            bd_means = [mean_1, mean_0];
+        }
         trial_info["sequence_forced_choices"][idx] = trial_info["sequence_forced_choices_prep"][shuffle_trials[idx]];
         trial_info["memory_test"][idx] = trial_info["memory_test_prep"][shuffle_trials[idx]];
         trial_info["location_test"][idx] = trial_info["location_test_prep"][shuffle_trials[idx]];
         trial_info["horizon"][idx] = trial_info["horizon_prep"][shuffle_trials[idx]];
         trial_info["distinctiveness"][idx] = trial_info["distinctiveness_prep"][shuffle_trials[idx]];
         trial_info["vals_bandit_0"][idx] = random_normal_samples_unique(
-            experiment_info["bandit_means"][assign_mean[0]], experiment_info["bandit_sd"], experiment_info["n_vals"]
+            bd_means[0], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
         trial_info["vals_bandit_1"][idx] = random_normal_samples_unique(
-            experiment_info["bandit_means"][assign_mean[1]], experiment_info["bandit_sd"], experiment_info["n_vals"]
+            bd_means[1], experiment_info["bandit_sd"], experiment_info["n_vals"]
         );
+        trial_info["mean_bandit_0"][idx] = bd_means[0];
+        trial_info["mean_bandit_1"][idx] = bd_means[1];
     }
+
 
     // fill practice such that all values of variables seen once
     // first practice trial
@@ -183,6 +217,9 @@ function setup_experiment() {
         experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
     practice_info["sequence_forced_choices"][0] = experiment_info["sequences_forced_choices"]["massed"];
+    practice_info["mean_bandit_0"][0] = experiment_info["bandit_means"][0];
+    practice_info["mean_bandit_1"][0] = experiment_info["bandit_means"][1];
+
     // second practice trial
     practice_info["memory_test"][1] = false;
     practice_info["location_test"][1] = 1;
@@ -195,7 +232,8 @@ function setup_experiment() {
         experiment_info["bandit_means"][1], experiment_info["bandit_sd"], experiment_info["n_vals"]
     );
     practice_info["sequence_forced_choices"][1] = experiment_info["sequences_forced_choices"]["interleaved"];
-
+    practice_info["mean_bandit_0"][1] = experiment_info["bandit_means"][0];
+    practice_info["mean_bandit_1"][1] = experiment_info["bandit_means"][1];
 
     var obj_setup_expt;
     obj_setup_expt = {
@@ -280,8 +318,8 @@ async function display_forced_choices(old, part_experiment = null) {
     var item_id = 0;
     display_option = cue_location(i, item_id, part)
     display_option.onclick = function () { next_value_forced(i, item_id, part) }
-    //display_option.addEventListener("click", function () { next_value_forced(i, item_id, part), { once: true } })
 }
+
 
 function cue_location(i, item_id, part) {
     if (part == 0) { // practice
@@ -303,6 +341,8 @@ async function next_value_forced(i, item_id, part) {
     } else if (part == 1) {
         current_info = trial_info;
     }
+    console.log("mean bandit left is = " + current_info["mean_bandit_0"][i]);
+    console.log("mean bandit right is = " + current_info["mean_bandit_1"][i]);
     // read out current choice value
     current_option = current_info["sequence_forced_choices"][i][item_id]
     value_display = "vals_bandit_" + current_option
@@ -316,12 +356,12 @@ async function next_value_forced(i, item_id, part) {
     // increase choice counter by one
     item_id += 1;
     // display another item or go to the memory test
-    if (item_id < 4) {//experiment_info["n_forced_choice"] - 1) {//
+    if (item_id < experiment_info["n_forced_choice"]) {//4) {//
         display_option = cue_location(i, item_id, part);
         display_option.onclick = function () {
             next_value_forced(i, item_id, part)
         }
-    } else {//if (item_id == experiment_info["n_forced_choice"] - 1) {//
+    } else if (item_id == experiment_info["n_forced_choice"]) {//{//
         // increase trial nr by 1
         document.getElementById("time_var").innerHTML = Date.now();
         if (current_info["memory_test"][i] == true) {
@@ -341,10 +381,12 @@ function cue_memory_responses(i) {
     display_option = document.getElementById(location_display);
     display_option.innerHTML = "?"
     display_option.style.background = "#26dabcde";
+    document.getElementById("time_var").innerHTML = Date.now();
 }
 
 function clean_and_proceed() {
-    // x can be used to save data
+    var rt_mem = Date.now() - document.getElementById("time_var").innerHTML;
+    document.getElementById("rt_mem").innerHTML = rt_mem;
     process_memory_responses();
     // input field is wiped again
     document.getElementById("mem_response").value = "";
@@ -383,6 +425,7 @@ function process_memory_responses() {
 
 function log_memory_responses(count_accuracy, count_redundant, responses_unique) {
     var [part, i, current_info] = progress_in_experiment();
+    var rt_mem = document.getElementById("rt_mem").innerHTML;
     var data_store = {
         participant_id: participant_id,
         session: part,
@@ -396,7 +439,8 @@ function log_memory_responses(count_accuracy, count_redundant, responses_unique)
         mask_shown: current_info["sequence_forced_choices"][i],
         responses_unique: responses_unique,
         n_correct: count_accuracy,
-        n_redundant: count_redundant
+        n_redundant: count_redundant,
+        rt: rt_mem
     }
     saveData(JSON.stringify(data_store), "memory");
 }
@@ -411,7 +455,7 @@ async function display_free_choices(old, item_id) {
     document.getElementById("cumulative_value_str").style.display = "block";
     if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
         [display_option_a, display_option_b] = format_both_options("question");
-
+        document.getElementById("time_var").innerHTML = Date.now()
         display_option_a.onclick = function () { next_value_free(i, item_id, current_info, 0) }
         display_option_b.onclick = function () { next_value_free(i, item_id, current_info, 1) }
         var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
@@ -453,6 +497,8 @@ async function next_value_free(i, item_id, current_info, pos) {
     var clickflag = parseInt(document.getElementById("block_responding").innerHTML);
     if (clickflag == 0) {
         document.getElementById("block_responding").innerHTML = 1;
+        var rt_choice = Date.now() - document.getElementById("time_var").innerHTML;
+        document.getElementById("rt_choice").innerHTML = rt_choice;
         value_display = "vals_bandit_" + pos
         location_display = "value_displayed_" + pos
         display_option = document.getElementById(location_display);
@@ -494,23 +540,26 @@ function format_both_options(direction) {
     return [display_option_a, display_option_b]
 }
 
-// store rts
-// fix counter running several times instead of once
+
 
 function log_choice(item_id, choice) {
     var [part, i, current_info] = progress_in_experiment();
+    var rt_choice = document.getElementById("rt_choice").innerHTML;
     var data_store = {
         participant_id: participant_id,
         session: part,
         trial_id: i,
         item_id: item_id,
-        choice: choice,
         var_distinct: current_info["distinctiveness"][i],
         var_horizon: current_info["horizon"][i],
         var_memtest: current_info["memory_test"][i],
         var_loctest: current_info["location_test"][i],
+        mean_left: current_info["mean_bandit_0"][i],
+        mean_right: current_info["mean_bandit_1"][i],
         items_left: current_info["vals_bandit_0"][i][item_id],
         items_right: current_info["vals_bandit_1"][i][item_id],
+        choice: choice,
+        rt: rt_choice
     }
     saveData(JSON.stringify(data_store), "choice");
 }
