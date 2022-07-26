@@ -24,7 +24,7 @@
     <script src="js/d3.v4.js" charset="utf-8"></script>
     <script src="js/js-helpers.js" charset="utf-8"></script>
     <script src="js/js-txt.js" charset="utf-8" </script></script>
-    <script>
+    <!--     <script>
         var _rollbarConfig = {
             accessToken: 'ce189ef6e760416db77b45599958b9e8',
             captureUncaught: true,
@@ -45,7 +45,7 @@
         // Rollbar Snippet
         !function (r) { var e = {}; function o(n) { if (e[n]) return e[n].exports; var t = e[n] = { i: n, l: !1, exports: {} }; return r[n].call(t.exports, t, t.exports, o), t.l = !0, t.exports } o.m = r, o.c = e, o.d = function (r, e, n) { o.o(r, e) || Object.defineProperty(r, e, { enumerable: !0, get: n }) }, o.r = function (r) { "undefined" != typeof Symbol && Symbol.toStringTag && Object.defineProperty(r, Symbol.toStringTag, { value: "Module" }), Object.defineProperty(r, "__esModule", { value: !0 }) }, o.t = function (r, e) { if (1 & e && (r = o(r)), 8 & e) return r; if (4 & e && "object" == typeof r && r && r.__esModule) return r; var n = Object.create(null); if (o.r(n), Object.defineProperty(n, "default", { enumerable: !0, value: r }), 2 & e && "string" != typeof r) for (var t in r) o.d(n, t, function (e) { return r[e] }.bind(null, t)); return n }, o.n = function (r) { var e = r && r.__esModule ? function () { return r.default } : function () { return r }; return o.d(e, "a", e), e }, o.o = function (r, e) { return Object.prototype.hasOwnProperty.call(r, e) }, o.p = "", o(o.s = 0) }([function (r, e, o) { "use strict"; var n = o(1), t = o(5); _rollbarConfig = _rollbarConfig || {}, _rollbarConfig.rollbarJsUrl = _rollbarConfig.rollbarJsUrl || "https://cdn.rollbar.com/rollbarjs/refs/tags/v2.24.0/rollbar.min.js", _rollbarConfig.async = void 0 === _rollbarConfig.async || _rollbarConfig.async; var a = n.setupShim(window, _rollbarConfig), l = t(_rollbarConfig); window.rollbar = n.Rollbar, a.loadFull(window, document, !_rollbarConfig.async, _rollbarConfig, l) }, function (r, e, o) { "use strict"; var n = o(2), t = o(3); function a(r) { return function () { try { return r.apply(this, arguments) } catch (r) { try { console.error("[Rollbar]: Internal error", r) } catch (r) { } } } } var l = 0; function i(r, e) { this.options = r, this._rollbarOldOnError = null; var o = l++; this.shimId = function () { return o }, "undefined" != typeof window && window._rollbarShims && (window._rollbarShims[o] = { handler: e, messages: [] }) } var s = o(4), d = function (r, e) { return new i(r, e) }, c = function (r) { return new s(d, r) }; function u(r) { return a((function () { var e = this, o = Array.prototype.slice.call(arguments, 0), n = { shim: e, method: r, args: o, ts: new Date }; window._rollbarShims[this.shimId()].messages.push(n) })) } i.prototype.loadFull = function (r, e, o, n, t) { var l = !1, i = e.createElement("script"), s = e.getElementsByTagName("script")[0], d = s.parentNode; i.crossOrigin = "", i.src = n.rollbarJsUrl, o || (i.async = !0), i.onload = i.onreadystatechange = a((function () { if (!(l || this.readyState && "loaded" !== this.readyState && "complete" !== this.readyState)) { i.onload = i.onreadystatechange = null; try { d.removeChild(i) } catch (r) { } l = !0, function () { var e; if (void 0 === r._rollbarDidLoad) { e = new Error("rollbar.js did not load"); for (var o, n, a, l, i = 0; o = r._rollbarShims[i++];)for (o = o.messages || []; n = o.shift();)for (a = n.args || [], i = 0; i < a.length; ++i)if ("function" == typeof (l = a[i])) { l(e); break } } "function" == typeof t && t(e) }() } })), d.insertBefore(i, s) }, i.prototype.wrap = function (r, e, o) { try { var n; if (n = "function" == typeof e ? e : function () { return e || {} }, "function" != typeof r) return r; if (r._isWrap) return r; if (!r._rollbar_wrapped && (r._rollbar_wrapped = function () { o && "function" == typeof o && o.apply(this, arguments); try { return r.apply(this, arguments) } catch (o) { var e = o; throw e && ("string" == typeof e && (e = new String(e)), e._rollbarContext = n() || {}, e._rollbarContext._wrappedSource = r.toString(), window._rollbarWrappedError = e), e } }, r._rollbar_wrapped._isWrap = !0, r.hasOwnProperty)) for (var t in r) r.hasOwnProperty(t) && (r._rollbar_wrapped[t] = r[t]); return r._rollbar_wrapped } catch (e) { return r } }; for (var p = "log,debug,info,warn,warning,error,critical,global,configure,handleUncaughtException,handleAnonymousErrors,handleUnhandledRejection,captureEvent,captureDomContentLoaded,captureLoad".split(","), f = 0; f < p.length; ++f)i.prototype[p[f]] = u(p[f]); r.exports = { setupShim: function (r, e) { if (r) { var o = e.globalAlias || "Rollbar"; if ("object" == typeof r[o]) return r[o]; r._rollbarShims = {}, r._rollbarWrappedError = null; var l = new c(e); return a((function () { e.captureUncaught && (l._rollbarOldOnError = r.onerror, n.captureUncaughtExceptions(r, l, !0), e.wrapGlobalEventHandlers && t(r, l, !0)), e.captureUnhandledRejections && n.captureUnhandledRejections(r, l, !0); var a = e.autoInstrument; return !1 !== e.enabled && (void 0 === a || !0 === a || "object" == typeof a && a.network) && r.addEventListener && (r.addEventListener("load", l.captureLoad.bind(l)), r.addEventListener("DOMContentLoaded", l.captureDomContentLoaded.bind(l))), r[o] = l, l }))() } }, Rollbar: c } }, function (r, e, o) { "use strict"; function n(r, e, o, n) { r._rollbarWrappedError && (n[4] || (n[4] = r._rollbarWrappedError), n[5] || (n[5] = r._rollbarWrappedError._rollbarContext), r._rollbarWrappedError = null); var t = e.handleUncaughtException.apply(e, n); o && o.apply(r, n), "anonymous" === t && (e.anonymousErrorsPending += 1) } r.exports = { captureUncaughtExceptions: function (r, e, o) { if (r) { var t; if ("function" == typeof e._rollbarOldOnError) t = e._rollbarOldOnError; else if (r.onerror) { for (t = r.onerror; t._rollbarOldOnError;)t = t._rollbarOldOnError; e._rollbarOldOnError = t } e.handleAnonymousErrors(); var a = function () { var o = Array.prototype.slice.call(arguments, 0); n(r, e, t, o) }; o && (a._rollbarOldOnError = t), r.onerror = a } }, captureUnhandledRejections: function (r, e, o) { if (r) { "function" == typeof r._rollbarURH && r._rollbarURH.belongsToShim && r.removeEventListener("unhandledrejection", r._rollbarURH); var n = function (r) { var o, n, t; try { o = r.reason } catch (r) { o = void 0 } try { n = r.promise } catch (r) { n = "[unhandledrejection] error getting `promise` from event" } try { t = r.detail, !o && t && (o = t.reason, n = t.promise) } catch (r) { } o || (o = "[unhandledrejection] error getting `reason` from event"), e && e.handleUnhandledRejection && e.handleUnhandledRejection(o, n) }; n.belongsToShim = o, r._rollbarURH = n, r.addEventListener("unhandledrejection", n) } } } }, function (r, e, o) { "use strict"; function n(r, e, o) { if (e.hasOwnProperty && e.hasOwnProperty("addEventListener")) { for (var n = e.addEventListener; n._rollbarOldAdd && n.belongsToShim;)n = n._rollbarOldAdd; var t = function (e, o, t) { n.call(this, e, r.wrap(o), t) }; t._rollbarOldAdd = n, t.belongsToShim = o, e.addEventListener = t; for (var a = e.removeEventListener; a._rollbarOldRemove && a.belongsToShim;)a = a._rollbarOldRemove; var l = function (r, e, o) { a.call(this, r, e && e._rollbar_wrapped || e, o) }; l._rollbarOldRemove = a, l.belongsToShim = o, e.removeEventListener = l } } r.exports = function (r, e, o) { if (r) { var t, a, l = "EventTarget,Window,Node,ApplicationCache,AudioTrackList,ChannelMergerNode,CryptoOperation,EventSource,FileReader,HTMLUnknownElement,IDBDatabase,IDBRequest,IDBTransaction,KeyOperation,MediaController,MessagePort,ModalWindow,Notification,SVGElementInstance,Screen,TextTrack,TextTrackCue,TextTrackList,WebSocket,WebSocketWorker,Worker,XMLHttpRequest,XMLHttpRequestEventTarget,XMLHttpRequestUpload".split(","); for (t = 0; t < l.length; ++t)r[a = l[t]] && r[a].prototype && n(e, r[a].prototype, o) } } }, function (r, e, o) { "use strict"; function n(r, e) { this.impl = r(e, this), this.options = e, function (r) { for (var e = function (r) { return function () { var e = Array.prototype.slice.call(arguments, 0); if (this.impl[r]) return this.impl[r].apply(this.impl, e) } }, o = "log,debug,info,warn,warning,error,critical,global,configure,handleUncaughtException,handleAnonymousErrors,handleUnhandledRejection,_createItem,wrap,loadFull,shimId,captureEvent,captureDomContentLoaded,captureLoad".split(","), n = 0; n < o.length; n++)r[o[n]] = e(o[n]) }(n.prototype) } n.prototype._swapAndProcessMessages = function (r, e) { var o, n, t; for (this.impl = r(this.options); o = e.shift();)n = o.method, t = o.args, this[n] && "function" == typeof this[n] && ("captureDomContentLoaded" === n || "captureLoad" === n ? this[n].apply(this, [t[0], o.ts]) : this[n].apply(this, t)); return this }, r.exports = n }, function (r, e, o) { "use strict"; r.exports = function (r) { return function (e) { if (!e && !window._rollbarInitialized) { for (var o, n, t = (r = r || {}).globalAlias || "Rollbar", a = window.rollbar, l = function (r) { return new a(r) }, i = 0; o = window._rollbarShims[i++];)n || (n = o.handler), o.handler._swapAndProcessMessages(l, o.messages); window[t] = n, window._rollbarInitialized = !0 } } } }]);
         // End Rollbar Snippet
-
+ -->
     </script>
 
 </head>
@@ -102,7 +102,7 @@
             <h1>Information on tasks and purpose of the study</h1>
             Today, you are stepping into the role of a gambler.<br>
             Your first goal is to gain as many rewards as possible.<br>
-            Sometimes, a friend is joining and asks you about the previous rewards of one of the slot machines.<br>
+            Sometimes, a friend is joining and asks you about the previous rewards of the slot machines.<br>
             Your second goal is to remember the rewards returned by each of the slot machines and inform your friend
             about them.<br><br>
 
@@ -200,7 +200,8 @@
             option to choose on average.<br><br>
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
             </button>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page3')" ;>
+            <!-- page3 -->
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page5')" ;>
                 Response Instruction
             </button>
 
@@ -214,13 +215,14 @@
             <b>1. An instructed phase</b> during which we will tell you which machine to play.<br>
             This will give you some experience with each option before you make your first choice.<br>
             The respective machine is highlighted with a green square containing a question mark (?) on top of the slot
-            machine to be chosen.<br>
-            <br>
+            machine to be chosen.<br><br>
 
             <b>2. A memory recall phase</b>. Occasionally, a friend who wants to play with you comes along.<br>
-            She already knows one of the slot machines very well but unfortunately not the other. She asks you about the
-            rewards of the latter. Try to help her!<br>
-            Sometimes, the recall phase is skipped and you are directly confronted with phase 3.
+            She has no information about the two slot machines and asks you about the
+            rewards you have received so far from the two machines. Try to help her!<br>
+            Sometimes, you just play yourself.<br>
+            That is, the phase, in which you recall the rewards to help your friend, is skipped in some trials and you
+            are directly confronted with phase 3.
             <br><br>
 
             <b>3. A choice phase</b> during which you choose yourself between the two slot machines.<br>
@@ -230,8 +232,7 @@
             To respond in <b>part 1 / the instructed phase</b>: click on the highlighted square with a question mark in
             green.<br><br>
             To respond in <b>part 2 / the memory recall phase</b>: click with the mouse into the text box appearing for
-            this
-            purpose.<br>
+            this purpose.<br>
             Recall the values that you received from the slot machine, which is highlighted with a green square
             containing a question mark (?).<br>
             Type in your responses using the number keys on the keyboard when you see the cursor in the textbox.<br>
@@ -255,8 +256,7 @@
             <fieldset>
                 <legend>Please answer a few questions about this study before proceeding</legend>
                 <p style="font-size:100%;color:maroon;"> You will only be directed to the next page if you manage to
-                    answer
-                    all of the questions correctly.</p>
+                    answer all of the questions correctly.</p>
                 <fieldset>
                     <b>What is your task in the third part of a given trial? </b><br>
                     <label for="q1l1" style="font-weight: normal;"><input type="radio" name="q1" id="l1"><span
@@ -268,11 +268,11 @@
                         </span></label><br>
                     <label for="q1l3" style="font-weight: normal;"><input type="radio" name="q1" id="l2"><span
                             id="q1l2">
-                            Only on green square is going to be highlighted. Click on that square. </span></label><br>
+                            Only one green square is going to be highlighted. Click on that square. </span></label><br>
                     <br>
                 </fieldset>
                 <fieldset>
-                    <b>How do you respond in the memory task when one slot machine is cued? </b><br>
+                    <b>How do you respond in the memory task when a slot machine is cued? </b><br>
                     <label for="q2l1" style="font-weight: normal;"><input type="radio" name="q2" id="l1" /><span
                             id="q2l1">
                             Recall the values in the order of their appearance. </span></label><br>
@@ -288,7 +288,7 @@
                     <b>What is your task in the first part / the instructed phase? </b><br>
                     <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l1"><span
                             id="q3l1">
-                            Inform your friend about the previously received rewards from one of the slot machines.
+                            Inform your friend about the previously received rewards from the two slot machines.
                         </span></label><br>
                     <label for="q3l2" style="font-weight: normal;"><input type="radio" name="q3" id="l2"><span
                             id="q3l2"></span> Maximize the sum of your rewards.
@@ -366,21 +366,40 @@
         </div>
         <br>
 
-        <div id="page7" style="display:none">
+        <div id="page7a" style="display:none">
             <div class="present_bandit_0">
-                <p id="response_displayed_0" height="200px" style="font-size:50px">/p>
+                <p id="response_displayed_a_0" height="200px" style="font-size:50px">/p>
             </div><br>
             <div class="present_bandit_1">
-                <p id="response_displayed_1" height="200px" style="font-size:50px"></p>
+                <p id="response_displayed_a_1" height="200px" style="font-size:50px"></p>
             </div><br>
             <div class="present_slotmachine_0">
-                <img id="slotmachine_r_0" src="stimuli/slotmachine-l.jpg" height="100px">
+                <img id="slotmachine_r_a_0" src="stimuli/slotmachine-l.jpg" height="100px">
             </div><br>
             <div class="present_slotmachine_1">
-                <img id="slotmachine_r_1" src="stimuli/slotmachine-r.jpg" height="100px">
+                <img id="slotmachine_r_a_1" src="stimuli/slotmachine-r.jpg" height="100px">
             </div><br>
 
-            <input type="text" id="mem_response" size="15" class="respond_mem">
+            <input type="text" id="mem_response_a" size="15" class="respond_mem">
+            <button type="button" , class="response_button" , onclick="link_mem_responses()"> Submit Response &
+                Proceed </button>
+        </div>
+
+        <div id="page7b" style="display:none">
+            <div class="present_bandit_0">
+                <p id="response_displayed_b_0" height="200px" style="font-size:50px">/p>
+            </div><br>
+            <div class="present_bandit_1">
+                <p id="response_displayed_b_1" height="200px" style="font-size:50px"></p>
+            </div><br>
+            <div class="present_slotmachine_0">
+                <img id="slotmachine_r_b_0" src="stimuli/slotmachine-l.jpg" height="100px">
+            </div><br>
+            <div class="present_slotmachine_1">
+                <img id="slotmachine_r_b_1" src="stimuli/slotmachine-r.jpg" height="100px">
+            </div><br>
+
+            <input type="text" id="mem_response_b" size="15" class="respond_mem">
             <button type="button" , class="response_button" , onclick="clean_and_proceed()">Submit Response &
                 Start Next Trial</button>
         </div>
@@ -406,156 +425,6 @@
                 Back to prolific </button>
         </div>
 
-
-        <div id="page7.1" style="display:none">
-            <h1>
-                Part two of the study
-            </h1>
-            <p>
-                Remember that the monsters come from different tribes.<br>
-                In the second part, your task is to categorize the monsters into <span id="myText"></span>
-                categories.<br>
-            </p>
-            <p class="category_instruction"></p>
-            <p>
-                <br>
-                There will be four blocks of trials after the target-training phase. Between the blocks you can take a
-                break if you want, but the experiment continues after 1 min at the latest.<br>
-                Please leave your hands on the keyboard while responding in a block.<br><br>
-                Try to use the feedack to sharpen your understanding of the categories and the border between them.<br>
-                In the beginning, it won't be an easy task, but no worries, you will get better with practice!
-            </p>
-            <!--             <script>
-                (() => {
-                    document.getElementById("myText").innerHTML = document.getElementById("n_categories").innerHTML;
-                })();
-            </script>
- --> <button type="button" name="button" class="default_button" ; onclick="clickStart('page7', 'page8')" ;> Start
-                Categorization</button>
-        </div>
-
-        <div id="page7b" style="display:none">
-            <h1>
-                Part two of the study
-            </h1>
-            <p>
-                In the second part, your task is to judge how similar the current monster is to the monster on the
-                previous trial.<br>
-                <b>Responding:</b><br>
-                You can use the number keys on your keyboard to give a response in the task.<br>
-                "1" relates to not similar at all to the monster presented on the previous trial<br>
-                "4" relates to very similar to the monster presented on the previous trial<br><br>
-                There is no option to relate the monster on the first trial to a previous monster.<br>
-                You can respond with any key from 1-4 on the first trial.<br><br>
-                <b>Please try to respond within 3 seconds as accurately as possible.</b> You will get feedback to
-                respond faster if you respond
-                too slowly!<br>
-            </p>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page7b', 'page8')" ;>
-                Start
-                Similarity Judgments</button>
-        </div>
-
-        <div id="trial_nr_cat" style="display:none">0</div>
-        <div id="rt" style="display:none">0</div>
-        <div id="key_id" style="display:none">0</div>
-
-        <div id="page18" style="display:none">
-            <h1>
-                Part 2 of the study!
-            </h1>
-            <p>
-                By clicking on the button below, you start the task of part 2.
-            </p>
-            <button type="button" name="button" class="default_button" ; onclick="next_item_cat('page8', 0)" ;> Start
-                Task </button>
-        </div>
-
-        <div id="page19" style="display:none;">
-            <div class="cat_feedback_neg" style="color:red; font-size:30px">
-                <p id="feedback_cat_wrong"></p>
-            </div>
-            <div class="cat_feedback_pos" style="color:green; font-size:30px">
-                <p id="feedback_cat_true"></p>
-            </div>
-            <div class="present_stimulus">
-                <img id="background_displayed_3" src="stimuli/mask.png" height="300px">
-            </div><br>
-            <div class="present_stimulus">
-                <img id="item_displayed_cat" height="300px" src="stimuli/mask.png">
-            </div><br>
-
-        </div>
-
-        <div id="page110" style="display:none;">
-            <h1>Time for a break!</h1>
-            <h2 id="progress"></h2>
-            <div id="cat_continued" style="display:none">0</div>
-            <div id="break_idx" style="display:none">0</div>
-            <button type="button" name="button" id="cat_button" ;
-                onclick="next_item_cat('page10', parseInt(document.getElementById('trial_nr_cat').innerHTML))" ;>
-                Continue
-            </button>
-            <script>
-                const element = document.getElementById("cat_button");
-                element.addEventListener("click", function () {
-                    document.getElementById("cat_continued").innerHTML = 1;
-                });
-            </script>
-
-            <body>
-                <div id="timeframe1" style="display:none">Experiment continues in <span id="time1"></span> minutes!
-                </div>
-                <div id="timeframe2" style="display:none">Experiment continues in <span id="time2"></span> minutes!
-                </div>
-                <div id="timeframe3" style="display:none">Experiment continues in <span id="time3"></span> minutes!
-                </div>
-                <div id="timeframe4" style="display:none">Experiment continues in <span id="time4"></span> minutes!
-                </div>
-            </body>
-
-        </div>
-
-        <div id="page101b" style="display:none;">
-            <h1>Target Examples</h1><br>
-            <p>The initial block with target category examples is now over.<br>
-                In the following, your task is to categorize monsters from all categories, including the
-                non-target category.</p>
-            <button type="button" name="button" class="default_button" ;
-                onclick="next_item_cat('page10b', parseInt(document.getElementById('trial_nr_cat').innerHTML))" ;>
-                Continue with all categories
-            </button>
-
-        </div>
-        <div id="page111" style="display:none">
-            <h1>
-                Very well done - That was it for part 2!<br>
-                You performed well enough and made it to part 3 of the study!
-            </h1>
-            <p>
-                By clicking on the button below, you get to part 3.
-            </p>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page11', 'page12')" ;>
-                Instructions
-                Memory Task </button>
-
-        </div>
-
-        <div id="trial_nr_cr2" style="display:none">0</div>
-        <div id="page112" style="display:none">
-            <h1>
-                Part 3 of the study!
-            </h1>
-            <p>
-                The third part is the final part of the study. It is again the memory task from part 1.<br>
-                That is, your task is again to remember the spikiness of the head and the fill of the belly of a monster
-                presented in a trial.<br>After presentation, use the two sliders to reproduce the monster just seen as
-                precisely as possible.<br>
-                By clicking on the button below, you start the third and last part of that study.
-            </p>
-            <button type="button" name="button" class="default_button" ; onclick="next_item_cr('page12')" ;> Start
-                Memory Task </button>
-        </div>
 
         <div id="page113" style="display:none">
             <h1>

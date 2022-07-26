@@ -18,10 +18,6 @@ var total_trials0;
 var total_trials1;
 var total_trials2;
 
-// todos
-// add instructions
-// add questionnaire
-
 
 if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
     var participant_id = getQueryVariable('PROLIFIC_PID');
@@ -80,8 +76,8 @@ function setup_experiment() {
         "var_mem_test": [true, false],
         "var_horizon": [1, 8],
         "var_distinct": ["massed", "interleaved"],
-        "var_location_test": [0, 1],
-        "var_mean_shift": [-20, -10, 0, 10, 20],
+        "var_location_test": Array([0, 1], [1, 0]),
+        "var_mean_shift": [-20, -10, -4, 4, 10, 20],
         "n_trials_practice": 2, // 1. memory test + horizon 12 + massed; 2. no memory test + horizon 1 + interleaved
         "n_trials_per_condition": 1,
         "bandit_means": [40, 60],
@@ -207,7 +203,7 @@ function setup_experiment() {
     // fill practice such that all values of variables seen once
     // first practice trial
     practice_info["memory_test"][0] = true;
-    practice_info["location_test"][0] = 0;
+    practice_info["location_test"][0] = [0, 1];
     practice_info["horizon"][0] = experiment_info["var_horizon"][1];
     practice_info["distinctiveness"][0] = "massed";
     practice_info["vals_bandit_0"][0] = random_normal_samples_unique(
@@ -222,7 +218,7 @@ function setup_experiment() {
 
     // second practice trial
     practice_info["memory_test"][1] = false;
-    practice_info["location_test"][1] = 1;
+    practice_info["location_test"][1] = [1, 0];
     practice_info["horizon"][1] = experiment_info["var_horizon"][0];
     practice_info["distinctiveness"][1] = "interleaved";
     practice_info["vals_bandit_0"][1] = random_normal_samples_unique(
@@ -303,7 +299,6 @@ function progress_in_experiment() {
 
 async function display_forced_choices(old, part_experiment = null) {
     // old refers to page to be switched away from
-    // i refers to the current trial to be displayed
     // reset the reward counter
     document.getElementById("cumulative_value").innerHTML = 0;
     document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = 0";
@@ -341,8 +336,6 @@ async function next_value_forced(i, item_id, part) {
     } else if (part == 1) {
         current_info = trial_info;
     }
-    console.log("mean bandit left is = " + current_info["mean_bandit_0"][i]);
-    console.log("mean bandit right is = " + current_info["mean_bandit_1"][i]);
     // read out current choice value
     current_option = current_info["sequence_forced_choices"][i][item_id]
     value_display = "vals_bandit_" + current_option
@@ -365,46 +358,74 @@ async function next_value_forced(i, item_id, part) {
         // increase trial nr by 1
         document.getElementById("time_var").innerHTML = Date.now();
         if (current_info["memory_test"][i] == true) {
-            cue_memory_responses(current_info["location_test"][i]);
-        } else {
+            cue_memory_responses1(current_info["location_test"][i][0]);
+        } else if (current_info["memory_test"][i] == false) {
             display_free_choices("page6", experiment_info["n_vals"] / 2) // second arg should be item_id
         }
     }
 }
 
-function cue_memory_responses(i) {
-    document.getElementById("mem_response").value = "";
-    document.getElementById("response_displayed_0").innerHTML = "";
-    document.getElementById("response_displayed_1").innerHTML = "";
-    clickStart("page6", "page7")
-    location_display = "response_displayed_" + i;
+function cue_memory_responses1(i) {
+    document.getElementById("mem_response_a").value = "";
+    document.getElementById("response_displayed_a_0").innerHTML = "";
+    document.getElementById("response_displayed_a_1").innerHTML = "";
+    clickStart("page6", "page7a")
+    location_display = "response_displayed_a_" + i;
     display_option = document.getElementById(location_display);
     display_option.innerHTML = "?"
     display_option.style.background = "#26dabcde";
     document.getElementById("time_var").innerHTML = Date.now();
 }
 
+function cue_memory_responses2(i) {
+    document.getElementById("mem_response_b").value = "";
+    document.getElementById("response_displayed_b_0").innerHTML = "";
+    document.getElementById("response_displayed_b_1").innerHTML = "";
+    clickStart("page7a", "page7b")
+    location_display = "response_displayed_b_" + i;
+    display_option = document.getElementById(location_display);
+    display_option.innerHTML = "?"
+    display_option.style.background = "#26dabcde";
+    document.getElementById("time_var").innerHTML = Date.now();
+}
+
+function link_mem_responses() {
+    var rt_mem = Date.now() - document.getElementById("time_var").innerHTML;
+    document.getElementById("rt_mem").innerHTML = rt_mem;
+    process_memory_responses("a");
+    document.getElementById("mem_response_a").value = "";
+    var [_, i, current_info] = progress_in_experiment();
+    var loc_test2 = current_info["location_test"][i][1];
+    cue_memory_responses2(loc_test2);
+}
+
 function clean_and_proceed() {
     var rt_mem = Date.now() - document.getElementById("time_var").innerHTML;
     document.getElementById("rt_mem").innerHTML = rt_mem;
-    process_memory_responses();
+    process_memory_responses("b");
     // input field is wiped again
-    document.getElementById("mem_response").value = "";
+    document.getElementById("mem_response_b").value = "";
     document.getElementById("cumulative_value").innerHTML = 0;
-    display_free_choices('page7', experiment_info["n_vals"] / 2)
+    display_free_choices('page7b', experiment_info["n_vals"] / 2)
 }
 
 // display cumulative value on free-choice items
 
 
-function process_memory_responses() {
+function process_memory_responses(step) {
     var [part, i, current_info] = progress_in_experiment();
+    var loc_idx;
+    if (step == "a") {
+        loc_idx = 0;
+    } else if (step == "b") {
+        loc_idx = 1;
+    }
 
-    var mem_response = document.getElementById("mem_response").value;
+    var mem_response = document.getElementById("mem_response_" + step).value;
     var mem_response_trim = mem_response.trim();
     var mem_response_split = mem_response_trim.split(",");
     var mem_response_split_unique = [...new Set(mem_response_split)];
-    var side_tested = current_info["location_test"][i]
+    var side_tested = current_info["location_test"][i][loc_idx]
     var vals_shown = "vals_bandit_" + side_tested;
     var shown_list_all = current_info[vals_shown][i].slice(0, experiment_info["n_forced_choice"]);
     var shown_list_mask = current_info["sequence_forced_choices"][i].map(item => item == side_tested)
@@ -449,16 +470,19 @@ function log_memory_responses(count_accuracy, count_redundant, responses_unique)
 async function display_free_choices(old, item_id) {
 
     var [part, i, current_info] = progress_in_experiment();
+    var display_option_a;
+    var display_option_b;
 
     clickStart(old, "page6");
 
     document.getElementById("cumulative_value_str").style.display = "block";
-    if (item_id <= current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) {
+    if (item_id <= parseInt(current_info["horizon"][i]) + parseInt((experiment_info["n_forced_choice"] - 1))) {
         [display_option_a, display_option_b] = format_both_options("question");
         document.getElementById("time_var").innerHTML = Date.now()
         display_option_a.onclick = function () { next_value_free(i, item_id, current_info, 0) }
         display_option_b.onclick = function () { next_value_free(i, item_id, current_info, 1) }
         var n_remaining = ((current_info["horizon"][i] + (experiment_info["n_forced_choice"] - 1)) - item_id + 1);
+
         document.getElementById("n_remaining_choices").style.display = "block"
         document.getElementById("n_remaining_choices").innerHTML = "Nr. remaining choices = " + n_remaining
         if (n_remaining == 1) {
@@ -474,16 +498,13 @@ async function display_free_choices(old, item_id) {
         document.getElementById("cumulative_value_str").style.display = "none";
         update_trial_counter(part, i);
         if (part == 0 & i == (experiment_info["n_trials_practice"] - 1)) {
-            console.log("practice is over")
             // practice is over
             format_both_options("reset")
             clickStart("page6", "page9")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
-            console.log("experiment is over")
             // experiment is over
             clickStart("page6", "page10")
         } else {
-            console.log("next trial is upcoming")
             // next trial
             format_both_options("reset")
             clickStart("page6", "page8")
