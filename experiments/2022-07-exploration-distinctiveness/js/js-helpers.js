@@ -98,6 +98,8 @@ function setup_experiment() {
             experiment_info["var_mean_shift"].length
         );
 
+    experiment_info["n_trials"] = 4;
+
     // display info
     var display_info = {
         iti: 500,
@@ -440,6 +442,7 @@ function process_memory_responses(step) {
             count_redundant += 1;
         }
     }
+    document.getElementById("memory_cum").innerHTML = parseInt(document.getElementById("memory_cum").innerHTML) + count_accuracy;
     log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique)
 }
 
@@ -503,6 +506,7 @@ async function display_free_choices(old, item_id) {
             clickStart("page6", "page9")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
             // experiment is over
+            calculate_bonus();
             clickStart("page6", "page10")
         } else {
             // next trial
@@ -511,6 +515,15 @@ async function display_free_choices(old, item_id) {
         }
     }
 }
+
+
+// todos
+// counter of total received rewards from free choice trials
+// counter of maximally possible rewards
+// function financial_reward_in_study dividing the two
+// have a counter of the number of correctly recalled items
+// sum of total number of items possibly recallable
+// again divide the two in the financial_reward_in_study function`
 
 
 async function next_value_free(i, item_id, current_info, pos) {
@@ -527,9 +540,11 @@ async function next_value_free(i, item_id, current_info, pos) {
         display_option.style.background = "white";
         var chosen_value = current_info[value_display][i][item_id];
         display_option.innerHTML = chosen_value;
-
+        var max_possible = Math.max(current_info["vals_bandit_0"][i][item_id], current_info["vals_bandit_1"][i][item_id]);
         document.getElementById("cumulative_value").innerHTML = parseInt(document.getElementById("cumulative_value").innerHTML) + parseInt(chosen_value);
-        document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = " + parseInt(document.getElementById("cumulative_value").innerHTML)
+        document.getElementById("cumulative_value_str").innerHTML = "Collected Amount = " + parseInt(document.getElementById("cumulative_value").innerHTML);
+        document.getElementById("reward_cum").innerHTML = parseInt(document.getElementById("reward_cum").innerHTML) + parseInt(chosen_value);
+        document.getElementById("reward_possible_cum").innerHTML = parseInt(document.getElementById("reward_possible_cum").innerHTML) + max_possible;
 
         await sleep(display_info["presentation"]);
         display_option.style.background = "#26dabcde";
@@ -610,17 +625,6 @@ function download(content, fileName, contentType) {
     a.href = URL.createObjectURL(file);
     a.download = fileName;
     a.click();
-}
-
-
-function calculate_categorization_accuracy(responses_cat_trial, lag) {
-    n_responses = responses_cat_trial.length
-    sum_correct = responses_cat_trial.reduce((a, b) => a + b, 0)
-    prop_correct_overall = ((parseFloat(sum_correct) / parseFloat(n_responses)))
-    sum_correct_lag = responses_cat_trial.slice(n_responses - lag, n_responses).reduce((a, b) => a + b, 0)
-    prop_correct_lag = ((parseFloat(sum_correct_lag) / parseFloat(lag)))
-    cat_accuracies = [prop_correct_overall, prop_correct_lag]
-    return cat_accuracies
 }
 
 
@@ -719,54 +723,39 @@ function saveBonus(filedata) {
 }
 
 
-function calculate_bonus(flag_performance) {
-    if (flag_performance == "dropout") {
-        var bonus_store = {
-            participant_id: participant_id,
-            bonus_cr: 0,
-            bonus_cat: 0,
-            bonus_total: 0
-        }
-    } else if (flag_performance == "succeed") {
-        // bonus continuous reproduction
-        const bonus_cr_max = 3.60
-        var n_trials_reproduction = setup_expt["experiment_info"]["n_trials_reproduction_1"] + setup_expt["experiment_info"]["n_trials_reproduction_2"]
-        var avg_deviation = parseFloat(document.getElementById("cr_deviation_cum").innerHTML) / n_trials_reproduction
-        var coef_bonus = Math.min(51, avg_deviation)
-        var above_chance = 51 - coef_bonus
-        var prop_bonus = above_chance / 46 // anything closer than 5 from the target counts as "perfect"
-        var bonus_cr = Math.round((prop_bonus * bonus_cr_max * 100)) / 100
+function calculate_bonus() {
 
-        // bonus categorization
-        var bonus_cat;
-        if (setup_expt["experiment_info"]["n_categories"] == 1) {
-            bonus_cat = 1.80
-        } else {
-            const bonus_cat_max = 3.60
-            var n_trials_categorization = setup_expt["experiment_info"]["n_trials_categorization_total"]
-            var prop_correct_cat = parseInt(document.getElementById("cat_accuracy_cum").innerHTML) / n_trials_categorization
-            bonus_cat = Math.round((prop_correct_cat * bonus_cat_max * 100)) / 100
-        }
-        if (bonus_cat < 1.8) { bonus_cat = 1.8 }
-        if (bonus_cr < 1.8) { bonus_cr = 1.8 }
+    // bonus continuous reproduction
+    const bonus_mem_max = 3.60
+    var n_trials = parseInt(2 * trial_info["memory_test"].length) / 3 + 1;
+    var n_memory_items = n_trials * experiment_info["n_forced_choice"];
+    var n_memory_correct = parseFloat(document.getElementById("memory_cum").innerHTML)
+    var prop_correct_memory = n_memory_correct / n_memory_items
+    var bonus_mem = Math.round(prop_correct_memory * bonus_mem_max * 100) / 100;
 
-        var bonus_total = Math.round((bonus_cr + bonus_cat) * 100) / 100;
+    var bonus_choice_max = 3.60
+    var received = document.getElementById("reward_cum").innerHTML;
+    var possible = document.getElementById("reward_possible_cum").innerHTML;
+    var prop_possible = received / possible;
+    var bonus_choice = Math.round(prop_possible * bonus_choice_max * 100) / 100;
 
 
-        var bonus_store = {
-            participant_id: participant_id,
-            bonus_cr: bonus_cr,
-            bonus_cat: bonus_cat,
-            bonus_total: bonus_total
-        }
+    var bonus_total = Math.round((bonus_mem + bonus_choice) * 100) / 100;
+
+
+    var bonus_store = {
+        participant_id: participant_id,
+        bonus_mem: bonus_mem,
+        bonus_choice: bonus_choice,
+        bonus_total: bonus_total
     }
 
     saveBonus(JSON.stringify(bonus_store));
 
     (() => {
         document.getElementById("total_bonus").innerHTML = bonus_total;
-        document.getElementById("cr_bonus").innerHTML = bonus_cr;
-        document.getElementById("cat_bonus").innerHTML = bonus_cat;
+        document.getElementById("mem_bonus").innerHTML = bonus_mem;
+        document.getElementById("choice_bonus").innerHTML = bonus_choice;
     })();
 
 }

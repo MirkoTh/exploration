@@ -56,9 +56,9 @@
     <div id="trial_nr_main" style="display:none">0</div>
     <div id="part_experiment" style="display:none">0</div>
     <div id="time_var" style="display:none"></div>
-    <div id="cr_deviation_cum" style="display:none">0</div>
-    <div id="cat_accuracy_cum" style="display:none">0</div>
-    <div id="cat_accuracy_running_mean" style="display:none">Average Accuracy = </div>
+    <div id="reward_cum" style="display:none">0</div>
+    <div id="reward_possible_cum" style="display:none">0</div>
+    <div id="memory_cum" style="display:none">0</div>
     <div id="myRange1_start" style="display:none">-1</div>
     <div id="myRange2_start" style="display:none">-1</div>
     <div id="n_trials_cat_lag" style="display:none">-1</div>
@@ -100,16 +100,18 @@
 
         <div id="page1" style="display:none;">
             <h1>Information on tasks and purpose of the study</h1>
-            Today, you are stepping into the role of a gambler.<br>
-            Your first goal is to gain as many rewards as possible.<br>
-            Sometimes, a friend is joining and asks you about the previous rewards of the slot machines.<br>
-            Your second goal is to remember the rewards returned by each of the slot machines and inform your friend
-            about them.<br><br>
+            Today, you are stepping into the role of a gambler visiting a series of casinos.<br>
+            In each casino you are playing on a pair of slot machines.<br>
+            Sometimes, a friend who wants to play as well joins and asks you about the payoffs you have received
+            from the two machines.<br>
+            Your goals are to gain as many rewards as possible and to remember the rewards returned by each of the slot
+            machines and inform your friend about them.<br><br>
 
 
             The purpose of the study is to gain knowledge about how people choose between uncertain options.<br>
-            A decision between uncertain options in everyday life could be to decide between dining in two
-            restaurants.<br>
+            A decision between uncertain options supposedly happens often in everyday life. An example could be to
+            decide between dining in two
+            different restaurants.<br>
             You may like the daily menues of one restaurant more than those of another restaurant.<br>
             But depending on the weekday and on the chef preparing the dishes you may expect some variation in food
             quality.<br>
@@ -200,8 +202,8 @@
             option to choose on average.<br><br>
             <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page1')" ;> Back
             </button>
-            <!-- page3 -->
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page5')" ;>
+            <!-- page5 -->
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page2', 'page3')" ;>
                 Response Instruction
             </button>
 
@@ -245,11 +247,10 @@
             Remember that you want to maximize your rewards on every trial!<br>
             <br>
 
-            <button type="button" name="bbutton" class="default_button" ; onclick="clickStart('page3', 'page2')" ;> Back
+            <button type="button" name="bbutton" class="default_button" onclick="clickStart('page3', 'page2')" ;>Back
             </button>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page3', 'page4')" ;>
-                Check Comprehension
-            </button>
+            <button type="button" name="button" class="default_button" onclick="clickStart('page3', 'page4')" ;>Check
+                Comprehension</button>
         </div>
 
         <div id="page4" style="display:none">
@@ -331,7 +332,7 @@
                 </fieldset>
             </fieldset>
             <br>
-            <button type="button" name="button" class="default_button" ; onclick="clickStart('page3', 'page4')" ;>
+            <button type="button" name="button" class="default_button" ; onclick="clickStart('page4', 'page3')" ;>
                 Back </button>
             <button type="button" name="button" class="default_button" ;
                 onclick="instructioncheck('page4', 'page3', 'page5')" ;><span id="check"> Check Answers </span>
@@ -420,6 +421,13 @@
         <div id="page10" style="display:none">
             <h1>You completed the study</h1>
             <p>Thank you a very much for participating in our study!</p>
+            <p>
+                In addition to the base payment of £xx.yy you earn a bonus of £<span id="total_bonus"></span>
+                .<br>
+                Your bonus in the memory task is £<span id="mem_bonus"></span>.<br>
+                Your bonus in the choice task is £<span id="choice_bonus"></span><br><br>
+                Please be patient! The payments for your participation will be paid within the next few days.<br>
+            </p>
             <button type="button" name="button" class="default_button" ; onclick="display_forced_choices('page10', 1)"
                 ;>
                 Back to prolific </button>
