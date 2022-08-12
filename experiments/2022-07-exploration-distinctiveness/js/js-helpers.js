@@ -74,7 +74,7 @@ function setup_experiment() {
     // experiment information
     var experiment_info = {
         "var_mem_test": [true, false],
-        "var_horizon": [1, 8],
+        "var_horizon": [1, 6],
         "var_distinct": ["massed", "interleaved"],
         "var_location_test": Array([0, 1], [1, 0]),
         "var_mean_shift": [-20, -10, -4, 4, 10, 20],
@@ -82,11 +82,11 @@ function setup_experiment() {
         "n_trials_per_condition": 1,
         "bandit_means": [40, 60],
         "bandit_sd": [10],
-        "n_vals": 16,
-        "n_forced_choice": 8,
+        "n_vals": 12,
+        "n_forced_choice": 6,
         "sequences_forced_choices": {
-            "massed": [0, 0, 0, 0, 1, 1, 1, 1],
-            "interleaved": [0, 1, 0, 1, 0, 1, 0, 1]
+            "massed": [0, 0, 0, 1, 1, 1],
+            "interleaved": [0, 1, 0, 1, 0, 1]
         }
     }
     experiment_info["n_trials"] = ( // no memory test
@@ -443,11 +443,11 @@ function process_memory_responses(step) {
         }
     }
     document.getElementById("memory_cum").innerHTML = parseInt(document.getElementById("memory_cum").innerHTML) + count_accuracy;
-    log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique)
+    log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique, loc_idx)
 }
 
 
-function log_memory_responses(count_accuracy, count_redundant, responses_unique) {
+function log_memory_responses(count_accuracy, count_redundant, responses_unique, loc_idx) {
     var [part, i, current_info] = progress_in_experiment();
     var rt_mem = document.getElementById("rt_mem").innerHTML;
     var data_store = {
@@ -461,6 +461,7 @@ function log_memory_responses(count_accuracy, count_redundant, responses_unique)
         items_left: current_info["vals_bandit_0"][i],
         items_right: current_info["vals_bandit_1"][i],
         mask_shown: current_info["sequence_forced_choices"][i],
+        location_cued: loc_idx,
         responses_unique: responses_unique,
         n_correct: count_accuracy,
         n_redundant: count_redundant,
