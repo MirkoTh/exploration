@@ -98,7 +98,7 @@ function setup_experiment() {
             experiment_info["var_mean_shift"].length
         );
 
-    experiment_info["n_trials"] = 4;
+    experiment_info["n_trials"] = 3 * 2 * 2 * 1; // [no mem test, left first, right first] * [horizon 1, horizon 6] * [massed, interleaved] * [mean shifts (1 only for testing, otherwise 6)]
 
     // display info
     var display_info = {
@@ -144,29 +144,32 @@ function setup_experiment() {
     for (const mem of experiment_info["var_mem_test"].entries()) {
         for (const hor of experiment_info["var_horizon"].entries()) {
             for (const dis of experiment_info["var_distinct"].entries()) {
-                for (const ms of experiment_info["var_mean_shift"].entries()) {
-                    for (let rep = 0; rep < experiment_info["n_trials_per_condition"]; rep++) {
-                        if (mem[1] == false) {
+                //for (const ms of experiment_info["var_mean_shift"].entries()) {
+                var var_num = Math.floor(6 * Math.random());
+                var ms = [0, experiment_info["var_mean_shift"][var_num]];
+                console.log("var num = " + var_num)
+                for (let rep = 0; rep < experiment_info["n_trials_per_condition"]; rep++) {
+                    if (mem[1] == false) {
+                        trial_info["memory_test_prep"][idx] = mem[1];
+                        trial_info["horizon_prep"][idx] = hor[1];
+                        trial_info["distinctiveness_prep"][idx] = dis[1];
+                        trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
+                        trial_info["location_test_prep"][idx] = null; // no test location because no memory test
+                        trial_info["mean_shift_prep"][idx] = ms[1];
+                        idx += 1;
+                    } else if (mem[1] == true) {
+                        for (const loc of experiment_info["var_location_test"].entries()) {
                             trial_info["memory_test_prep"][idx] = mem[1];
                             trial_info["horizon_prep"][idx] = hor[1];
                             trial_info["distinctiveness_prep"][idx] = dis[1];
                             trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
-                            trial_info["location_test_prep"][idx] = null; // no test location because no memory test
+                            trial_info["location_test_prep"][idx] = loc[1];
                             trial_info["mean_shift_prep"][idx] = ms[1];
                             idx += 1;
-                        } else if (mem[1] == true) {
-                            for (const loc of experiment_info["var_location_test"].entries()) {
-                                trial_info["memory_test_prep"][idx] = mem[1];
-                                trial_info["horizon_prep"][idx] = hor[1];
-                                trial_info["distinctiveness_prep"][idx] = dis[1];
-                                trial_info["sequence_forced_choices_prep"][idx] = experiment_info["sequences_forced_choices"][dis[1]];
-                                trial_info["location_test_prep"][idx] = loc[1];
-                                trial_info["mean_shift_prep"][idx] = ms[1];
-                                idx += 1;
-                            }
                         }
                     }
                 }
+                //}
             }
         }
     };
@@ -200,7 +203,6 @@ function setup_experiment() {
         trial_info["mean_bandit_0"][idx] = bd_means[0];
         trial_info["mean_bandit_1"][idx] = bd_means[1];
     }
-
 
     // fill practice such that all values of variables seen once
     // first practice trial
@@ -435,33 +437,36 @@ function process_memory_responses(step) {
 
     var count_accuracy = 0;
     var count_redundant = 0;
+    var mem_response_int_unique = Array();
     for (const response of mem_response_split_unique) {
-        if (shown_list.includes(parseInt(response))) {
-            count_accuracy += 1;
-        } else {
-            count_redundant += 1;
+        if (response !== "") {
+            if (shown_list.includes(parseInt(response))) {
+                count_accuracy += 1;
+            } else {
+                count_redundant += 1;
+            }
+            mem_response_int_unique.push(parseInt(response))
         }
+
     }
     document.getElementById("memory_cum").innerHTML = parseInt(document.getElementById("memory_cum").innerHTML) + count_accuracy;
-    log_memory_responses(count_accuracy, count_redundant, mem_response_split_unique, loc_idx)
+    log_memory_responses(shown_list, count_accuracy, count_redundant, mem_response_int_unique, loc_idx)
 }
 
 
-function log_memory_responses(count_accuracy, count_redundant, responses_unique, loc_idx) {
+function log_memory_responses(shown_list, count_accuracy, count_redundant, responses_unique, loc_idx) {
     var [part, i, current_info] = progress_in_experiment();
     var rt_mem = document.getElementById("rt_mem").innerHTML;
     var data_store = {
         participant_id: participant_id,
         session: part,
         trial_id: i,
-        var_distinct: current_info["distinctiveness"][i],
-        var_horizon: current_info["horizon"][i],
-        var_memtest: current_info["memory_test"][i],
-        var_loctest: current_info["location_test"][i],
-        items_left: current_info["vals_bandit_0"][i],
-        items_right: current_info["vals_bandit_1"][i],
-        mask_shown: current_info["sequence_forced_choices"][i],
-        location_cued: loc_idx,
+        presentation: current_info["distinctiveness"][i],
+        horizon: current_info["horizon"][i],
+        is_memtest: current_info["memory_test"][i],
+        loc_cued: loc_idx,
+        true_mean: current_info["mean_bandit_" + loc_idx][i],
+        items: shown_list,
         responses_unique: responses_unique,
         n_correct: count_accuracy,
         n_redundant: count_redundant,
@@ -587,14 +592,14 @@ function log_choice(item_id, choice) {
         session: part,
         trial_id: i,
         item_id: item_id,
-        var_distinct: current_info["distinctiveness"][i],
-        var_horizon: current_info["horizon"][i],
-        var_memtest: current_info["memory_test"][i],
-        var_loctest: current_info["location_test"][i],
+        presentation: current_info["distinctiveness"][i],
+        horizon: current_info["horizon"][i],
+        is_memtest: current_info["memory_test"][i],
+        loc_cued: current_info["location_test"][i],
         mean_left: current_info["mean_bandit_0"][i],
         mean_right: current_info["mean_bandit_1"][i],
-        items_left: current_info["vals_bandit_0"][i][item_id],
-        items_right: current_info["vals_bandit_1"][i][item_id],
+        val_l: current_info["vals_bandit_0"][i][item_id],
+        val_r: current_info["vals_bandit_1"][i][item_id],
         choice: choice,
         rt: rt_choice
     }
