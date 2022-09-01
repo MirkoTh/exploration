@@ -6,7 +6,7 @@ load_data <- function(path_data, participants_returned) {
   #' 
   #' @return a list with the two tibbles
   #' 
-
+  
   # check for each participant which file has more data and select that one
   
   
@@ -17,7 +17,7 @@ load_data <- function(path_data, participants_returned) {
   paths_choice_individual <- str_c(path_data,  fld_choice[!str_detect(fld_choice, "allinone")])
   paths_choice_compound <- str_c(path_data,  fld_choice[str_detect(fld_choice, "allinone")])
   paths_mem_compound <- str_c(path_data, fld_mem[str_detect(fld_mem, "allinone")])
-
+  
   l_paths <- list(
     `memory` = paths_mem_individual, 
     `choice` = paths_choice_individual, 
@@ -50,17 +50,21 @@ load_data <- function(path_data, participants_returned) {
   c_paths <- function(x) str_c(path_data, x$savemethod, "-participant-", x$participant_id, ".json")
   l_paths <- map(l_files_select, c_paths)
   
-  tbl_mem <- reduce(map(l_paths[["memory"]], json_to_tibble), rbind) %>% filter(session %in% c(1, 2))
-  tbl_choice <- reduce(map(l_paths[["choice"]], json_to_tibble), rbind)
-
-  factors <- c("participant_id", "session", "item_id", "presentation", "horizon", "is_memtest")
+  tbl_mem <- reduce(map(l_paths[["memory"]], json_to_tibble), rbind) %>% filter(session == 1)
+  tbl_choice <- reduce(map(l_paths[["choice"]], json_to_tibble), rbind) %>% filter(session == 1)
+  
+  factors <- c(
+    "participant_id", "session", "item_id", "presentation", "horizon", 
+    "is_memtest", "test_cue_nr", "test_cue_pos", "first_item_pres", 
+    "first_item_cue"
+  )
   numerics <- c("trial_id", "true_mean", "n_correct", "n_redundant", "rt")
   tbl_mem <- fix_data_types(tbl_mem, c(factors, "loc_cued"), numerics)
   tbl_choice <- fix_data_types(tbl_choice, factors, numerics)
   
   tbl_mem <- tbl_mem %>% filter(!(participant_id %in% participants_returned))
   tbl_choice <- tbl_choice %>% filter(!(participant_id %in% participants_returned))
-  
+
   l_data <- list("memory" = tbl_mem, "choice" = tbl_choice)
   return(l_data)
 }
