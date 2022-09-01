@@ -71,6 +71,7 @@ function random_normal_samples_unique(m, sd, n_numbers) {
 
 
 function setup_experiment() {
+    document.getElementById("t_start").innerHTML = Date.now();
     // experiment information
     var experiment_info = {
         "var_mem_test": [true, false],
@@ -98,7 +99,7 @@ function setup_experiment() {
             experiment_info["var_mean_shift"].length
         );
 
-    experiment_info["n_trials"] = 3 * 2 * 2 * 1; // [no mem test, left first, right first] * [horizon 1, horizon 6] * [massed, interleaved] * [mean shifts (1 only for testing, otherwise 6)]
+    experiment_info["n_trials"] = 1//3 * 2 * 2 * 1; // [no mem test, left first, right first] * [horizon 1, horizon 6] * [massed, interleaved] * [mean shifts (1 only for testing, otherwise 6)]
 
     // display info
     var display_info = {
@@ -147,7 +148,6 @@ function setup_experiment() {
                 //for (const ms of experiment_info["var_mean_shift"].entries()) {
                 var var_num = Math.floor(6 * Math.random());
                 var ms = [0, experiment_info["var_mean_shift"][var_num]];
-                console.log("var num = " + var_num)
                 for (let rep = 0; rep < experiment_info["n_trials_per_condition"]; rep++) {
                     if (mem[1] == false) {
                         trial_info["memory_test_prep"][idx] = mem[1];
@@ -222,7 +222,7 @@ function setup_experiment() {
 
     // second practice trial
     practice_info["memory_test"][1] = false;
-    practice_info["location_test"][1] = [1, 0];
+    practice_info["location_test"][1] = null;
     practice_info["horizon"][1] = experiment_info["var_horizon"][0];
     practice_info["distinctiveness"][1] = "interleaved";
     practice_info["vals_bandit_0"][1] = random_normal_samples_unique(
@@ -512,6 +512,7 @@ async function display_free_choices(old, item_id) {
             clickStart("page6", "page9")
         } else if (part == 1 & i == (experiment_info["n_trials"] - 1)) {
             // experiment is over
+            time_taken();
             calculate_bonus();
             clickStart("page6", "page10")
         } else {
@@ -520,6 +521,16 @@ async function display_free_choices(old, item_id) {
             clickStart("page6", "page8")
         }
     }
+}
+
+function time_taken() {
+    var total_time = Date.now() - document.getElementById("t_start").innerHTML;
+    var time_store = {
+        participant_id: participant_id,
+        total_time: total_time,
+        total_time_min: Math.ceil((total_time / 1000) / 60)
+    }
+    saveTime(JSON.stringify(time_store));
 }
 
 
@@ -725,6 +736,11 @@ function instructioncheck(pg, pg_prev, pg_succeed) {
 
 function saveBonus(filedata) {
     var filename = "./data/bonus.json";
+    $.post("save_data.php", { postresult: filedata + "\n", postfile: filename })
+}
+
+function saveTime(filedata) {
+    var filename = "./data/total-time.json";
     $.post("save_data.php", { postresult: filedata + "\n", postfile: filename })
 }
 
