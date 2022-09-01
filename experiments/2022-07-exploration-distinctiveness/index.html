@@ -7,9 +7,9 @@
 
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Gamble With Your Friends">
     <meta name="author" content="Mirko Thalmann, Akshay Jagadish, & Eric Schulz">
     <meta charset="utf-8">
@@ -17,13 +17,10 @@
 
     <link rel="stylesheet" href="js/myStyle.css">
 
-    <script src='https://cdn.firebase.com/js/client/1.1.1/firebase.js'></script>
-    <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
-    <link href="https://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css" rel="stylesheet" type="text/css">
-    <script src="js/d3.v4.js" charset="utf-8"></script>
-    <script src="js/js-helpers.js" charset="utf-8"></script>
-    <script src="js/js-txt.js" charset="utf-8" </script></script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/d3.v4.js" charset="utf-8" cache-control="public"></script>
+    <script src="js/js-helpers.js" charset="utf-8" cache-control="public"></script>
+    <script src="js/js-txt.js" charset="utf-8" cache-control="public"></script>
     <!--     <script>
         var _rollbarConfig = {
             accessToken: 'ce189ef6e760416db77b45599958b9e8',
@@ -84,8 +81,8 @@
             at the Max Planck Institute for Biological Cybernetics in Tuebingen, Germany.<br><br>
 
             <span>
-                <img src="./stimuli/tuebingen.jpg" height="200px">
-                <img src="./stimuli/mpi.jpg" height="200px">
+                <img src="./stimuli/tuebingen.jpg" title="tuebingen" height="200px">
+                <img src="./stimuli/mpi.jpg" title="mpi" height="200px">
                 <figcaption style="font-size: 12px;">By Rabe! - Own work, CC BY-SA 3.0, <a
                         href=" https://commons.wikimedia.org/w/index.php?curid=33554043" target="_blank"> Source </a>
                 </figcaption>
@@ -161,7 +158,8 @@
             <br>
 
             <body onload="myDataProtection()"></body>
-            <textarea id="DataProtection" rows="15" cols="100" style="font-size: 100%;" readonly></textarea>
+            <textarea id="DataProtection" title="DataProtection" rows="15" cols="100" style="font-size: 100%;"
+                readonly></textarea>
 
             <br>
             <br>
@@ -183,8 +181,8 @@
             The slot machines look as follows:<br><br><br>
 
             <span>
-                <img id="example-slotmachine-l" , height="100px" src="stimuli/slotmachine-l.jpg"></img>
-                <img id="example-slotmachine-r" , height="100px" src="stimuli/slotmachine-r.jpg"></img>
+                <img id="example-slotmachine-l" , title="m1" height="100px" src="stimuli/slotmachine-l.jpg"></img>
+                <img id="example-slotmachine-r" , title="m2" height="100px" src="stimuli/slotmachine-r.jpg"></img>
 
             </span>
 
@@ -261,25 +259,25 @@
                     answer all of the questions correctly.</p>
                 <fieldset>
                     <b>What is your task in the third part of a given trial? </b><br>
-                    <label for="q1l1" style="font-weight: normal;"><input type="radio" name="q1" id="l1"><span
-                            id="q1l1">
+                    <label for="q1l1" style="font-weight: normal;"><input type="radio" name="q1" id="l11"><span
+                            id="q1l11">
                             Inform your friend about the previously received rewards from one of the slot machines.
                         </span></label><br>
                     <label for="q1l2" style="font-weight: normal;"><input type="radio" name="q1" id="icheck1"><span
                             id="q1icheck1"> Maximize the sum of your rewards.
                         </span></label><br>
-                    <label for="q1l3" style="font-weight: normal;"><input type="radio" name="q1" id="l2"><span
-                            id="q1l2">
+                    <label for="q1l3" style="font-weight: normal;"><input type="radio" name="q1" id="l12"><span
+                            id="q1l12">
                             Only one green square is going to be highlighted. Click on that square. </span></label><br>
                     <br>
                 </fieldset>
                 <fieldset>
                     <b>How do you respond in the memory task when a slot machine is cued? </b><br>
-                    <label for="q2l1" style="font-weight: normal;"><input type="radio" name="q2" id="l1" /><span
-                            id="q2l1">
+                    <label for="q2l1" style="font-weight: normal;"><input type="radio" name="q2" id="l21" /><span
+                            id="q2l21">
                             Recall the values in the order of their appearance. </span></label><br>
-                    <label for="q2l2" style="font-weight: normal;"><input type="radio" name="q2" id="l2" /><span
-                            id="q2l2">
+                    <label for="q2l2" style="font-weight: normal;"><input type="radio" name="q2" id="l22" /><span
+                            id="q2l22">
                             Type in the values in any order; separate them using a whitespace.</span></label><br>
                     <label for="q2l3" style="font-weight: normal;"><input type="radio" name="q2" id="icheck2"> <span
                             id="q2icheck2"> Type in the values in any order; separate them using a comma.
@@ -288,12 +286,12 @@
                 </fieldset>
                 <fieldset>
                     <b>What is your task in the first part / the instructed phase? </b><br>
-                    <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l1"><span
-                            id="q3l1">
+                    <label for="q3l1" style="font-weight: normal;"><input type="radio" name="q3" id="l31"><span
+                            id="q3l31">
                             Inform your friend about the previously received rewards from the two slot machines.
                         </span></label><br>
-                    <label for="q3l2" style="font-weight: normal;"><input type="radio" name="q3" id="l2"><span
-                            id="q3l2"></span> Maximize the sum of your rewards.
+                    <label for="q3l2" style="font-weight: normal;"><input type="radio" name="q3" id="l32"><span
+                            id="q3l32"></span> Maximize the sum of your rewards.
                         </span></label><br>
                     <label for="q3l3" style="font-weight: normal;"><input type="radio" name="q3" id="icheck3"><span
                             id="q3icheck3"> </span>Click on the greenly highlighted square containing a question mark
@@ -302,12 +300,12 @@
                 </fieldset>
                 <fieldset>
                     <b>How do the two slot machines differ on a given trial? </b><br>
-                    <label for="q4l1" style="font-weight: normal;"><input type="radio" name="q4" id="l1" /><span
-                            id="q4l1">
+                    <label for="q4l1" style="font-weight: normal;"><input type="radio" name="q4" id="l41" /><span
+                            id="q4l41">
                             Both slot machines have the same expected value. They only differ in their variability.
                         </span></label><br>
-                    <label for="q4l2" style="font-weight: normal;"><input type="radio" name="q4" id="l2" /><span
-                            id="q4l2">
+                    <label for="q4l2" style="font-weight: normal;"><input type="radio" name="q4" id="l42" /><span
+                            id="q4l42">
                             The expected values and the variabilities differ between the two slot
                             machines.</span></label><br>
                     <label for="q4l3" style="font-weight: normal;"><input type="radio" name="q4" id="icheck4"> <span
@@ -318,17 +316,17 @@
                 </fieldset>
                 <fieldset>
                     <b> How long is the experiment going to last approximately? </b><br>
-                    <label for="q5l1" style="font-weight: normal;"><input type="radio" name="q5" id="l1"><span
-                            id="q5l1">
+                    <label for="q5l1" style="font-weight: normal;"><input type="radio" name="q5" id="l51"><span
+                            id="q5l51">
                             Roughly 10 minutes </span></label><br>
-                    <label for="q5l2" style="font-weight: normal;"><input type="radio" name="q5" id='l2'><span
-                            id="q5l2">
+                    <label for="q5l2" style="font-weight: normal;"><input type="radio" name="q5" id='l52'><span
+                            id="q5l52">
                             Roughly 15 minutes </span></label><br>
                     <label for="q5l3" style="font-weight: normal;"><input type="radio" name="q5" id='icheck5'><span
                             id="q5icheck5">
                             Roughly 60 minutes </span></label><br>
-                    <label for="q5l4" style="font-weight: normal;"><input type="radio" name="q5" id='l3'><span
-                            id="q5l3">
+                    <label for="q5l4" style="font-weight: normal;"><input type="radio" name="q5" id='l53'><span
+                            id="q5l53">
                             Roughly 120 minutes </span></label><br>
                 </fieldset>
             </fieldset>
@@ -360,10 +358,10 @@
             </div><br>
 
             <div class="present_slotmachine_0">
-                <img id="slotmachine_0" src="stimuli/slotmachine-l.jpg" height="100px">
+                <img id="slotmachine_0" title="slotmachine_0" src="stimuli/slotmachine-l.jpg" height="100px">
             </div><br>
             <div class="present_slotmachine_1">
-                <img id="slotmachine_1" src="stimuli/slotmachine-r.jpg" height="100px">
+                <img id="slotmachine_1" title="slotmachine_1" src="stimuli/slotmachine-r.jpg" height="100px">
             </div><br>
         </div>
         <br>
@@ -376,13 +374,13 @@
                 <p id="response_displayed_a_1" height="200px" style="font-size:50px"></p>
             </div><br>
             <div class="present_slotmachine_0">
-                <img id="slotmachine_r_a_0" src="stimuli/slotmachine-l.jpg" height="100px">
+                <img id="slotmachine_r_a_0" title="slotmachine_r_a_0" src="stimuli/slotmachine-l.jpg" height="100px">
             </div><br>
             <div class="present_slotmachine_1">
-                <img id="slotmachine_r_a_1" src="stimuli/slotmachine-r.jpg" height="100px">
+                <img id="slotmachine_r_a_1" title="slotmachine_r_a_1" src="stimuli/slotmachine-r.jpg" height="100px">
             </div><br>
 
-            <input type="text" id="mem_response_a" size="15" class="respond_mem">
+            <input type="text" id="mem_response_a" title="mem_response_a" size="15" class="respond_mem">
             <button type="button" , class="response_button" , onclick="link_mem_responses()"> Submit Response &
                 Proceed </button>
         </div>
@@ -395,13 +393,13 @@
                 <p id="response_displayed_b_1" height="200px" style="font-size:50px"></p>
             </div><br>
             <div class="present_slotmachine_0">
-                <img id="slotmachine_r_b_0" src="stimuli/slotmachine-l.jpg" height="100px">
+                <img id="slotmachine_r_b_0" title="slotmachine_r_b_0" src="stimuli/slotmachine-l.jpg" height="100px">
             </div><br>
             <div class="present_slotmachine_1">
-                <img id="slotmachine_r_b_1" src="stimuli/slotmachine-r.jpg" height="100px">
+                <img id="slotmachine_r_b_1" title="slotmachine_r_b_1" src="stimuli/slotmachine-r.jpg" height="100px">
             </div><br>
 
-            <input type="text" id="mem_response_b" size="15" class="respond_mem">
+            <input type="text" id="mem_response_b" title="mem_response_b" size="15" class="respond_mem">
             <button type="button" , class="response_button" , onclick="clean_and_proceed()">Submit Response &
                 Start Next Trial</button>
         </div>
