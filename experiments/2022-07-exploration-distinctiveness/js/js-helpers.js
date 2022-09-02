@@ -80,7 +80,7 @@ function setup_experiment() {
         "var_location_test": Array([0, 1], [1, 0]),
         "var_mean_shift": [-20, -10, -4, 4, 10, 20],
         "n_trials_practice": 2, // 1. memory test + horizon 12 + massed; 2. no memory test + horizon 1 + interleaved
-        "n_trials_per_condition": 1,
+        "n_trials_per_condition": 2,
         "bandit_means": [40, 60],
         "bandit_sd": [10],
         "n_vals": 12,
@@ -98,8 +98,13 @@ function setup_experiment() {
             experiment_info["var_horizon"].length * experiment_info["var_location_test"].length *
             experiment_info["var_mean_shift"].length
         );
-
-    experiment_info["n_trials"] = 2 * 2 * 2 * 1; // [no mem test, left first, right first] * [horizon 1, horizon 6] * [massed, interleaved] * [mean shifts (1 only for testing, otherwise 6)]
+    experiment_info["n_trials"] = (
+        experiment_info["n_trials_per_condition"] *
+        experiment_info["var_mem_test"].length *
+        experiment_info["var_horizon"].length *
+        experiment_info["var_distinct"].length
+    )
+    //experiment_info["n_trials"] = 2 * 2 * 2 * 2; // [no mem test, left first, right first] * [horizon 1, horizon 6] * [massed, interleaved] * [mean shifts (1 only for testing, otherwise 6)]
 
     // display info
     var display_info = {
@@ -472,7 +477,8 @@ function log_memory_responses(shown_list, count_accuracy, count_redundant, respo
         is_memtest: current_info["memory_test"][i],
         test_cue_nr: loc_idx,
         test_cue_pos: loc_test,
-        first_item_pos: loc_pres,
+        first_item_pres: current_info["sequence_forced_choices"][i][0],
+        first_item_cue: current_info["location_test"][i][0],
         true_mean: current_info["mean_bandit_" + loc_idx][i],
         items: shown_list,
         responses_unique: responses_unique,
@@ -602,7 +608,6 @@ function format_both_options(direction) {
 }
 
 
-
 function log_choice(item_id, choice) {
     var [part, i, current_info] = progress_in_experiment();
     var rt_choice = document.getElementById("rt_choice").innerHTML;
@@ -614,7 +619,8 @@ function log_choice(item_id, choice) {
         presentation: current_info["distinctiveness"][i],
         horizon: current_info["horizon"][i],
         is_memtest: current_info["memory_test"][i],
-        loc_cued_first: current_info["location_test"][i][0],
+        first_item_pres: current_info["sequence_forced_choices"][i][0],
+        first_item_cue: current_info["location_test"][i][0],
         mean_left: current_info["mean_bandit_0"][i],
         mean_right: current_info["mean_bandit_1"][i],
         val_l: current_info["vals_bandit_0"][i][item_id],
