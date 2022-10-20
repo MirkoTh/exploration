@@ -20,6 +20,8 @@ l_tbl_data <- list(
 tbl_choice <- l_tbl_data[["choice"]]
 tbl_memory <- l_tbl_data[["memory"]]
 
+n_mem_items <- 3
+
 
 # things to analyze:
 # memory performance depending on presentation condition$
@@ -30,50 +32,37 @@ tbl_memory <- l_tbl_data[["memory"]]
 # 
 # tbl_memory <- tbl_memory %>% left_join(tbl_tmp, by = "trial_id")
 tbl_memory$match_first_presented <- tbl_memory$first_item_pres == tbl_memory$test_cue_pos
+tbl_memory$prop_correct <- tbl_memory$n_correct / n_mem_items
 
 tbl_memory_agg <- as_tibble(summarySEwithin(
   tbl_memory, 
-  measurevar = "n_correct", 
+  measurevar = "prop_correct", 
   withinvars = c("presentation", "test_cue_nr", "match_first_presented"), 
   idvar = "participant_id"
 )) %>% mutate(
   test_cue_nr = factor(test_cue_nr, labels = c("First", "Second")),
   match_first_presented = factor(
     match_first_presented, labels = c("Matches Second", "Matches First")
-    )
+  )
 )
 
 pd <- position_dodge(width = .8)
-ggplot(tbl_memory_agg, aes(presentation, n_correct, group = test_cue_nr)) +
+ggplot(tbl_memory_agg, aes(presentation, prop_correct, group = test_cue_nr)) +
+  geom_errorbar(aes(ymin = prop_correct - ci, ymax = prop_correct + ci), color = "black",  position = pd, width = .2) +
+  geom_point(aes(presentation, prop_correct, color = test_cue_nr), position = pd) +
   geom_col(aes(fill = test_cue_nr, alpha = test_cue_nr), position = pd) +
   facet_wrap(~ match_first_presented) +
-  scale_fill_brewer(palette = "Set1", name = "Cue Position") +
+  scale_fill_viridis_d(name = "Cue Position") +
+  scale_color_viridis_d(guide = "none") +
   scale_alpha_discrete(range = c(.2, .8), name = "Cue Position") +
   theme_bw() +
   labs(
     x = "Presentation",
-    y = "Nr. Correct"
+    y = "Prop. Correct"
   )
 
 
 # choice prob depending on mean difference
-
-# very basic pattern: more right when right is higher overall
-tbl_choice %>% group_by(mean_diff_right_true, trial_id) %>%
-  summarize(choice_mn = mean(choice)) %>%
-  group_by(mean_diff_right_true) %>%
-  summarize(choice_mn = mean(choice_mn)) %>% 
-  ggplot(aes(mean_diff_right_true, choice_mn, group = 1)) +
-  geom_line() +
-  geom_point(color = "white", size = 3) +
-  geom_point(shape = 1) +
-  theme_bw() +
-  labs(
-    x = "Right - Left (True Means)",
-    y = "Proportion Right Option"
-  )
-
-
 tbl_choice$mean_diff_right_true <- tbl_choice$mean_right - tbl_choice$mean_left
 tbl_choice$mean_diff_right_true_cut <- cut(tbl_choice$mean_diff_right_true, 3)
 mean_diff_first_presented <- function(first_item_pres, mean_left, mean_right) {
@@ -84,6 +73,31 @@ tbl_choice$mean_diff_first_true <- pmap_dbl(tbl_choice[, c("first_item_pres", "m
 tbl_choice$mean_diff_first_true_cut <- cut(tbl_choice$mean_diff_first_true, 3)
 tbl_choice$choice_first_pres <- tbl_choice$choice == tbl_choice$first_item_pres
 
+# very basic pattern: more right when right is higher overall
+tbl_choice %>% group_by(participant_id, mean_diff_right_true, trial_id) %>%
+  summarize(
+    choice_mn = mean(choice),
+    n = n()
+  ) %>%
+  group_by(mean_diff_right_true) %>%
+  summarize(
+    choice_mn = mean(choice_mn),
+    n = sum(n)
+  ) %>% 
+  ggplot(aes(mean_diff_right_true, choice_mn, group = 1)) +
+  geom_vline(xintercept = 0, alpha = .3) +
+  geom_hline(yintercept = .5, alpha = .3) +
+  geom_line() +
+  geom_point(color = "white", size = 7) +
+  geom_point(shape = 1, aes(size = n)) +
+  scale_size_continuous(name = "Nr. Responses") +
+  theme_bw() +
+  labs(
+    x = "Right - Left (True Means)",
+    y = "Proportion Right Option",
+    caption = "Nb. all choices"
+  ) +
+  coord_cartesian(ylim = c(0, 1))
 
 
 tbl_choice_agg <- as_tibble(summarySEwithin(
@@ -96,12 +110,15 @@ tbl_choice_agg <- as_tibble(summarySEwithin(
 # more exploration with longer horizon?
 # more exploration in interleaved compared to massed condition (i.e., when memory is worse)
 # more exploration in massed condition towards option presented longer ago (i.e., towards the first presented location)
-
+pd <- position_dodge(width = .4)
 ggplot(tbl_choice_agg, aes(mean_diff_right_true_cut, choice, group = presentation)) +
-  geom_line(aes(color = presentation)) +
-  geom_point(size = 3, color = "white") +
-  geom_point(shape = 1, aes(color = presentation)) +
+  geom_line(aes(color = presentation), position = pd) +
+  geom_point(size = 7, color = "white", position = pd) +
+  geom_point(shape = 1, aes(color = presentation, size = N), position = pd) +
+  geom_vline(xintercept = "(-6.67,6.67]", alpha = .3) +
+  geom_hline(yintercept = .5, alpha = .3) +
   facet_grid(choice_first_pres ~ horizon) +
+  scale_size_continuous(name = "Nr. Responses") +
   theme_bw() +
   labs(
     x = "Right - Left (True Means)",
@@ -121,7 +138,7 @@ tbl_memory_wide_agg <- tbl_memory %>%
   summarize(
     n_correct_first_mn = mean(n_correct_first),
     n_correct_second_mn = mean(n_correct_second)
-    ) %>% ungroup() %>%
+  ) %>% ungroup() %>%
   mutate(
     n_correct_diff = n_correct_first_mn - n_correct_second_mn
   )
@@ -134,18 +151,19 @@ tbl_choice_mem <- left_join(
 tbl_choice_mem_agg <- tbl_choice_mem %>%
   group_by(
     presentation, horizon, mean_diff_first_true_cut, n_correct_diff >= 0
-    ) %>% summarize(
-    choice_mn = mean(choice_first_pres)
-    ) %>% ungroup()
+  ) %>% summarize(
+    choice_mn = mean(choice_first_pres),
+    n = n()
+  ) %>% ungroup()
 
 # here, idea is that if people know less about first-presented option
 # they again choose it more often (-> intercept shift aka directed exploration)
 
 ggplot(tbl_choice_mem_agg, aes(mean_diff_first_true_cut, choice_mn, group = `n_correct_diff >= 0`)) +
-  geom_line(aes(color = `n_correct_diff >= 0`)) +
-  geom_point(color = "white", size = 3) +
-  geom_point(aes(color = `n_correct_diff >= 0`), ) +
-  facet_grid(presentation ~ horizon) +
+  geom_line(aes(color = `n_correct_diff >= 0`), position = pd) +
+  geom_point(color = "white", size = 3, position = pd) +
+  geom_point(aes(color = `n_correct_diff >= 0`, size = n), position = pd) +
+  facet_grid( ~ presentation) + #horizon
   scale_color_viridis_d() +
   theme_bw() +
   labs(
