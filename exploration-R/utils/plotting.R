@@ -1,3 +1,5 @@
+library(grid)
+
 check_reward_distributions <- function(tbl_conditions) {
   #' violin plots of simulated rewards
   #' 
@@ -380,4 +382,16 @@ plot_study_table <- function(tbl_studies) {
       `Explore Value-Guided`= color_tile(customRed, customGreen)
     )
   )
+}
+
+save_my_tiff <- function(pl, path_fl, w, h) {
+  tiff(path_fl, w, h, "in", res = 300)
+  grid.draw(pl)
+  dev.off()
+}
+
+save_my_pdf <- function(pl, path_fl, w, h) {
+  pdf(path_fl, w, h, paper = "special")
+  grid.draw(pl)
+  dev.off()
 }
