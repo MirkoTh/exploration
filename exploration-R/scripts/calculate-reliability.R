@@ -29,6 +29,8 @@ tbl_sample <- tibble(
 
 tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
 tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
+
+# plot subset of subjects as a check
 ggplot(
   tbl_sim_long %>% 
     filter(subject %in% sample(1:n_subjects, 5, replace = FALSE)),
@@ -50,4 +52,67 @@ sample_y <- function(subj, mu_t1, mu_t2, var, n) {
     t2 = y_t2
   )
 }
+
+
+
+stan_sim <- function() {
+  
+  stan_normal_sim <- write_stan_file("
+data {
+  int n_data;
+  int n_subj;
+  vector[n_data] response;
+  array[n_data] int subj;
+  matrix[n_data, 2] x; // ic, timepoint
+}
+
+transformed data {
+  real scale_cont = sqrt(2) / 4;
+  real scale_cat = 1.0/2;
+}
+
+parameters {
+  matrix[n_subj, 2] b;
+  vector[2] mu;
+  vector <lower=0>[2] sigma_subject;
+  real<lower=0> sigma;
+}
+
+transformed parameters {
+  array[2] real mu_tf;
+  mu_tf[1] = mu[1];
+  mu_tf[2] = scale_cont * mu[2];
+  vector[n_data] mn;
+
+  for (n in 1:n_data) {
+    mn[n] = b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2];
+  }
+}
+
+model {
+  for (n in 1:n_data) {
+    response[n] ~ normal(mu_rs[n], sigma_error);
+    mu_rs[n] = mu_ic + mu_time * (x[n, 2] - 1.5) + tau_rs[subj[n], x[n, 2]]
+  }
+
+  L ~ lkj_corr_cholesky(1);
+  L_std ~ normal(0, 2.5);
+  matrix[D, D] L_Sigma = diag_pre_multiply(L_std, L);
+
+  for (s in 1:n_subj) {
+    tau_rs[s] ~ multi_normal_cholesky([0, 0], L_Sigma)
+  }
+  
+  sigma_error ~ uniform(0.001, 10);
+  sigma_subject[1] ~ uniform(0.001, 10);
+  sigma_subject[2] ~ uniform(0.001, 10);
+  a_r ~ normal(0, 1);
+  mu[2] ~ student_t(1, 0, 1);
+}
+
+")
+  return(stan_normal_sim)
+}
+
+
 
