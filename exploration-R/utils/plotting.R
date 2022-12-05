@@ -381,3 +381,25 @@ plot_study_table <- function(tbl_studies) {
     )
   )
 }
+
+
+plot_some_subjects <- function(tbl_df) {
+  #' plot y values of a subset of subjects
+  #' 
+  #' @description plot y values of a subset of subjects for both time points;
+  #' also display by-time point and by-subject means
+  #' @param tbl_df tbl with trial-wise data
+  #' @return the ggplot object
+  ggplot(
+    tbl_df %>% 
+      filter(subject %in% sample(1:n_subjects, 5, replace = FALSE)) %>%
+      group_by(subject, timepoint) %>% mutate(y_mn = mean(y)) %>% arrange(y_mn) %>% 
+      ungroup() %>% mutate(subject = fct_inorder(as.character(subject))),
+    aes(timepoint, y, group = subject)
+  ) + geom_point(aes(color = subject), position = position_dodge(width = .2)) + 
+    geom_point(aes(y = y_mn), position = position_dodge(width = .2), size = 3, shape = 2) +
+    scale_color_viridis_d(name = "Subject ID") +
+    scale_x_discrete(labels = c("1", "2")) + 
+    theme_bw() +
+    labs(x = "Timepoint", y = "y")
+}

@@ -267,7 +267,6 @@ agg_runs <-function(condition_idx, l_results, params_fixed) {
   #' @param l_results list with simulation results
   #' @param params_fixed list with simulation parameters
   #' @return tbl grouped by condition and trial
-  #' 
   
   map(l_results, condition_idx) %>% 
     unlist() %>%
@@ -285,3 +284,26 @@ agg_runs <-function(condition_idx, l_results, params_fixed) {
     # ) %>%
     ungroup()
 } 
+
+
+
+sample_y <- function(subj, mu_t1, mu_t2, var, n) {
+  #' sample t1 and t2 values for one subject given means and error variance
+  #' 
+  #' @description sample t1 and t2 values from normal distributions
+  #' for one subject given means and error variance; assemble everything in tibble
+  #' @param subj subject id
+  #' @param mu_t1 mean at t1
+  #' @param mu_t2 mean at t2
+  #' @param var error variance
+  #' @param n number of samples
+  #' @return the tbl with columns subject, val t1, and val t2
+
+  y_t1 <- rnorm(n, mu_t1, sqrt(var))
+  y_t2 <- rnorm(n, mu_t2, sqrt(var))
+  tibble(
+    subject = subj,
+    t1 = y_t1,
+    t2 = y_t2
+  )
+}

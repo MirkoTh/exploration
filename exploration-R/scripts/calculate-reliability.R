@@ -3,6 +3,11 @@ library(MASS)
 library(cmdstanr)
 library(loo)
 
+# home grown
+dirs_home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
+walk(dirs_home_grown, source)
+
+
 n_subjects <- 80
 n_trials <- 20
 n_timepoints <- 2
@@ -29,35 +34,13 @@ tbl_sample <- tibble(
 )
 
 
-
-sample_y <- function(subj, mu_t1, mu_t2, var, n) {
-  y_t1 <- rnorm(n, mu_t1, var)
-  y_t2 <- rnorm(n, mu_t2, var)
-  tibble(
-    subject = subj,
-    t1 = y_t1,
-    t2 = y_t2
-  )
-}
-
 tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
 tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
 
-# plot subset of subjects as a check
-ggplot(
-  tbl_sim_long %>% 
-    filter(subject %in% sample(1:n_subjects, 5, replace = FALSE)) %>%
-    group_by(subject, timepoint) %>% mutate(y_mn = mean(y)) %>% arrange(y_mn) %>% 
-    ungroup() %>% mutate(subject = fct_inorder(as.character(subject))),
-  aes(timepoint, y, group = subject)
-  ) + geom_point(aes(color = subject), position = position_dodge(width = .2)) + 
-  geom_point(aes(y = y_mn), position = position_dodge(width = .2), size = 3, shape = 2) +
-  scale_color_viridis_d(name = "Subject ID") +
-  theme_bw() +
-  labs(x = "Timepoint", y = "y")
+plot_some_subjects(tbl_sim_long)
 
 
-# fit bayesian reliability model ------------------------------------------
+# fit Bayesian reliability model ------------------------------------------
 
 
 stan_normal_rel <- stan_normal_reliability()
