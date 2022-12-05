@@ -307,3 +307,79 @@ sample_y <- function(subj, mu_t1, mu_t2, var, n) {
     t2 = y_t2
   )
 }
+
+reliability_pipeline <- function(n_subjects, n_trials, reliability) {
+  #' run reliability pipeline of Bayesian model once
+  #' 
+  #' @description create a data set with given number of subjects, trials, 
+  #' and reliability and run Bayesian model on that data set
+  #' @param n_subjects number of subjects in simulated data set
+  #' @param n_trials number of subjects in simulated data set
+  #' @param reliability reliability in simulated data set
+  #' @return a summary tbl with means and ses of posterior distributionssz
+  
+  # set up data set ---------------------------------------------------------
+  
+  n_timepoints <- 2
+  d_r <- 1.5
+  a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over time
+  
+  sig_sq_0 <- 1 # error variance
+  var_subj_t1 <- .5
+  var_subj_t2 <- .5
+  cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
+  
+  mu_subj <- c(0, 0)
+  R_bold <- matrix(c(var_subj_t1, cov_t1_t2, cov_t1_t2, var_subj_t2), nrow = 2) # vcov matrix of subject level variability
+  
+  tau_s <- MASS::mvrnorm(n_subjects, mu_subj, R_bold)
+  
+  mu_rs <- matrix(rep(a_r, each = n_subjects), ncol = 2) + tau_s
+  tbl_sample <- tibble(
+    subj = 1:nrow(mu_rs),
+    mu_t1 = mu_rs[, 1],
+    mu_t2 = mu_rs[, 2]
+  )
+  
+  tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
+  tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
+  
+  
+  # fit Bayesian reliability model ------------------------------------------
+  
+  
+  stan_normal_rel <- stan_normal_reliability()
+  mod_normal_rel <- cmdstan_model(stan_normal_rel)
+  
+  x <- tbl_sim_long$timepoint %>% as.factor() %>% as.numeric()
+  
+  l_data <- list(
+    n_data = nrow(tbl_sim_long),
+    n_subj = length(unique(tbl_sim_long$subject)),
+    subj = as.numeric(factor(
+      tbl_sim_long$subject, 
+      labels = 1:length(unique(tbl_sim_long$subject))
+    )),
+    x = x,
+    response = tbl_sim_long$y
+  )
+  
+  fit_normal_rel <- mod_normal_rel$sample(
+    data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1
+  )
+  
+  pars_interest <- c("mu_ic", "mu_time", "Sigma")
+  tbl_draws <- fit_normal_rel$draws(variables = pars_interest, format = "df")
+  tbl_summary <- fit_normal_rel$summary(variables = pars_interest)
+  
+  tbl_posterior <- tbl_draws %>% 
+    dplyr::select(starts_with(c("mu", "Sigma[2,1]")), .chain) %>%
+    rename(chain = .chain) %>%
+    pivot_longer(starts_with(c("mu", "Sigma[2,1]")), names_to = "parameter", values_to = "value") %>%
+    mutate(parameter = factor(parameter, labels = c("Intercept", "Time", "Reliability")))
+  
+  
+  tbl_descriptive <- grouped_agg(tbl_posterior, parameter, value)
+  
+  return(tbl_descriptive)
+}
