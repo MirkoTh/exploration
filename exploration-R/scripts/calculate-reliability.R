@@ -1,6 +1,7 @@
 library(tidyverse)
 library(MASS)
-
+library(cmdstanr)
+library(loo)
 
 n_subjects <- 80
 n_trials <- 20
@@ -12,8 +13,8 @@ a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over time
 sig_sq_0 <- 1 # error variance
 var_subj_t1 <- .5
 var_subj_t2 <- .5
-cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
 reliability <- .8
+cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
 
 mu_subj <- c(0, 0)
 R_bold <- matrix(c(var_subj_t1, cov_t1_t2, cov_t1_t2, var_subj_t2), nrow = 2) # vcov matrix of subject level variability
@@ -27,20 +28,6 @@ tbl_sample <- tibble(
   mu_t2 = mu_rs[, 2]
 )
 
-tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
-tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
-
-# plot subset of subjects as a check
-ggplot(
-  tbl_sim_long %>% 
-    filter(subject %in% sample(1:n_subjects, 5, replace = FALSE)),
-  aes(timepoint, y, group = as.factor(subject))
-  ) + geom_point(
-    aes(color = as.factor(subject)), position = position_dodge(width = .2)
-    ) + scale_color_viridis_d(name = "Subject ID") +
-  theme_bw() +
-  labs(x = "Timepoint", y = "y")
-
 
 
 sample_y <- function(subj, mu_t1, mu_t2, var, n) {
@@ -53,17 +40,73 @@ sample_y <- function(subj, mu_t1, mu_t2, var, n) {
   )
 }
 
+tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
+tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
+
+# plot subset of subjects as a check
+ggplot(
+  tbl_sim_long %>% 
+    filter(subject %in% sample(1:n_subjects, 5, replace = FALSE)) %>%
+    group_by(subject, timepoint) %>% mutate(y_mn = mean(y)) %>% arrange(y_mn) %>% 
+    ungroup() %>% mutate(subject = fct_inorder(as.character(subject))),
+  aes(timepoint, y, group = subject)
+  ) + geom_point(aes(color = subject), position = position_dodge(width = .2)) + 
+  geom_point(aes(y = y_mn), position = position_dodge(width = .2), size = 3, shape = 2) +
+  scale_color_viridis_d(name = "Subject ID") +
+  theme_bw() +
+  labs(x = "Timepoint", y = "y")
 
 
-stan_sim <- function() {
+# fit bayesian reliability model ------------------------------------------
+
+
+stan_normal_rel <- stan_normal_reliability()
+mod_normal_rel <- cmdstan_model(stan_normal_rel)
+
+
+x <- tbl_sim_long$timepoint %>% as.factor() %>% as.numeric()
+
+l_data <- list(
+  n_data = nrow(tbl_sim_long),
+  n_subj = length(unique(tbl_sim_long$subject)),
+  subj = as.numeric(factor(
+    tbl_sim_long$subject, 
+    labels = 1:length(unique(tbl_sim_long$subject))
+  )),
+  x = x,
+  response = tbl_sim_long$y
+)
+
+fit_normal_rel <- mod_normal_rel$sample(
+  data = l_data, iter_sampling = 200, iter_warmup = 200, chains = 1
+)
+
+
+file_loc <- str_c("exploration-R/data/recovery-normal.RDS")
+fit_normal_rel$save_object(file = file_loc)
+pars_interest <- c("mu_ic", "mu_time", "Sigma")
+tbl_draws <- fit_normal_rel$draws(variables = pars_interest, format = "df")
+tbl_summary <- fit_normal_rel$summary(variables = pars_interest)
+
+tbl_posterior <- tbl_draws %>% 
+  dplyr::select(starts_with(c("mu", "Sigma[2,1]")), .chain) %>%
+  rename(chain = .chain) %>%
+  pivot_longer(starts_with(c("mu", "Sigma[2,1]")), names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, labels = c("Intercept", "Time", "Reliability")))
+
+loo_normal_rel <- fit_normal_rel$loo(variables = "log_lik_pred")
+
+
+
+stan_normal_reliability <- function() {
   
-  stan_normal_sim <- write_stan_file("
+  stan_normal_reliability <- write_stan_file("
 data {
   int n_data;
   int n_subj;
   vector[n_data] response;
   array[n_data] int subj;
-  matrix[n_data, 2] x; // ic, timepoint
+  array[n_data] int x; // timepoint
 }
 
 transformed data {
@@ -72,46 +115,58 @@ transformed data {
 }
 
 parameters {
-  matrix[n_subj, 2] b;
-  vector[2] mu;
-  vector <lower=0>[2] sigma_subject;
-  real<lower=0> sigma;
+  cholesky_factor_corr[2] L; //cholesky factor of covariance
+  vector<lower=0>[2] L_std;
+  real<lower=0> sigma_error;
+  real mu_ic;
+  real mu_time;
+  matrix[n_subj, 2] tau_rs;
+  vector[2] mu_subject;
 }
 
 transformed parameters {
-  array[2] real mu_tf;
-  mu_tf[1] = mu[1];
-  mu_tf[2] = scale_cont * mu[2];
-  vector[n_data] mn;
-
+  vector[n_data] mu_rs;
+  
   for (n in 1:n_data) {
-    mn[n] = b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2];
+    mu_rs[n] = mu_ic + mu_time * (x[n] - 1.5) + tau_rs[subj[n], x[n]];
   }
 }
 
 model {
   for (n in 1:n_data) {
     response[n] ~ normal(mu_rs[n], sigma_error);
-    mu_rs[n] = mu_ic + mu_time * (x[n, 2] - 1.5) + tau_rs[subj[n], x[n, 2]]
+    
   }
 
   L ~ lkj_corr_cholesky(1);
   L_std ~ normal(0, 2.5);
-  matrix[D, D] L_Sigma = diag_pre_multiply(L_std, L);
+  matrix[2, 2] L_Sigma = diag_pre_multiply(L_std, L);
+  
 
   for (s in 1:n_subj) {
-    tau_rs[s] ~ multi_normal_cholesky([0, 0], L_Sigma)
+    tau_rs[s] ~ multi_normal_cholesky(mu_subject, L_Sigma);
   }
   
-  sigma_error ~ uniform(0.001, 10);
-  sigma_subject[1] ~ uniform(0.001, 10);
-  sigma_subject[2] ~ uniform(0.001, 10);
-  a_r ~ normal(0, 1);
-  mu[2] ~ student_t(1, 0, 1);
+  sigma_error ~ gamma(1, 1);
+  mu_ic ~ normal(0, 1);
+  mu_time ~ normal(0, 1);
+  mu_subject ~ normal(0, 1);
+}
+ 
+  
+generated quantities {
+ corr_matrix[2] Sigma;
+ array[n_data] real log_lik_pred;
+
+ Sigma = multiply_lower_tri_self_transpose(L);
+
+ for (n in 1:n_data) {
+   log_lik_pred[n] = normal_lpdf(response[n] | mu_rs[n], sigma_error);
+ }
 }
 
 ")
-  return(stan_normal_sim)
+  return(stan_normal_reliability)
 }
 
 
