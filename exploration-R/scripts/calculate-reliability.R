@@ -13,17 +13,17 @@ walk(dirs_home_grown, source)
 
 run_model <- FALSE
 n_subjects <- 80
-n_trials <- 20
-n_timepoints <- 2
+n_trials <- 10
 
 d_r <- 1.5
-a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over time
+a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over two time points
 
-sig_sq_0 <- 1 # error variance
-var_subj_t1 <- .5
-var_subj_t2 <- .5
-reliability <- .8
+sig_sq_0 <- .5 # within variance
+var_subj_t1 <- 1 # between-subjects variance t1
+var_subj_t2 <- 1 # between-subjects variance t2
+reliability <- .8 # correlation between task scores at t1 and t2
 cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
+var_error <- .5 # error variance
 
 mu_subj <- c(0, 0)
 R_bold <- matrix(c(var_subj_t1, cov_t1_t2, cov_t1_t2, var_subj_t2), nrow = 2) # vcov matrix of subject level variability
@@ -37,12 +37,67 @@ tbl_sample <- tibble(
   mu_t2 = mu_rs[, 2]
 )
 
-
 tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
+# add independent random error to both time points
+tbl_sim$t1 <- tbl_sim$t1 + rnorm(nrow(tbl_sim), 0, sqrt(var_error))
+tbl_sim$t2 <- tbl_sim$t2 + rnorm(nrow(tbl_sim), 0, sqrt(var_error))
+
+
 tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
+
+
+tbl_sim %>% group_by(subject) %>% summarize(mean(t1), mean(t2)) %>% apply(2, var)
 
 plot_some_subjects(tbl_sim_long)
 
+# between subjects
+tbl_sim_long %>% group_by(subject, timepoint) %>%
+  summarize(mean_y_s = mean(y)) %>%
+  group_by(timepoint) %>%
+  summarize(var(mean_y_s))
+
+tbl_sim_long %>% group_by(subject, timepoint) %>%
+  summarize(mean_y_s = mean(y)) %>%
+  group_by(timepoint) %>%
+  mutate(
+    mean_tp = mean(mean_y_s),
+    squared_dev = (mean_tp - mean_y_s)^2
+    ) %>%
+  group_by(timepoint) %>%
+  summarize(sum_squares_r = sum(squared_dev) / (length(unique(subject)) - 1))
+  
+
+
+# within subjects
+tbl_sim_long %>% group_by(timepoint, subject) %>%
+  mutate(
+    mean_y_subject_tp = mean(y),
+    delta = y - mean_y_subject_tp
+    ) %>%
+  summarize(var_within = var(delta)) %>%
+  group_by(timepoint) %>% 
+  summarize(mean(var_within))
+
+tbl_sim_long %>% group_by(timepoint, subject) %>%
+  mutate(
+    mean_y_subject_tp = mean(y),
+    squared_dev = (y - mean_y_subject_tp)^2
+  ) %>% group_by(timepoint) %>%
+  summarize(sum_squares_w = sum(squared_dev) / (length(unique(subject)) * (n_trials - 1)))
+
+tbl_sim %>% group_by(subject) %>% summarize(mn_t1 = mean(t1), mn_t2 = mean(t2)) %>%
+  dplyr::select(-subject) %>%
+  ICC()
+
+tmp <- tbl_sim %>% dplyr::select(-t2) %>% group_by(subject) %>% mutate(trial = row_number(subject))
+tmp %>% pivot_wider(id_cols = subject, names_from = trial, values_from = t1) %>%
+  ungroup() %>%
+  dplyr::select(-subject) %>%
+  ICC()
+
+tbl_sim %>% group_by(subject) %>% summarize(mn_t1 = mean(t1), mn_t2 = mean(t2)) %>%
+  dplyr::select(-subject) %>%
+  ICC()
 
 # fit/load Bayesian reliability model -------------------------------------
 

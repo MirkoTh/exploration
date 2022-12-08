@@ -320,14 +320,15 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   
   # set up data set ---------------------------------------------------------
   
-  n_timepoints <- 2
   d_r <- 1.5
-  a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over time
+  a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over two time points
   
-  sig_sq_0 <- 1 # error variance
-  var_subj_t1 <- .5
-  var_subj_t2 <- .5
+  sig_sq_0 <- .5 # within variance
+  var_subj_t1 <- 1 # between-subjects variance t1
+  var_subj_t2 <- 1 # between-subjects variance t2
+  reliability <- .8 # correlation between task scores at t1 and t2
   cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
+  var_error <- .5 # error variance
   
   mu_subj <- c(0, 0)
   R_bold <- matrix(c(var_subj_t1, cov_t1_t2, cov_t1_t2, var_subj_t2), nrow = 2) # vcov matrix of subject level variability
@@ -342,6 +343,10 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   )
   
   tbl_sim <- pmap(tbl_sample, sample_y, var = sig_sq_0, n = n_trials) %>% reduce(rbind)
+  # add independent random error to both time points
+  tbl_sim$t1 <- tbl_sim$t1 + rnorm(nrow(tbl_sim), 0, sqrt(var_error))
+  tbl_sim$t2 <- tbl_sim$t2 + rnorm(nrow(tbl_sim), 0, sqrt(var_error))
+  
   tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_to = "y")
   
   
