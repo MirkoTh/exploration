@@ -107,15 +107,7 @@ reliability <- c(.3, .6, .9)
 
 
 tbl_design <- crossing(n_subjects, n_trials, reliability)
-repeat_tibble <- function(tbl_df, n_reps) {
-  i <- 1
-  tbl_df_new <- tbl_df
-  while (i < n_reps) {
-    tbl_df_new <- rbind(tbl_df_new, tbl_df)
-    i <- i + 1
-  }
-  return(tbl_df_new)
-}
+
 tbl_design_rep <- repeat_tibble(tbl_design, 10)
 
 file_loc_iter <- "exploration-R/data/reliability-recovery-results.RDS"

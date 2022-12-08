@@ -184,7 +184,7 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
   }
   tbl_prep$value_sampled <- pmap(
     tbl_prep[, c("option_selected", "trial_id")], ~ extract_nested_sample(.x, .y)
-    ) %>% unlist()
+  ) %>% unlist()
   return(list(tbl_prep, l_rewards))
 }
 
@@ -216,7 +216,7 @@ kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
   #' @return nested list containing list with Kalman 
   #' results (i.e., ms, sds, choices, rewards)
   #' 
-
+  
   # reward matrix
   rewards <- l_tbl_rewards[[2]]
   # tbl with by-trial info
@@ -244,7 +244,7 @@ kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
 
 # two helper functions to calculate density above zero after each choice
 cum_density_above_zero <- function(i, l) {
- 
+  
   #' @description calculate density of difference of posterior distributions above zero
   #' 
   
@@ -298,7 +298,7 @@ sample_y <- function(subj, mu_t1, mu_t2, var, n) {
   #' @param var error variance
   #' @param n number of samples
   #' @return the tbl with columns subject, val t1, and val t2
-
+  
   y_t1 <- rnorm(n, mu_t1, sqrt(var))
   y_t2 <- rnorm(n, mu_t2, sqrt(var))
   tibble(
@@ -316,7 +316,7 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   #' @param n_subjects number of subjects in simulated data set
   #' @param n_trials number of subjects in simulated data set
   #' @param reliability reliability in simulated data set
-  #' @return a summary tbl with means and ses of posterior distributionssz
+  #' @return a summary tbl with means and ses of posterior distributions
   
   # set up data set ---------------------------------------------------------
   
@@ -382,4 +382,22 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   tbl_descriptive <- grouped_agg(tbl_posterior, parameter, value)
   
   return(tbl_descriptive)
+}
+
+
+repeat_tibble <- function(tbl_df, n_reps) {
+  #' concatenate the same tibble several times
+  #' 
+  #' @description copy a tibble n_reps times and rbind it to the original tibble
+  #' @param tbl_df the tbl to be repeated
+  #' @param n_reps the number of times the tbl should be repeated
+  #' @return the new larger tibble
+  
+  i <- 1
+  tbl_df_new <- tbl_df
+  while (i < n_reps) {
+    tbl_df_new <- rbind(tbl_df_new, tbl_df)
+    i <- i + 1
+  }
+  return(tbl_df_new)
 }
