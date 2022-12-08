@@ -19,7 +19,8 @@ l_tbl_data <- list(
 
 tbl_choice <- l_tbl_data[["choice"]]
 tbl_memory <- l_tbl_data[["memory"]]
-
+tbl_memory <- tbl_memory[1:48, ]
+tbl_choice <- tbl_choice[1:168, ]
 n_mem_items <- 3
 
 
@@ -37,30 +38,39 @@ tbl_memory$prop_correct <- tbl_memory$n_correct / n_mem_items
 tbl_memory_agg <- as_tibble(summarySEwithin(
   tbl_memory, 
   measurevar = "prop_correct", 
-  withinvars = c("presentation", "test_cue_nr", "match_first_presented"), 
+  withinvars = c("presentation", "match_first_presented"), #"test_cue_nr", 
   idvar = "participant_id"
 )) %>% mutate(
-  test_cue_nr = factor(test_cue_nr, labels = c("First", "Second")),
+  #test_cue_nr = factor(test_cue_nr, labels = c("First", "Second")),
   match_first_presented = factor(
-    match_first_presented, labels = c("Matches Second", "Matches First")
+    match_first_presented, labels = c("Presented Second", "Presented First")
   )
 )
 
 pd <- position_dodge(width = .8)
-ggplot(tbl_memory_agg, aes(presentation, prop_correct, group = test_cue_nr)) +
-  geom_errorbar(aes(ymin = prop_correct - ci, ymax = prop_correct + ci), color = "black",  position = pd, width = .2) +
-  geom_point(aes(presentation, prop_correct, color = test_cue_nr), position = pd) +
-  geom_col(aes(fill = test_cue_nr, alpha = test_cue_nr), position = pd) +
-  facet_wrap(~ match_first_presented) +
-  scale_fill_viridis_d(name = "Cue Position") +
+pl_mem_acc <- ggplot(
+  tbl_memory_agg, 
+  aes(presentation, prop_correct, group = match_first_presented)
+  ) +
+  geom_errorbar(
+    aes(ymin = prop_correct - ci, ymax = prop_correct + ci),
+    color = "black",  position = pd, width = .2
+    ) +
+  geom_point(aes(presentation, prop_correct), position = pd) +
+  geom_col(aes(fill = match_first_presented, alpha = match_first_presented), position = pd) +
+  scale_fill_viridis_d(name = "Location Probed") +
   scale_color_viridis_d(guide = "none") +
-  scale_alpha_discrete(range = c(.2, .8), name = "Cue Position") +
+  scale_alpha_discrete(range = c(.2, .8), name = "Location Probed") +
   theme_bw() +
   labs(
     x = "Presentation",
     y = "Prop. Correct"
   )
-
+save_my_pdf(
+  pl_mem_acc, 
+  "experiments/2022-07-exploration-distinctiveness/data/figures/memory-agg.pdf",
+  5, 4
+  )
 
 # choice prob depending on mean difference
 tbl_choice$mean_diff_right_true <- tbl_choice$mean_right - tbl_choice$mean_left
@@ -74,7 +84,7 @@ tbl_choice$mean_diff_first_true_cut <- cut(tbl_choice$mean_diff_first_true, 3)
 tbl_choice$choice_first_pres <- tbl_choice$choice == tbl_choice$first_item_pres
 
 # very basic pattern: more right when right is higher overall
-tbl_choice %>% group_by(participant_id, mean_diff_right_true, trial_id) %>%
+pl_choice_basic <- tbl_choice %>% group_by(participant_id, mean_diff_right_true, trial_id) %>%
   summarize(
     choice_mn = mean(choice),
     n = n()
@@ -98,7 +108,11 @@ tbl_choice %>% group_by(participant_id, mean_diff_right_true, trial_id) %>%
     caption = "Nb. all choices"
   ) +
   coord_cartesian(ylim = c(0, 1))
-
+save_my_pdf(
+  pl_choice_basic, 
+  "experiments/2022-07-exploration-distinctiveness/data/figures/choice-basic.pdf",
+  5, 4
+  )
 
 tbl_choice_agg <- as_tibble(summarySEwithin(
   tbl_choice, 
@@ -119,12 +133,40 @@ ggplot(tbl_choice_agg, aes(mean_diff_right_true_cut, choice, group = presentatio
   geom_hline(yintercept = .5, alpha = .3) +
   facet_grid(choice_first_pres ~ horizon) +
   scale_size_continuous(name = "Nr. Responses") +
+  scale_color_viridis_d(name = "Presentation") +
   theme_bw() +
   labs(
     x = "Right - Left (True Means)",
     y = "Proportion Right Option"
   )
 
+# same as above, but aggregating over horizon and choice first presented
+tbl_choice_agg_crude <- as_tibble(summarySEwithin(
+  tbl_choice, 
+  measurevar = "choice", 
+  withinvars = c("presentation", "mean_diff_right_true_cut"), 
+  idvar = "participant_id"
+))
+
+pl_choice_condition <- ggplot(tbl_choice_agg_crude, aes(mean_diff_right_true_cut, choice, group = presentation)) +
+  geom_line(aes(color = presentation), position = pd) +
+  geom_point(size = 7, color = "white", position = pd) +
+  geom_point(shape = 1, aes(color = presentation, size = N), position = pd) +
+  geom_vline(xintercept = "(-6.67,6.67]", alpha = .3) +
+  geom_hline(yintercept = .5, alpha = .3) +
+  scale_size_continuous(name = "Nr. Responses") +
+  scale_color_viridis_d(name = "Presentation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .5)) +
+  labs(
+    x = "Right - Left (True Means)",
+    y = "Proportion Right Option"
+  )
+save_my_pdf(
+  pl_choice_condition,
+  "experiments/2022-07-exploration-distinctiveness/data/figures/choices-condition.pdf",
+  5, 4
+)
 
 # choice prob depending on memory performance
 tbl_memory_wide_agg <- tbl_memory %>% 
@@ -150,7 +192,7 @@ tbl_choice_mem <- left_join(
 
 tbl_choice_mem_agg <- tbl_choice_mem %>%
   group_by(
-    presentation, horizon, mean_diff_first_true_cut, n_correct_diff >= 0
+    presentation, mean_diff_first_true_cut, n_correct_diff >= 0 # horizon, 
   ) %>% summarize(
     choice_mn = mean(choice_first_pres),
     n = n()
@@ -159,16 +201,22 @@ tbl_choice_mem_agg <- tbl_choice_mem %>%
 # here, idea is that if people know less about first-presented option
 # they again choose it more often (-> intercept shift aka directed exploration)
 
-ggplot(tbl_choice_mem_agg, aes(mean_diff_first_true_cut, choice_mn, group = `n_correct_diff >= 0`)) +
+pl_choice_mem <- ggplot(tbl_choice_mem_agg, aes(mean_diff_first_true_cut, choice_mn, group = `n_correct_diff >= 0`)) +
   geom_line(aes(color = `n_correct_diff >= 0`), position = pd) +
   geom_point(color = "white", size = 3, position = pd) +
   geom_point(aes(color = `n_correct_diff >= 0`, size = n), position = pd) +
   facet_grid( ~ presentation) + #horizon
-  scale_color_viridis_d() +
+  scale_color_viridis_d(name = "Better Memory\nfor Left Bandit") +
+  scale_size_continuous(name = "Nr. Trials") +
   theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .5)) +
   labs(
     x = "True Mean Difference",
-    y = "Choice Proportion"
+    y = "Choice Proportion Left Bandit"
   )
-
+save_my_pdf(
+  pl_choice_mem,
+  "experiments/2022-07-exploration-distinctiveness/data/figures/choices-left-memory.pdf",
+  6.5, 4.5
+)
 
