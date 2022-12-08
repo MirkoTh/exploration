@@ -11,7 +11,7 @@ dirs_home_grown <- c(
 )
 walk(dirs_home_grown, source)
 
-
+run_model <- FALSE
 n_subjects <- 80
 n_trials <- 20
 n_timepoints <- 2
@@ -44,11 +44,7 @@ tbl_sim_long <- pivot_longer(tbl_sim, c(t1, t2), names_to = "timepoint", values_
 plot_some_subjects(tbl_sim_long)
 
 
-# fit Bayesian reliability model ------------------------------------------
-
-
-stan_normal_rel <- stan_normal_reliability()
-mod_normal_rel <- cmdstan_model(stan_normal_rel)
+# fit/load Bayesian reliability model -------------------------------------
 
 
 x <- tbl_sim_long$timepoint %>% as.factor() %>% as.numeric()
@@ -64,13 +60,20 @@ l_data <- list(
   response = tbl_sim_long$y
 )
 
-fit_normal_rel <- mod_normal_rel$sample(
-  data = l_data, iter_sampling = 200, iter_warmup = 200, chains = 1
-)
-
 
 file_loc <- str_c("exploration-R/data/recovery-normal.RDS")
-fit_normal_rel$save_object(file = file_loc)
+
+if (run_model == TRUE) {
+  stan_normal_rel <- stan_normal_reliability()
+  mod_normal_rel <- cmdstan_model(stan_normal_rel)
+  fit_normal_rel <- mod_normal_rel$sample(
+    data = l_data, iter_sampling = 200, iter_warmup = 200, chains = 1
+  )
+  fit_normal_rel$save_object(file = file_loc)
+} else {
+  fit_normal_rel <- readRDS(file_loc)
+}
+
 pars_interest <- c("mu_ic", "mu_time", "Sigma")
 tbl_draws <- fit_normal_rel$draws(variables = pars_interest, format = "df")
 tbl_summary <- fit_normal_rel$summary(variables = pars_interest)
@@ -91,7 +94,7 @@ ggplot(tbl_posterior, aes(value)) +
   geom_label(
     data = tbl_descriptive, 
     aes(0, n/4, label = str_c(round(mean_value, 2), " +/- ", round(se_value, 2)))
-    ) + facet_wrap(~ parameter) +
+  ) + facet_wrap(~ parameter) +
   theme_bw()
 
 
@@ -140,10 +143,10 @@ ggplot(tbl_performance, aes(n_trials, mn_delta, group = n_subjects)) +
   geom_errorbar(
     aes(ymin = mn_delta - 2*se_delta, ymax = mn_delta + 2*se_delta),
     width = 1, position = pd
-    ) +
+  ) +
   geom_label(aes(
     y = mn_delta, label = str_c("r=", round(correlation, 2))
-    ), position = pd) +
+  ), position = pd) +
   scale_fill_viridis_d(name = "Nr. Subjects") +
   theme_bw() +
   labs(x = "Nr. Trials", y = "Mean Absolute Deviation")
@@ -157,7 +160,7 @@ grouped_agg(tbl_results_mn, c(n_subjects, n_trials, reliability), mn_reliability
     ymin = mean_mn_reliability - 2*se_mn_reliability, 
     ymax = mean_mn_reliability + 2*se_mn_reliability,
     color = as.factor(n_trials)
-    ), width = .05, position = pd) +
+  ), width = .05, position = pd) +
   geom_line(aes(color = as.factor(n_trials)), position = pd) +
   geom_point(size = 3, color = "white", position = pd) +
   geom_point(aes(color = as.factor(n_trials)), position = pd) +
