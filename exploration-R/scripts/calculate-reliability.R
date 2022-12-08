@@ -90,13 +90,16 @@ loo_normal_rel <- fit_normal_rel$loo(variables = "log_lik_pred")
 tbl_descriptive <- grouped_agg(tbl_posterior, parameter, value)
 
 ggplot(tbl_posterior, aes(value)) +
-  geom_histogram(binwidth = .1, aes(fill = "dodgerblue")) +
+  geom_histogram(binwidth = .1, fill = "#66CCFF", color = "white") +
   geom_label(
     data = tbl_descriptive, 
     aes(0, n/4, label = str_c(round(mean_value, 2), " +/- ", round(se_value, 2)))
   ) + facet_wrap(~ parameter) +
   theme_bw()
 
+
+
+# reliability recovery study ----------------------------------------------
 
 n_subjects <- c(40, 80, 120)
 n_trials <- c(5, 10, 20)
@@ -115,14 +118,19 @@ repeat_tibble <- function(tbl_df, n_reps) {
 }
 tbl_design_rep <- repeat_tibble(tbl_design, 10)
 
-n_workers_available <- parallel::detectCores()
-future::plan("future::multisession", workers = n_workers_available - 2)
-
-options(warn = -1)
-l_results <- furrr::future_pmap(tbl_design_rep, reliability_pipeline, .progress = TRUE)
-options(warn = 0)
-
-saveRDS(l_results, file = "exploration-R/data/reliability-recovery-results.RDS")
+file_loc_iter <- "exploration-R/data/reliability-recovery-results.RDS"
+if (run_model) {
+  n_workers_available <- parallel::detectCores()
+  future::plan("future::multisession", workers = n_workers_available - 2)
+  
+  options(warn = -1)
+  l_results <- furrr::future_pmap(tbl_design_rep, reliability_pipeline, .progress = TRUE)
+  options(warn = 0)
+  
+  saveRDS(l_results, file = file_loc_iter)
+} else {
+  l_results <- readRDS(file_loc_iter)
+}
 
 tbl_map <- map(l_results, "mean_value") %>% reduce(rbind) %>% as.data.frame() %>% as_tibble()
 colnames(tbl_map) <- c("mn_ic", "mn_time", "mn_reliability")
