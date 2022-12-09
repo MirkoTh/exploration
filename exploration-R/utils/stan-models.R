@@ -22,15 +22,17 @@ parameters {
   real mu_ic;
   real mu_time;
   matrix[n_subj, 2] tau_rs;
-  vector[2] mu_subject;
 }
 
 transformed parameters {
   vector[n_data] mu_rs;
+  vector[2] mu_zeros;
   
   for (n in 1:n_data) {
-    mu_rs[n] = mu_ic + mu_time * (x[n] - 1.5) + tau_rs[subj[n], x[n]];
+    mu_rs[n] = mu_time * (x[n] - 1.5) + tau_rs[subj[n], x[n]];
   }
+  mu_zeros[1] = 0;
+  mu_zeros[2] = 0;
 }
 
 model {
@@ -45,13 +47,11 @@ model {
   
 
   for (s in 1:n_subj) {
-    tau_rs[s] ~ multi_normal_cholesky(mu_subject, L_Sigma);
+    tau_rs[s] ~ multi_normal_cholesky(mu_zeros, L_Sigma);
   }
   
   sigma_error ~ gamma(1, 1);
-  mu_ic ~ normal(0, 1);
   mu_time ~ normal(0, 1);
-  mu_subject ~ normal(0, 1);
 }
  
   

@@ -50,6 +50,10 @@ tbl_sim %>% group_by(subject) %>% summarize(mean(t1), mean(t2)) %>% apply(2, var
 
 plot_some_subjects(tbl_sim_long)
 
+ggplot(grouped_agg(grouped_agg(tbl_sim_long, c(subject, timepoint), y), timepoint, mean_y), aes(timepoint, mean_mean_y)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_mean_y - 2*se_mean_y, ymax = mean_mean_y + 2*se_mean_y))
+
 # between subjects
 tbl_sim_long %>% group_by(subject, timepoint) %>%
   summarize(mean_y_s = mean(y)) %>%
@@ -122,14 +126,14 @@ if (run_model == TRUE) {
   stan_normal_rel <- stan_normal_reliability()
   mod_normal_rel <- cmdstan_model(stan_normal_rel)
   fit_normal_rel <- mod_normal_rel$sample(
-    data = l_data, iter_sampling = 200, iter_warmup = 200, chains = 1
+    data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1
   )
   fit_normal_rel$save_object(file = file_loc)
 } else {
   fit_normal_rel <- readRDS(file_loc)
 }
 
-pars_interest <- c("mu_ic", "mu_time", "Sigma")
+pars_interest <- c("mu_time", "Sigma")
 tbl_draws <- fit_normal_rel$draws(variables = pars_interest, format = "df")
 tbl_summary <- fit_normal_rel$summary(variables = pars_interest)
 
@@ -137,7 +141,7 @@ tbl_posterior <- tbl_draws %>%
   dplyr::select(starts_with(c("mu", "Sigma[2,1]")), .chain) %>%
   rename(chain = .chain) %>%
   pivot_longer(starts_with(c("mu", "Sigma[2,1]")), names_to = "parameter", values_to = "value") %>%
-  mutate(parameter = factor(parameter, labels = c("Intercept", "Time", "Reliability")))
+  mutate(parameter = factor(parameter, labels = c("Time",  "Reliability")))
 
 loo_normal_rel <- fit_normal_rel$loo(variables = "log_lik_pred")
 
@@ -145,11 +149,11 @@ loo_normal_rel <- fit_normal_rel$loo(variables = "log_lik_pred")
 tbl_descriptive <- grouped_agg(tbl_posterior, parameter, value)
 
 ggplot(tbl_posterior, aes(value)) +
-  geom_histogram(binwidth = .1, fill = "#66CCFF", color = "white") +
-  geom_label(
-    data = tbl_descriptive, 
-    aes(0, n/4, label = str_c(round(mean_value, 2), " +/- ", round(se_value, 2)))
-  ) + facet_wrap(~ parameter) +
+  geom_histogram(binwidth = .025, fill = "#66CCFF", color = "white") +
+  geom_label(data = tbl_descriptive, aes(
+      mean_value - mean_value/4, n/4, 
+      label = str_c(round(mean_value, 2), " +/- ", round(se_value, 2))
+      )) + facet_wrap(~ parameter, scales = "free_x") +
   theme_bw()
 
 
@@ -159,7 +163,6 @@ ggplot(tbl_posterior, aes(value)) +
 n_subjects <- c(40, 80, 120)
 n_trials <- c(5, 10, 20)
 reliability <- c(.3, .6, .9)
-
 
 tbl_design <- crossing(n_subjects, n_trials, reliability)
 
