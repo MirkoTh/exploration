@@ -326,7 +326,6 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   sig_sq_0 <- .5 # within variance
   var_subj_t1 <- 1 # between-subjects variance t1
   var_subj_t2 <- 1 # between-subjects variance t2
-  reliability <- .8 # correlation between task scores at t1 and t2
   cov_t1_t2 <- reliability * sqrt(var_subj_t1) * sqrt(var_subj_t2)
   var_error <- .5 # error variance
   
