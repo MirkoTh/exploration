@@ -1,0 +1,325 @@
+library(tidyverse)
+library(rutils)
+library(grid)
+library(gridExtra)
+
+
+
+# Fixed-Means Bandit ------------------------------------------------------
+# Data from Gershman (2018)
+
+tbl_exp2 <- read_csv("data2.csv")
+tbl_exp2 <- read_csv("https://raw.githubusercontent.com/sjgershm/exploration/master/data2.csv")
+tbl_exp2$higher_mean <- 1
+tbl_exp2$higher_mean[tbl_exp2$mu2 > tbl_exp2$mu1] <- 2
+tbl_exp2$chose_higher <- tbl_exp2$higher_mean == tbl_exp2$choice
+tbl_exp2$mean_diff_abs <- abs(tbl_exp2$mu1 - tbl_exp2$mu2)
+tbl_exp2$mean_diff_abs_cut <- factor(cut(
+  tbl_exp2$mean_diff_abs, 
+  c(-Inf, 5, 10, 15, Inf),
+  c("< 5", "5 - 10", "10 - 15", "> 15")
+))
+tbl_exp2 <- tbl_exp2 %>% filter(
+  between(RT, 300, 3500)
+)
+
+# aggregate by subject and drop cells with < 3 obs
+by_subj <- grouped_agg(tbl_exp2, c(subject, trial, mean_diff_abs_cut), c(RT, block)) %>%
+  ungroup() %>% filter(n >= 3)
+
+tbl_exp2_agg <- grouped_agg(by_subj, c(trial, mean_diff_abs_cut), mean_RT)
+
+x_vals <- sort(unique(tbl_exp2_agg$trial))
+x_show <- seq(min(x_vals), max(x_vals), by = 2)
+pd <- position_dodge(width = .4)
+pl_gersh_e2 <- ggplot(tbl_exp2_agg, aes(trial, mean_mean_RT, group = mean_diff_abs_cut)) +
+  geom_errorbar(
+    aes(
+      ymin = mean_mean_RT - 1.96 * se_mean_RT, 
+      ymax = mean_mean_RT + 1.96 * se_mean_RT,
+      color = mean_diff_abs_cut
+    ), width = .3, position = pd
+  ) +
+  geom_point(color = "white", size = 3, position = pd) +
+  geom_point(aes(color = mean_diff_abs_cut), position = pd) +
+  geom_line(aes(color = mean_diff_abs_cut), position = pd) +
+  #facet_wrap(~ mean_diff_abs_cut) +
+  scale_color_brewer(palette = "Set1", name = "Difference of Means") +
+  scale_x_continuous(breaks = x_show) +
+  coord_cartesian(ylim = c(0, 3000)) +
+  theme_bw() +
+  theme(legend.position = c(.7, .8)) +
+  labs(
+    x = "Trial",
+    y = "RT (ms)",
+    title = "Gershman (2018): Experiment 2"
+  )
+
+
+# Restless Bandit ---------------------------------------------------------
+# Data from Speekenbrink & Konstantinidis (2015)
+
+
+tbl_rb <- read_csv(
+  "https://github.com/speekenbrink-lab/data/raw/master/Speekenbrink_Konstantinidis_2015.csv"
+)
+tbl_rb <- tbl_rb %>% mutate(
+  trend = factor(startsWith(cond, "t"), labels = c("Trend", "No Trend")),
+  volatility = factor(endsWith(cond, "n"), labels = c("Variance Changes", "Variance Stable"))
+)
+
+rb_by_trial <- grouped_agg(tbl_rb %>% filter(between(rt, 300, 3500)), c(trial, trend, volatility), c(rt)) %>%
+  ungroup()
+rb_by_trial$cond_long <- interaction(rb_by_trial$trend, rb_by_trial$volatility, sep = " & ")
+x_vals <- sort(unique(rb_by_trial$trial))
+x_show <- seq(min(x_vals), max(x_vals), by = length(x_vals)/8)
+
+
+make_poly <- function(x, y) {
+  cond_long <- unique(rb_by_trial$cond_long)
+  tbl_polygon <- crossing(x, y, cond_long)
+  tbl_polygon$val <- 0
+  tbl_polygon$val[endsWith(as.character(tbl_polygon$cond_long), "Changes")] <- 1
+  tbl_polygon1 <- tbl_polygon[1:(nrow(tbl_polygon)/2), ]
+  tbl_polygon2 <- tbl_polygon[((nrow(tbl_polygon)/2)+1):nrow(tbl_polygon), ]
+  tbl_polygon2 <- tbl_polygon2 %>% arrange(desc(y))
+  tbl_polygon <- rbind(tbl_polygon1, tbl_polygon2)
+  return(tbl_polygon)
+}
+
+x1 <- c(51, 51, 100, 100)
+x2 <- c(151, 151, 200, 200)
+y <- c(1500, 2500, 2500, 1500)
+tbl_polygon_h1 <- make_poly(x1, y)
+tbl_polygon_h2 <- make_poly(x2, y)
+
+rb_by_trial <- rb_by_trial %>% filter(cond_long == "Trend & Variance Changes")
+tbl_polygon_h1 <- tbl_polygon_h1 %>% filter(cond_long == "Trend & Variance Changes")
+tbl_polygon_h2 <- tbl_polygon_h2 %>% filter(cond_long == "Trend & Variance Changes")
+
+pl_speek_konst <- ggplot(rb_by_trial, aes(
+  trial, mean_rt, group = cond_long)
+) + geom_errorbar(
+  aes(
+    ymin = mean_rt - 1.96 * se_rt, 
+    ymax = mean_rt + 1.96 * se_rt,
+    color = cond_long
+  ), width = .3, position = pd
+) +
+  geom_line(aes(color = cond_long), position = pd) +
+  geom_point(color = "white", size = 3, position = pd) +
+  geom_point(aes(color = cond_long), position = pd, shape = 1) +
+  geom_polygon(data = tbl_polygon_h1, aes(x, y, alpha = val, group = cond_long)) +
+  geom_polygon(data = tbl_polygon_h2, aes(x, y, alpha = val, group = cond_long)) +
+  facet_wrap(~ cond_long) +
+  scale_color_brewer(palette = "Set1", guide = "none") +
+  scale_alpha_continuous(range = c(0, .1), guide = "none") +
+  scale_x_continuous(breaks = x_show) +
+  coord_cartesian(ylim = c(0, 3000)) +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "white")) +
+  labs(
+    x = "Trial",
+    y = "RT (ms)",
+    title = "Speekenbrink & Konstantinidis (2015)"
+  )
+
+grid.draw(arrangeGrob(pl_gersh_e2, pl_speek_konst, ncol = 2))
+
+
+tbl_exp2 <- tbl_exp2 %>% arrange(subject, block, trial) %>% 
+  group_by(subject, block) %>% mutate(
+    previous_choice = lag(choice),
+    repeat_choice = choice == previous_choice,
+    switch_choice = choice != previous_choice
+  )
+tbl_exp2$repeat_choice[is.na(tbl_exp2$repeat_choice)] <- FALSE
+tbl_exp2$switch_choice[is.na(tbl_exp2$switch_choice)] <- TRUE
+
+
+tbl_rep_choice_exp2 <- grouped_agg(tbl_exp2, c(subject, mean_diff_abs_cut, trial), repeat_choice) %>%
+  drop_na() %>%
+  grouped_agg(c(mean_diff_abs_cut, trial), mean_repeat_choice)
+
+ggplot(tbl_rep_choice_exp2, aes(trial, mean_mean_repeat_choice, group = mean_diff_abs_cut)) +
+  geom_line(aes(color = mean_diff_abs_cut)) +
+  geom_point(color = "white", size = 3) +
+  geom_point(aes(color = mean_diff_abs_cut)) +
+  geom_hline(yintercept=c(0, 1), linetype='dotdash', color=c("black", "black"), size = .6) +
+  scale_color_brewer(name = "Difference of Means", palette = "Set1") +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_bw() +
+  labs(
+    x = "Trial",
+    y = "Proportion Repeat Choice",
+    title = "Gershman (2018): Experiment 2"
+  )
+
+
+ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
+  geom_tile(aes(fill = as.factor(deck)), color = "white") +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  facet_grid(trend ~ volatility)
+
+
+
+# Add Variables to Restless Bandit Data -----------------------------------
+
+
+tbl_rb <- tbl_rb %>% 
+  arrange(id, cond, trial) %>%
+  group_by(id) %>%
+  mutate(
+    previous_deck = lag(deck),
+    repeat_deck = deck == previous_deck,
+    switch_deck = deck != previous_deck
+  )
+tbl_rb$repeat_deck[is.na(tbl_rb$repeat_deck)] <- FALSE
+tbl_rb$switch_deck[is.na(tbl_rb$switch_deck)] <- TRUE
+tbl_rb$run_nr <- cumsum(tbl_rb$switch_deck)
+
+tbl_rb <- tbl_rb %>% group_by(id, cond, run_nr) %>%
+  mutate(run_length = cumsum(repeat_deck) + 1)
+
+
+tbl_rb_run <- tbl_rb %>% group_by(id, trend, volatility, run_nr) %>%
+  summarize(run_length = max(run_length)) %>%
+  ungroup()
+
+
+
+# Entropy -----------------------------------------------------------------
+
+
+library(entropy)
+
+freqs_runs_trend <- tbl_rb_run %>% group_by(id, volatility) %>% count(run_length) 
+tbl_design <- crossing(id = unique(tbl_rb_run$id), volatility = unique(tbl_rb_run$volatility), run_length = 1:max(freqs_runs_trend$run_length))
+tbl_freqs <- tbl_design %>% 
+  left_join(freqs_runs_trend, by = c("id", "volatility", "run_length")) %>%
+  replace_na(list(n = 0))
+
+l_tbl_freqs <- tbl_freqs %>% split(interaction(.$id, .$volatility))
+l_freqs_empirical <- map(l_tbl_freqs, ~ freqs.empirical(.x$n))
+l_entropy_empirical <- map(l_freqs_empirical, entropy.empirical)
+tbl_entropy <- reduce(l_entropy_empirical, rbind) %>% as.data.frame()
+tbl_entropy$id <- str_extract(names(l_entropy_empirical), "^[0-9]*")
+tbl_entropy$cond <- str_extract(names(l_entropy_empirical), "[a-z A-Z]*$")
+
+tbl_entropy_wide <- tbl_entropy %>%
+  pivot_wider(id_cols = id, names_from = cond, values_from = V1)
+tbl_entropy_cor <- tibble(r = cor(tbl_entropy_wide$`Variance Changes`, tbl_entropy_wide$`Variance Stable`))
+
+ggplot(tbl_entropy_wide, aes(`Variance Changes`, `Variance Stable`)) +
+  geom_point() +
+  geom_label(data = tbl_entropy_cor, aes(x = .75, y = .75, label = str_c("r = ", round(r, 2)))) +
+  geom_smooth(method = "lm")
+
+
+
+# Run Lengths -------------------------------------------------------------
+
+
+ggplot(tbl_rb_run %>% filter(run_length > 1), aes(run_length)) +
+  geom_histogram(aes(fill = id), binwidth = 2) +
+  facet_wrap(~ id) +
+  coord_cartesian(xlim = c(0, 20)) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Run Length", y = "Nr. Runs", title = "Speekenbrink & Konstantinidis (2015)")
+
+
+l_by_trend <- tbl_rb_run %>%
+  filter(run_length > 1) %>%
+  split(interaction(.$id, .$volatility))
+l_summary <- map(
+  l_by_trend, 
+  ~ c(mn_run_length = mean(.x$run_length), sd_run_length = sd(.x$run_length))
+)
+tbl_run_stats <- reduce(l_summary, rbind) %>% as.data.frame()
+tbl_run_stats$id <- str_extract(names(l_summary), "^[0-9]*")
+tbl_run_stats$cond <- str_extract(names(l_summary), "[a-z A-Z]*$")
+
+tbl_run_wide <- tbl_run_stats %>%
+  pivot_wider(id_cols = id, names_from = cond, values_from = mn_run_length) %>%
+  mutate(var = "Means") %>%
+  rbind(
+    tbl_run_stats %>%
+      pivot_wider(id_cols = id, names_from = cond, values_from = sd_run_length) %>%
+      mutate(var = "SDs")
+  ) %>% mutate(var = factor(var))
+
+
+tbl_label_e2 <- tbl_run_wide %>% group_by(var) %>% summarize(r = cor(Trend, `No Trend`))
+ggplot(tbl_run_wide, aes(Trend, `No Trend`, group = var)) +
+  geom_point(aes(color = var)) +
+  geom_label(data = tbl_label_e2, aes(x = 20, y = 37.5, label = str_c("r = ", round(r, 2)))) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~ var)
+
+tbl_label_e2 <- tbl_run_wide %>% group_by(var) %>% summarize(r = cor(`Variance Changes`, `Variance Stable`))
+ggplot(tbl_run_wide, aes(`Variance Changes`, `Variance Stable`, group = var)) +
+  geom_point(aes(color = var)) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~ var)
+
+
+
+
+# Nr. Switches ------------------------------------------------------------
+
+
+tbl_rb %>% group_by(id, volatility) %>%
+  summarise(n_switches = sum(switch_deck)) %>%
+  pivot_wider(names_from = volatility, values_from = n_switches) %>%
+  ggplot(aes(`Variance Changes`, `Variance Stable`)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+
+tbl_trend_switches <- tbl_rb %>% group_by(id, trend) %>%
+  summarise(n_switches = sum(switch_deck)) %>%
+  pivot_wider(names_from = trend, values_from = n_switches)
+tbl_label_trend <- tibble(r = cor(tbl_trend_switches$Trend, tbl_trend_switches$`No Trend`))
+
+pl_switches_rl <- tbl_rb %>% group_by(id, trend) %>%
+  summarise(n_switches = sum(switch_deck)) %>%
+  pivot_wider(names_from = trend, values_from = n_switches) %>%
+  ggplot(aes(`Trend`, `No Trend`)) +
+  geom_point() +
+  geom_smooth(method = "lm", alpha = .1, color = "#440154") +
+  geom_label(data = tbl_label_trend, aes(x = 100, y = 250, label = str_c("r = ", round(r, 2)))) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Trend", y = "No Trend", title = "Nr. Switches: Speekenbrink & Konstantinidis (2015)")
+
+
+tbl_exp2$half <- tbl_exp2$block %% 2
+tbl_exp2_switches_wide <- tbl_exp2 %>% group_by(subject, half) %>%
+  summarize(n_switches = sum(switch_choice)) %>% 
+  ungroup() %>%
+  pivot_wider(id_cols = subject, names_from = half, values_from = n_switches)
+
+tbl_label <- tibble(r = cor(tbl_exp2_switches_wide$`0`, tbl_exp2_switches_wide$`1`))
+
+pl_switches_fixed <- ggplot(tbl_exp2_switches_wide, aes(`0`, `1`)) +
+  geom_point() +
+  geom_smooth(method = "lm", alpha = .1, color = "#440154") +
+  geom_label(data = tbl_label, aes(x = 20, y = 45, label = str_c("r = ", round(r, 2)))) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Even Blocks", y = "Uneven Blocks", title = "Nr. Switches: Gershman (2018)")
+
+grid.draw(arrangeGrob(pl_switches_fixed, pl_switches_rl, nrow = 1))
+
+
+
+
+
+
