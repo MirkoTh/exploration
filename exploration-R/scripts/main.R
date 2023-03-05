@@ -8,7 +8,7 @@ library(gridExtra)
 # Fixed-Means Bandit ------------------------------------------------------
 # Data from Gershman (2018)
 
-tbl_exp2 <- read_csv("data2.csv")
+#tbl_exp2 <- read_csv("data2.csv")
 tbl_exp2 <- read_csv("https://raw.githubusercontent.com/sjgershm/exploration/master/data2.csv")
 tbl_exp2$higher_mean <- 1
 tbl_exp2$higher_mean[tbl_exp2$mu2 > tbl_exp2$mu1] <- 2
@@ -189,6 +189,14 @@ tbl_rb_run <- tbl_rb %>% group_by(id, trend, volatility, run_nr) %>%
   summarize(run_length = max(run_length)) %>%
   ungroup()
 
+write_csv(
+  tbl_exp2 %>% mutate(repeat_choice = as.numeric(repeat_choice), switch_choice = as.numeric(switch_choice)),
+  "open-data/gershman-2018-e2.csv"
+  )
+write_csv(
+  tbl_rb %>% mutate(repeat_deck = as.numeric(repeat_deck), switch_deck = as.numeric(switch_deck)),
+  "open-data/speekenbrink-konstantinidis-2015.csv"
+)
 
 
 # Entropy -----------------------------------------------------------------
