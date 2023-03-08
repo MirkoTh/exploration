@@ -19,9 +19,9 @@ tbl_exp2$mean_diff_abs_cut <- factor(cut(
   c(-Inf, 5, 10, 15, Inf),
   c("< 5", "5 - 10", "10 - 15", "> 15")
 ))
-tbl_exp2 <- tbl_exp2 %>% filter(
-  between(RT, 300, 3500)
-)
+# tbl_exp2 <- tbl_exp2 %>% filter(
+#   between(RT, 300, 3500)
+# )
 
 # aggregate by subject and drop cells with < 3 obs
 by_subj <- grouped_agg(tbl_exp2, c(subject, trial, mean_diff_abs_cut), c(RT, block)) %>%
@@ -135,6 +135,9 @@ tbl_exp2 <- tbl_exp2 %>% arrange(subject, block, trial) %>%
   )
 tbl_exp2$repeat_choice[is.na(tbl_exp2$repeat_choice)] <- FALSE
 tbl_exp2$switch_choice[is.na(tbl_exp2$switch_choice)] <- TRUE
+tbl_exp2 <- tbl_exp2 %>%
+  mutate(nr_previous_switches = cumsum(as.numeric(switch_choice))) %>%
+  ungroup()
 
 
 tbl_rep_choice_exp2 <- grouped_agg(tbl_exp2, c(subject, mean_diff_abs_cut, trial), repeat_choice) %>%
@@ -155,6 +158,33 @@ ggplot(tbl_rep_choice_exp2, aes(trial, mean_mean_repeat_choice, group = mean_dif
     title = "Gershman (2018): Experiment 2"
   )
 
+tbl_exp2 <- tbl_exp2 %>% 
+  group_by(subject) %>%
+  mutate(
+    avg_switches = mean(nr_previous_switches)
+  ) %>% ungroup() %>%
+  arrange(avg_switches) %>%
+  mutate(subject = fct_inorder(factor(subject)))
+
+
+tbl_exp2$run_nr <- cumsum(tbl_exp2$switch_choice)
+
+tbl_exp2 <- tbl_exp2 %>% group_by(subject, run_nr) %>%
+  mutate(run_length = cumsum(repeat_choice) + 1)
+
+
+
+ggplot(
+  tbl_exp2
+  , aes(nr_previous_switches, group = subject)) +
+  geom_histogram(color = "white", aes(fill = avg_switches)) +
+  facet_wrap(~ subject) +
+  scale_x_continuous(breaks = seq(2, 10, by = 2), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_viridis_c(guide = "none") +
+  theme_bw() +
+  labs(x = "Nr. Previous Switches", y = "Nr. Choices")
+
 
 ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
   geom_tile(aes(fill = as.factor(deck)), color = "white") +
@@ -168,6 +198,8 @@ ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
 
 # Add Variables to Restless Bandit Data -----------------------------------
 
+library(zoo)
+library(TTR)
 
 tbl_rb <- tbl_rb %>% 
   arrange(id, cond, trial) %>%
@@ -182,7 +214,17 @@ tbl_rb$switch_deck[is.na(tbl_rb$switch_deck)] <- TRUE
 tbl_rb$run_nr <- cumsum(tbl_rb$switch_deck)
 
 tbl_rb <- tbl_rb %>% group_by(id, cond, run_nr) %>%
-  mutate(run_length = cumsum(repeat_deck) + 1)
+  mutate(
+    run_length = cumsum(repeat_deck) + 1
+  ) %>% group_by(id, cond) %>%
+  mutate(
+    nr_previous_switches_lagged = runSum(x = switch_deck, n = 10, cumulative = FALSE),
+    nr_previous_switches_lagged = lag(nr_previous_switches_lagged),
+    nr_previous_switches_cumsum = lag(cumsum(switch_deck)),
+    nr_previous_switches_lagged = coalesce(nr_previous_switches_lagged, nr_previous_switches_cumsum),
+    run_length_lagged = lag(run_length)
+  ) %>% select(-nr_previous_switches_cumsum) %>%
+  replace_na(list(nr_previous_switches_lagged = 0, run_length_lagged = 0))
 
 
 tbl_rb_run <- tbl_rb %>% group_by(id, trend, volatility, run_nr) %>%
@@ -190,6 +232,70 @@ tbl_rb_run <- tbl_rb %>% group_by(id, trend, volatility, run_nr) %>%
   ungroup()
 
 
+
+# Learning ----------------------------------------------------------------
+
+
+kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
+  #' Kalman filter without choice model given chosen options by participants
+  #' 
+  #' @description applies Kalman filter equations for a given bandit task with existing choices by participants
+  #' @param tbl_df with made choices and collected rewards as columns
+  #' @param no number of response options
+  #' @param sigma_xi_sq innovation variance
+  #' @param sigma_epsilon_sq error variance
+  #' @return a tbl with by-trial posterior means and variances for all bandits
+  rewards <- tbl_df$rewards
+  choices <- tbl_df$choices
+  m0 <- 0
+  nt <- length(rewards) # number of time points
+  m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
+  v <- matrix(sigma_epsilon_sq, ncol = no, nrow = nt + 1) # to hold the posterior variances
+  
+  for(t in 1:nt) {
+    kt <- rep(0, no)
+    # set the Kalman gain for the chosen option
+    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
+    # compute the posterior means
+    m[t+1,] <- m[t,] + kt*(rewards[t] - m[t,])
+    # compute the posterior variances
+    v[t+1,] <- (1-kt)*(v[t,])
+  }
+  tbl_m <- as.data.frame(m)
+  tbl_v <- as.data.frame(v)
+  colnames(tbl_m) <- str_c("m_", 1:no)
+  colnames(tbl_v) <- str_c("v_", 1:no)
+  tbl_return <- tibble(cbind(tbl_m, tbl_v))
+  
+  return(tbl_return)
+}
+
+# run kalman learning model on both data sets
+
+sigma_xi_sq_exp2 <- 0
+sigma_epsilon_sq_exp2 <- 10
+no_exp2 <- 2
+
+sigma_epsilon_sq_rb <- 16
+sigma_xi_sq_rb <- 16
+no_rb <- 4
+
+
+l_exp2 <- split(tbl_exp2[, c("choice", "reward")], interaction(tbl_exp2$subject, tbl_exp2$block))
+l_rb <- split(tbl_rb[, c("deck", "payoff")], interaction(tbl_rb$id, tbl_rb$trend, tbl_rb$volatility))
+l_exp2 <- map(l_exp2, function(x) {
+  colnames(x) <- c("choices", "rewards")
+  return(x)
+})
+l_rb <- map(l_rb, function(x) {
+  colnames(x) <- c("choices", "rewards")
+  return(x)
+})
+
+l_results_rb <- map(l_rb, kalman_learning, no = no_rb, sigma_xi_sq = sigma_xi_sq_rb, sigma_epsilon_sq = sigma_epsilon_sq_rb)
+l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2)
+
+l_results_rb[[32]]
 
 # Entropy -----------------------------------------------------------------
 
