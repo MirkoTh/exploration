@@ -1,7 +1,7 @@
 library(tidyverse)
 library(rutils)
 
-l_utils <- c("utils/utils.R")
+l_utils <- c("exploration-R/utils/utils.R")
 walk(l_utils, source)
 
 n_options_max <- 4
