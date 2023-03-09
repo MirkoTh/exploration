@@ -295,7 +295,55 @@ l_rb <- map(l_rb, function(x) {
 l_results_rb <- map(l_rb, kalman_learning, no = no_rb, sigma_xi_sq = sigma_xi_sq_rb, sigma_epsilon_sq = sigma_epsilon_sq_rb)
 l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2)
 
-l_results_rb[[32]]
+
+
+# a few checks of the learned values by the model
+# l_results_rb[[77]]
+# names(l_rb)[[77]]
+# tbl_rb %>% filter(id == 17 & trend == "No Trend" & volatility == "Variance Stable")
+# 
+# l_results_exp2[[734]]
+# names(l_exp2)[[734]]
+# tbl_exp2 %>% filter(subject == 35 & block == 17)
+#
+# checks look good
+
+subjects <- map_chr(names(l_results_exp2), ~ str_extract(.x, "^[0-9]*"))
+blocks <- map_chr(names(l_results_exp2), ~ str_extract(.x, "[0-9]+$"))
+
+tbl_exp2_features_learned <- pmap(
+  list(l_results_exp2, subjects, blocks), 
+  function(x, y, z){
+    x$subject <- y
+    x$block <- z
+    return(x)
+  }
+) %>% reduce(rbind)
+
+tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
+  mutate(
+    val_diff = m_1 - m_2,
+    ru = v_1 - v_2
+    )
+
+str_match(names(l_results_rb)[[1]], "\\.([a-z A-Z]*)\\.")
+str_extract(names(l_results_rb)[[1]], "^[0-9]*")
+str_extract(names(l_results_exp2)[[1]], "[0-9]+$")
+subjects <- map_chr(names(l_results_rb), ~ str_extract(.x, "^[0-9]*"))
+trend <- map_chr(names(l_results_rb), ~ str_match(.x, "\\.([a-z A-Z]*)\\.")[, 2])
+volatility <- map_chr(names(l_results_rb), ~ str_match(.x, "\\.([a-z A-Z]*)$")[, 2])
+
+tbl_rb_features_learned <- pmap(
+  list(l_results_rb, subjects, trend, volatility), 
+  function(x, y, z, a){
+    x$id <- y
+    x$trend <- z
+    x$volatility <- a
+    return(x)
+  }
+) %>% reduce(rbind)
+
+
 
 # Entropy -----------------------------------------------------------------
 
