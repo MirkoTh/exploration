@@ -2,7 +2,9 @@ library(tidyverse)
 library(rutils)
 library(grid)
 library(gridExtra)
-
+library(mvtnorm)
+library(zoo)
+library(TTR)
 
 
 # Fixed-Means Bandit ------------------------------------------------------
@@ -45,7 +47,8 @@ pl_gersh_e2 <- ggplot(tbl_exp2_agg, aes(trial, mean_mean_RT, group = mean_diff_a
   geom_line(aes(color = mean_diff_abs_cut), position = pd) +
   #facet_wrap(~ mean_diff_abs_cut) +
   scale_color_brewer(palette = "Set1", name = "Difference of Means") +
-  scale_x_continuous(breaks = x_show) +
+  scale_x_continuous(breaks = x_show, expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
   coord_cartesian(ylim = c(0, 3000)) +
   theme_bw() +
   theme(legend.position = c(.7, .8)) +
@@ -105,8 +108,7 @@ pl_speek_konst <- ggplot(rb_by_trial, aes(
     ymax = mean_rt + 1.96 * se_rt,
     color = cond_long
   ), width = .3, position = pd
-) +
-  geom_line(aes(color = cond_long), position = pd) +
+) + geom_line(aes(color = cond_long), position = pd) +
   geom_point(color = "white", size = 3, position = pd) +
   geom_point(aes(color = cond_long), position = pd, shape = 1) +
   geom_polygon(data = tbl_polygon_h1, aes(x, y, alpha = val, group = cond_long)) +
@@ -114,7 +116,8 @@ pl_speek_konst <- ggplot(rb_by_trial, aes(
   facet_wrap(~ cond_long) +
   scale_color_brewer(palette = "Set1", guide = "none") +
   scale_alpha_continuous(range = c(0, .1), guide = "none") +
-  scale_x_continuous(breaks = x_show) +
+  scale_x_continuous(breaks = x_show, expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
   coord_cartesian(ylim = c(0, 3000)) +
   theme_bw() +
   theme(strip.background = element_rect(fill = "white")) +
@@ -136,8 +139,11 @@ tbl_exp2 <- tbl_exp2 %>% arrange(subject, block, trial) %>%
 tbl_exp2$repeat_choice[is.na(tbl_exp2$repeat_choice)] <- FALSE
 tbl_exp2$switch_choice[is.na(tbl_exp2$switch_choice)] <- TRUE
 tbl_exp2 <- tbl_exp2 %>%
-  mutate(nr_previous_switches = cumsum(as.numeric(switch_choice))) %>%
-  ungroup()
+  mutate(
+    nr_previous_switches = cumsum(as.numeric(switch_choice)),
+    nr_previous_switches = lag(nr_previous_switches)
+  ) %>%
+  ungroup() %>% replace_na(list(nr_previous_switches = 0))
 
 
 tbl_rep_choice_exp2 <- grouped_agg(tbl_exp2, c(subject, mean_diff_abs_cut, trial), repeat_choice) %>%
@@ -164,14 +170,11 @@ tbl_exp2 <- tbl_exp2 %>%
     avg_switches = mean(nr_previous_switches)
   ) %>% ungroup() %>%
   arrange(avg_switches) %>%
-  mutate(subject = fct_inorder(factor(subject)))
-
-
-tbl_exp2$run_nr <- cumsum(tbl_exp2$switch_choice)
-
-tbl_exp2 <- tbl_exp2 %>% group_by(subject, run_nr) %>%
+  mutate(
+    subject = fct_inorder(factor(subject)),
+    run_nr = cumsum(switch_choice)) %>% 
+  group_by(subject, run_nr) %>%
   mutate(run_length = cumsum(repeat_choice) + 1)
-
 
 
 ggplot(
@@ -186,6 +189,7 @@ ggplot(
   labs(x = "Nr. Previous Switches", y = "Nr. Choices")
 
 
+# nb. all four conditions are between participants
 ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
   geom_tile(aes(fill = as.factor(deck)), color = "white") +
   scale_fill_viridis_d() +
@@ -198,12 +202,10 @@ ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
 
 # Add Variables to Restless Bandit Data -----------------------------------
 
-library(zoo)
-library(TTR)
 
 tbl_rb <- tbl_rb %>% 
-  arrange(id, cond, trial) %>%
-  group_by(id) %>%
+  arrange(id2, cond, trial) %>%
+  group_by(id2) %>%
   mutate(
     previous_deck = lag(deck),
     repeat_deck = deck == previous_deck,
@@ -213,10 +215,10 @@ tbl_rb$repeat_deck[is.na(tbl_rb$repeat_deck)] <- FALSE
 tbl_rb$switch_deck[is.na(tbl_rb$switch_deck)] <- TRUE
 tbl_rb$run_nr <- cumsum(tbl_rb$switch_deck)
 
-tbl_rb <- tbl_rb %>% group_by(id, cond, run_nr) %>%
+tbl_rb <- tbl_rb %>% group_by(id2, cond, run_nr) %>%
   mutate(
     run_length = cumsum(repeat_deck) + 1
-  ) %>% group_by(id, cond) %>%
+  ) %>% group_by(id2, cond) %>%
   mutate(
     nr_previous_switches_lagged = runSum(x = switch_deck, n = 10, cumulative = FALSE),
     nr_previous_switches_lagged = lag(nr_previous_switches_lagged),
@@ -227,14 +229,14 @@ tbl_rb <- tbl_rb %>% group_by(id, cond, run_nr) %>%
   replace_na(list(nr_previous_switches_lagged = 0, run_length_lagged = 0))
 
 
-tbl_rb_run <- tbl_rb %>% group_by(id, trend, volatility, run_nr) %>%
+tbl_rb_run <- tbl_rb %>% group_by(id2, trend, volatility, run_nr) %>%
   summarize(run_length = max(run_length)) %>%
   ungroup()
 
 write_csv(
   tbl_exp2 %>% mutate(repeat_choice = as.numeric(repeat_choice), switch_choice = as.numeric(switch_choice)),
   "open-data/gershman-2018-e2.csv"
-  )
+)
 write_csv(
   tbl_rb %>% mutate(repeat_deck = as.numeric(repeat_deck), switch_deck = as.numeric(switch_deck)),
   "open-data/speekenbrink-konstantinidis-2015.csv"
@@ -270,6 +272,8 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
     v[t+1,] <- (1-kt)*(v[t,])
   }
   tbl_m <- as.data.frame(m)
+  # constrain v from becoming to small
+  v <- t(apply(v, 1, function(x) pmax(x, .0001)))
   tbl_v <- as.data.frame(v)
   colnames(tbl_m) <- str_c("m_", 1:no)
   colnames(tbl_v) <- str_c("v_", 1:no)
@@ -290,7 +294,7 @@ no_rb <- 4
 
 
 l_exp2 <- split(tbl_exp2[, c("choice", "reward")], interaction(tbl_exp2$subject, tbl_exp2$block))
-l_rb <- split(tbl_rb[, c("deck", "payoff")], interaction(tbl_rb$id, tbl_rb$trend, tbl_rb$volatility))
+l_rb <- split(tbl_rb[, c("deck", "payoff")], tbl_rb$id2)
 l_exp2 <- map(l_exp2, function(x) {
   colnames(x) <- c("choices", "rewards")
   return(x)
@@ -306,9 +310,9 @@ l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma
 
 
 # a few checks of the learned values by the model
-# l_results_rb[[77]]
-# names(l_rb)[[77]]
-# tbl_rb %>% filter(id == 17 & trend == "No Trend" & volatility == "Variance Stable")
+# l_results_rb[[1]]
+# names(l_rb)[[1]]
+# tbl_rb %>% filter(id2 == 1)
 # 
 # l_results_exp2[[734]]
 # names(l_exp2)[[734]]
@@ -316,42 +320,157 @@ l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma
 #
 # checks look good
 
-subjects <- map_chr(names(l_results_exp2), ~ str_extract(.x, "^[0-9]*"))
-blocks <- map_chr(names(l_results_exp2), ~ str_extract(.x, "[0-9]+$"))
 
+# Choices -----------------------------------------"------------------------
+
+
+# function definition
+thompson_choice_prob <- function(m, v) {
+  # m is a vector with prior predictive means
+  # v is a covariance matrix for the prior predictive distributions
+  # construct the transformation matrix for the difference scores for the first option
+  A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
+  # construct an array to contain the transformation matrices for all options
+  A <- array(0,dim=c(3,4,4))
+  A[,,1] <- A1
+  # transformation of each other option is just a shuffle of the one for option 1
+  A[,,2] <- A1[,c(2,1,3,4)]
+  A[,,3] <- A1[,c(2,3,1,4)]
+  A[,,4] <- A1[,c(2,3,4,1)]
+  # initialize a matrix for the choice probabilities
+  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
+  # loop through all trials
+  for(t in 1:nrow(m)) {
+    # loop through all options
+    for(i in 1:4) {
+      # newM is the mean vector of the difference scores
+      newM <- as.vector(A[,,i] %*% m[t,])
+      # newV is the covariance matrix of the difference scores
+      newV <- A[,,i] %*% diag(v[t,]) %*% t(A[,,i])
+      # calculate the (inverse) cumulative probability with the Miwa algorithm. Note: this is slow!
+      prob[t,i] <- pmvnorm(lower=c(0,0,0), mean = newM, sigma = newV, algorithm=Miwa(steps=128))
+      # If there are any probabilities below 0 due to numerical issues, set these to 0
+      prob[prob<0] <- 0
+    }
+  }
+  return(prob)
+}
+
+
+thompson_choice_prob_map <- function(m, v, no) {
+  # m is a vector with prior predictive means
+  # v is a covariance matrix for the prior predictive distributions
+  # construct the transformation matrix for the difference scores for the first option
+  A <- list()
+  if (no == 4) {
+    A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
+    # construct an array to contain the transformation matrices for all options
+    A[[1]] <- A1
+    # transformation of each other option is just a shuffle of the one for option 1
+    A[[2]] <- A1[,c(2,1,3,4)]
+    A[[3]] <- A1[,c(2,3,1,4)]
+    A[[4]] <- A1[,c(2,3,4,1)]
+  } else if (no == 2) {
+    A[[1]] <- matrix(c(1, -1), nrow = 1)
+    A[[2]] <- matrix(c(-1, 1), nrow = 1)
+  }
+  
+  # initialize a matrix for the choice probabilities
+  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
+  # loop through all trials
+  for(t in 1:nrow(m)) {
+    # iterate over all options
+    prob[t, ] <- map_dbl(A, normprobs, mt = m[t, ], vt = v[t, ])
+  }
+  return(prob)
+}
+
+normprobs <- function(A_current, mt, vt){
+  newM <- as.vector(A_current %*% mt)
+  # newV is the covariance matrix of the difference scores
+  newV <- A_current %*% diag(vt) %*% t(A_current)
+  # calculate the (inverse) cumulative probability with the Miwa algorithm. Note: this is slow!
+  prob <- pmvnorm(lower=rep(0, nrow(A_current)), mean = newM, sigma = newV, algorithm=Miwa(steps=128))
+  # If there are any probabilities below 0 due to numerical issues, set these to 0
+  prob[prob<0] <- 0
+  return(prob)
+}
+
+choice_probs_rb <- function(l_results_by_id) {
+  ms_rb <- l_results_by_id[, c("m_1", "m_2", "m_3", "m_4")] %>% as.matrix()
+  vs_rb <- l_results_by_id[, c("v_1", "v_2", "v_3", "v_4")] %>% as.matrix()
+  tbl_choice_probs <- thompson_choice_prob_map(ms_rb, vs_rb) %>% 
+    as.data.frame() %>% as_tibble()
+  return(tbl_choice_probs)
+}
+
+l_choice_probs_rb <- map(l_results_rb, safely(choice_probs_rb))
+l_choice_probs_results_rb <- map(l_choice_probs_rb, "result")
+
+
+
+subjects_rb <- map_chr(names(l_choice_probs_results_rb), ~ str_extract(.x, "^[0-9]*"))
+tbl_rb_features_learned <- pmap(
+  list(l_choice_probs_results_rb, subjects_rb), 
+  function(x, y){
+    x$id2 <- y
+    return(x)
+  }
+) %>% reduce(rbind) %>% 
+  rename(p_1 = V1, p_2 = V2, p_3 = V3, p_4 = V4) %>%
+  cbind(reduce(l_results_rb, rbind)) %>%
+  as_tibble()
+
+tbl_rb_features_learned <- tbl_rb_features_learned %>% left_join(
+  tbl_rb %>% group_by(id2 = as.character(id2), trend, volatility) %>% count() %>% select(-n),
+  by = c("id2")
+) %>% relocate(where(is.character) | where(is.factor), .before = p_1) %>%
+  mutate(
+    trial_id = rep(
+      1:(nrow(tbl_rb_features_learned)/length(unique(tbl_rb_features_learned$id2))), 
+      length(unique(tbl_rb_features_learned$id2))
+    )) %>% relocate(trial_id, .after = id2)
+
+ggplot(
+  tbl_rb_features_learned %>% 
+    select(id2, trial_id, p_1, p_2, p_3, p_4) %>%
+    pivot_longer(cols = c(p_1, p_2, p_3, p_4))
+  , aes(trial_id, name)) +
+  geom_tile(aes(fill = value)) +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "white")) +
+  scale_fill_viridis_c(name = "p(choice)") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  facet_wrap(~ id2) +
+  labs(
+    x = "Trial ID",
+    y = "Bandit Nr."
+  )
+
+
+
+l_results_exp2
+ms_e2 <- l_results_exp2[[1]][, c("m_1", "m_2")] %>% as.matrix()
+vs_e2 <- l_results_exp2[[1]][, c("v_1", "v_2")] %>% as.matrix()
+thompson_choice_prob_map(ms_e2, vs_e2, 2)
+
+# unpack results again into tbl
+subjects_e2 <- map_chr(names(l_results_exp2), ~ str_extract(.x, "^[0-9]*"))
+blocks_e2 <- map_chr(names(l_results_exp2), ~ str_extract(.x, "[0-9]+$"))
 tbl_exp2_features_learned <- pmap(
-  list(l_results_exp2, subjects, blocks), 
+  list(l_results_exp2, subjects_e2, blocks_e2), 
   function(x, y, z){
     x$subject <- y
     x$block <- z
     return(x)
   }
 ) %>% reduce(rbind)
-
 tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
   mutate(
     val_diff = m_1 - m_2,
     ru = v_1 - v_2
-    )
-
-str_match(names(l_results_rb)[[1]], "\\.([a-z A-Z]*)\\.")
-str_extract(names(l_results_rb)[[1]], "^[0-9]*")
-str_extract(names(l_results_exp2)[[1]], "[0-9]+$")
-subjects <- map_chr(names(l_results_rb), ~ str_extract(.x, "^[0-9]*"))
-trend <- map_chr(names(l_results_rb), ~ str_match(.x, "\\.([a-z A-Z]*)\\.")[, 2])
-volatility <- map_chr(names(l_results_rb), ~ str_match(.x, "\\.([a-z A-Z]*)$")[, 2])
-
-tbl_rb_features_learned <- pmap(
-  list(l_results_rb, subjects, trend, volatility), 
-  function(x, y, z, a){
-    x$id <- y
-    x$trend <- z
-    x$volatility <- a
-    return(x)
-  }
-) %>% reduce(rbind)
-
-
+  )
 
 # Entropy -----------------------------------------------------------------
 
