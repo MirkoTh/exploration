@@ -6,6 +6,9 @@ library(mvtnorm)
 library(zoo)
 library(TTR)
 
+home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
+walk(home_grown, source)
+
 
 # Fixed-Means Bandit ------------------------------------------------------
 # Data from Gershman (2018)
@@ -143,7 +146,8 @@ tbl_exp2 <- tbl_exp2 %>%
     nr_previous_switches = cumsum(as.numeric(switch_choice)),
     nr_previous_switches = lag(nr_previous_switches)
   ) %>%
-  ungroup() %>% replace_na(list(nr_previous_switches = 0)) %>% 
+  ungroup() %>%
+  replace_na(list(nr_previous_switches = 0)) %>% 
   group_by(subject) %>%
   mutate(
     avg_switches = mean(nr_previous_switches)
@@ -151,10 +155,12 @@ tbl_exp2 <- tbl_exp2 %>%
   arrange(avg_switches) %>%
   group_by(subject, block) %>%
   mutate(
-    subject = fct_inorder(factor(subject)),
-    run_nr = cumsum(switch_choice)) %>% 
+    subject = as.character(subject),
+    run_nr = cumsum(switch_choice)
+    ) %>% 
   group_by(subject, run_nr) %>%
   mutate(run_length = cumsum(repeat_choice) + 1)
+tbl_exp2$subject <- fct_inorder(tbl_exp2$subject)
 
 
 tbl_rep_choice_exp2 <- grouped_agg(tbl_exp2, c(subject, mean_diff_abs_cut, trial), repeat_choice) %>%
@@ -174,7 +180,6 @@ ggplot(tbl_rep_choice_exp2, aes(trial, mean_mean_repeat_choice, group = mean_dif
     y = "Proportion Repeat Choice",
     title = "Gershman (2018): Experiment 2"
   )
-
 
 ggplot(
   tbl_exp2
@@ -227,7 +232,9 @@ tbl_rb <- tbl_rb %>% group_by(id2) %>%
     run_length_lagged = lag(run_length)
   ) %>% select(-nr_previous_switches_cumsum) %>%
   replace_na(list(nr_previous_switches_lagged = 0, run_length_lagged = 0)) %>%
-  ungroup()
+  mutate(avg_switches = mean(nr_previous_switches_lagged)) %>%
+  ungroup() %>% arrange(avg_switches)
+tbl_rb$id2 <- fct_inorder(as.character(tbl_rb$id2))
 
 tbl_rb_run <- tbl_rb %>% group_by(id2, trend, volatility, run_nr) %>%
   summarize(run_length = max(run_length)) %>%
@@ -242,45 +249,21 @@ write_csv(
   "open-data/speekenbrink-konstantinidis-2015.csv"
 )
 
+ggplot(
+  tbl_rb
+  , aes(nr_previous_switches_lagged, group = id2)) +
+  geom_histogram(color = "white", aes(fill = avg_switches)) +
+  facet_wrap(~ id2) +
+  scale_x_continuous(breaks = seq(2, 10, by = 2), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_viridis_c(guide = "none") +
+  theme_bw() +
+  labs(x = "Nr. Previous Switches (Lagged)", y = "Nr. Choices")
+
+
 
 # Learning ----------------------------------------------------------------
 
-
-kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
-  #' Kalman filter without choice model given chosen options by participants
-  #' 
-  #' @description applies Kalman filter equations for a given bandit task with existing choices by participants
-  #' @param tbl_df with made choices and collected rewards as columns
-  #' @param no number of response options
-  #' @param sigma_xi_sq innovation variance
-  #' @param sigma_epsilon_sq error variance
-  #' @return a tbl with by-trial posterior means and variances for all bandits
-  rewards <- tbl_df$rewards
-  choices <- tbl_df$choices
-  m0 <- 0
-  nt <- length(rewards) # number of time points
-  m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
-  v <- matrix(sigma_epsilon_sq, ncol = no, nrow = nt + 1) # to hold the posterior variances
-  
-  for(t in 1:nt) {
-    kt <- rep(0, no)
-    # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
-    # compute the posterior means
-    m[t+1,] <- m[t,] + kt*(rewards[t] - m[t,])
-    # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,])
-  }
-  tbl_m <- as.data.frame(m)
-  # constrain v from becoming to small
-  v <- t(apply(v, 1, function(x) pmax(x, .0001)))
-  tbl_v <- as.data.frame(v)
-  colnames(tbl_m) <- str_c("m_", 1:no)
-  colnames(tbl_v) <- str_c("v_", 1:no)
-  tbl_return <- tibble(cbind(tbl_m, tbl_v))
-  
-  return(tbl_return)
-}
 
 # run kalman learning model on both data sets
 
@@ -323,70 +306,6 @@ l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma
 
 # Choices -----------------------------------------"------------------------
 
-
-# function definition
-
-thompson_choice_prob_map <- function(m, v, no) {
-  #' Thompson sampling implemented with pmvnorm
-  #' 
-  #' @description takes prior means and variances and computes p(highest) 
-  #' given all pairwise comparisons between response options
-  #' @param m matrix with prior predictive means for each bandit in a column
-  #' and every time point in a row
-  #' @param v matrix with prior predictive variance for each bandit in a columns
-  #' and every time point in a row
-  #' @param no number of response options
-  #' @return a tbl with by-trial posterior means and variances for all bandits
-
-  # construct the transformation matrix for the difference scores for the first option  
-  A <- list()
-  if (no == 4) {
-    A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
-    # construct an array to contain the transformation matrices for all options
-    A[[1]] <- A1
-    # transformation of each other option is just a shuffle of the one for option 1
-    A[[2]] <- A1[,c(2,1,3,4)]
-    A[[3]] <- A1[,c(2,3,1,4)]
-    A[[4]] <- A1[,c(2,3,4,1)]
-  } else if (no == 2) {
-    A[[1]] <- matrix(c(1, -1), nrow = 1)
-    A[[2]] <- matrix(c(-1, 1), nrow = 1)
-  }
-  
-  # initialize a matrix for the choice probabilities
-  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
-  # loop through all trials
-  for(t in 1:nrow(m)) {
-    # iterate over all options
-    prob[t, ] <- map_dbl(A, normprobs, mt = m[t, ], vt = v[t, ])
-  }
-  return(prob)
-}
-
-normprobs <- function(A_current, mt, vt){
-  #' @description computes probabilities of current bandit being larger than other bandits
-  #' @param A_current matrix with pairwise comparisons for current bandit
-  #' @param mt prior predictive means on trial t
-  #' @param vt prior predictive variances on trial t
-  
-  newM <- as.vector(A_current %*% mt)
-  # newV is the covariance matrix of the difference scores
-  newV <- A_current %*% diag(vt) %*% t(A_current)
-  # calculate the (inverse) cumulative probability with the Miwa algorithm. Note: this is slow!
-  prob <- pmvnorm(lower=rep(0, nrow(A_current)), mean = newM, sigma = newV, algorithm=Miwa(steps=128))
-  # If there are any probabilities below 0 due to numerical issues, set these to 0
-  prob[prob<0] <- 0
-  return(prob)
-}
-
-choice_probs_rb <- function(l_results_by_id) {
-  #' @description wrapper around Thompson sampling for RB
-  ms_rb <- l_results_by_id[, c("m_1", "m_2", "m_3", "m_4")] %>% as.matrix()
-  vs_rb <- l_results_by_id[, c("v_1", "v_2", "v_3", "v_4")] %>% as.matrix()
-  tbl_choice_probs <- thompson_choice_prob_map(ms_rb, vs_rb, 4) %>% 
-    as.data.frame() %>% as_tibble()
-  return(tbl_choice_probs)
-}
 
 l_choice_probs_rb <- map(l_results_rb, safely(choice_probs_rb))
 l_choice_probs_results_rb <- map(l_choice_probs_rb, "result")
@@ -436,14 +355,6 @@ ggplot(
     y = "Bandit Nr."
   )
 
-choice_probs_e2 <- function(l_results_by_id) {
-  #' @description wrapper around Thompson sampling for E2
-  ms_e2 <- l_results_by_id[, c("m_1", "m_2")] %>% as.matrix()
-  vs_e2 <- l_results_by_id[, c("v_1", "v_2")] %>% as.matrix()
-  tbl_choice_probs <- thompson_choice_prob_map(ms_e2, vs_e2, 2) %>% 
-    as.data.frame() %>% as_tibble()
-  return(tbl_choice_probs)
-}
 
 l_choice_probs_e2 <- map(l_results_exp2, safely(choice_probs_e2))
 l_choice_probs_results_e2 <- map(l_choice_probs_e2, "result")
