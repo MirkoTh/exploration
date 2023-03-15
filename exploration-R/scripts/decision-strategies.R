@@ -23,8 +23,7 @@ tbl_e2_switches <- tbl_e2 %>%
 
 
 
-
-# Pre-Processing ----------------------------------------------------------
+# Experiment 2 Gershman (2018) --------------------------------------------
 
 
 tbl_cor <- cor(
@@ -65,7 +64,7 @@ tbl_cor %>%
 
 strategies_one_subject <- function(subject_id) {
   m <- train(
-    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev,
+    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, #m_prev + v_prev,
     data = tbl_e2_switches %>% filter(subject == subject_id),
     method = "rpart",
     trControl = trainControl(method = "cv", number = 10),
@@ -74,13 +73,13 @@ strategies_one_subject <- function(subject_id) {
   return(m)
 }
 
-
 subjs <- unique(tbl_e2_switches$subject)
-l_ms <- map(subjs, strategies_one_subject, .progress = TRUE)
+l_ms <- map(subjs, strategies_one_subject)
 
 
 make_my_list <- function(x, y) {
   tbl_design <- tibble(name = c("p_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
+  # tbl_design <- tibble(name = c("m_prev", "v_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
   tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$variable.importance))) %>% pivot_longer(cols = -id) %>% select(-id)
   # tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$coefficients[2:4]))) %>% pivot_longer(cols = -id) %>% select(-id)
   tbl_design %>% left_join(tbl_results, by = "name")
@@ -90,13 +89,24 @@ tbl_results <- map2(l_ms, subjs, make_my_list) %>%
   reduce(rbind) %>% replace_na(list(value = 0)) %>%
   pivot_wider(id_cols = id, values_from = value, names_from = name)
 
+nrow <- 4
+ncol <- 3
+par(mfrow=c(nrow, ncol))
+for (i in 1:(nrow*ncol)){
+  rpart.plot(l_ms[[i]]$finalModel, cex = 1)
+}
+
+
 plot3d(
   x=tbl_results$p_prev, y=tbl_results$run_length, z=tbl_results$nr_previous_switches, 
   type = 's', 
-  radius = .34,
+  radius = 1,
   xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
-  xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
+  #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
   )
+
+ggplot(tbl_results, aes(run_length, nr_previous_switches)) +
+  geom_point()
 
 
 # kmeans clustering
@@ -119,6 +129,109 @@ its <- 1000
 dp <- DirichletProcessMvnormal(tbl_results[, c("p_prev", "run_length", "nr_previous_switches")] %>% as.matrix())
 dp <- Fit(dp, its)
 plot(dp)
+
+
+
+
+# Speekenbrink & Konstantinidis (2015) ------------------------------------
+
+tbl_rb <- tbl_rb %>% select(-run_length) %>%
+  rename(
+    run_length = run_length_lagged, 
+    nr_previous_switches = nr_previous_switches_lagged,
+    repeat_choice = repeat_deck,
+    m_prev = m_diff,
+    v_prev = v_diff
+    )
+
+tbl_cor <- cor(
+  tbl_rb[
+    complete.cases(tbl_rb),
+    c("nr_previous_switches", "run_nr", "run_length", "p_prev", "m_prev", "v_prev", "repeat_choice")
+  ]
+) %>% as.data.frame() %>% as_tibble()
+tbl_cor$x <- colnames(tbl_cor)
+tbl_cor$x <- fct_inorder(tbl_cor$x)
+levels(tbl_cor$x) <- c(
+  "Nr. Prev. Switches", "Run Nr.", "Run Length", "PMU Prev.", "Mean Diff. Prev.", "Var. Diff. Prev", "Repeat Choice"
+)
+colnames(tbl_cor) <- c(levels(tbl_cor$x), "x")
+tbl_cor <- tbl_cor %>% pivot_longer(cols = -x) 
+tbl_cor$name <- fct_inorder(tbl_cor$name)
+
+# are the predictors correlated?
+tbl_cor %>%
+  ggplot(aes(x, name)) +
+  geom_tile(aes(fill = value)) +
+  scale_fill_viridis_c() +
+  geom_text(aes(label = str_replace(round(value, 2), "(0)\\.", ".")), color = "black", size = 5) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 90), 
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  scale_y_discrete(limits = rev, expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_fill_gradient2(name = "Correlation")
+# mean prev and pmu prev, but they are not entered together into model anyway
+# var prev and pmu prev, but same as above
+# rest is more or less ok
+
+strategies_one_subject <- function(subject_id) {
+  m <- train(
+    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, #m_prev + v_prev,
+    data = tbl_rb %>% filter(id2 == subject_id),
+    method = "rpart",
+    trControl = trainControl(method = "cv", number = 10),
+    tuneLength = 20
+  )
+  return(m)
+}
+
+# id2 == 1 selected the same deck throughout the experiment
+subjs <- unique(tbl_rb$id2)
+subjs <- subjs[subjs != 1]
+l_ms <- map(subjs, strategies_one_subject)
+
+
+make_my_list <- function(x, y) {
+  tbl_design <- tibble(name = c("p_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
+  # tbl_design <- tibble(name = c("m_prev", "v_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
+  tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$variable.importance))) %>% pivot_longer(cols = -id) %>% select(-id)
+  # tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$coefficients[2:4]))) %>% pivot_longer(cols = -id) %>% select(-id)
+  tbl_design %>% left_join(tbl_results, by = "name")
+}
+
+idx <- 10
+make_my_list(l_ms[[idx]], subjs[idx])
+
+
+# for some participants the model does not converge, therefore use "safely"
+tbl_results <- map2(l_ms, subjs, safely(make_my_list)) %>%
+  map("result") %>%
+  reduce(rbind) %>% replace_na(list(value = 0)) %>%
+  pivot_wider(id_cols = id, values_from = value, names_from = name)
+
+nrow <- 4
+ncol <- 3
+par(mfrow=c(nrow, ncol))
+for (i in 1:(nrow*ncol)){
+  rpart.plot(l_ms[[i]]$finalModel, cex = 1)
+}
+
+
+plot3d(
+  x=tbl_results$p_prev, y=tbl_results$run_length, z=tbl_results$nr_previous_switches, 
+  type = 's', 
+  radius = 1,
+  xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
+  #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
+)
+
+ggplot(tbl_results, aes(run_length, nr_previous_switches)) +
+  geom_point()
+
 
 
 
