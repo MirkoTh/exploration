@@ -157,7 +157,7 @@ tbl_exp2 <- tbl_exp2 %>%
   mutate(
     subject = as.character(subject),
     run_nr = cumsum(switch_choice)
-    ) %>% 
+  ) %>% 
   group_by(subject, run_nr) %>%
   mutate(run_length = cumsum(repeat_choice) + 1)
 tbl_exp2$subject <- fct_inorder(tbl_exp2$subject)
@@ -196,7 +196,7 @@ ggplot(
 # nb. all four conditions are between participants
 ggplot(tbl_rb, aes(trial, id), group = as.factor(deck)) +
   geom_tile(aes(fill = as.factor(deck)), color = "white") +
-  scale_fill_viridis_d() +
+  scale_fill_viridis_d(name = "Deck") +
   theme_bw() +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
@@ -307,6 +307,7 @@ l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma
 # Choices -----------------------------------------"------------------------
 
 
+# restless bandit sp. & ko. 2015
 l_choice_probs_rb <- map(l_results_rb, safely(choice_probs_rb))
 l_choice_probs_results_rb <- map(l_choice_probs_rb, "result")
 
@@ -329,13 +330,13 @@ tbl_rb_features_learned <- tbl_rb_features_learned %>%
       1:(nrow(tbl_rb_features_learned)/length(unique(tbl_rb_features_learned$id2))), 
       length(unique(tbl_rb_features_learned$id2))
     )) %>% left_join(
-  tbl_rb %>% ungroup() %>%
-    select(
-      id2, trial, trend, volatility, deck, 
-      repeat_deck, run_nr, run_length, nr_previous_switches_lagged, run_length_lagged
-      ) %>% mutate(id2 = as.character(id2)),
-  by = c("id2", "trial")
-) %>% relocate(where(is.character) | where(is.factor), .before = p_1) %>% relocate(trial, .after = id2)
+      tbl_rb %>% ungroup() %>%
+        select(
+          id2, trial, trend, volatility, deck, previous_deck,
+          repeat_deck, run_nr, run_length, nr_previous_switches_lagged, run_length_lagged
+        ) %>% mutate(id2 = as.character(id2)),
+      by = c("id2", "trial")
+    ) %>% relocate(where(is.character) | where(is.factor), .before = p_1) %>% relocate(trial, .after = id2)
 
 ggplot(
   tbl_rb_features_learned %>% 
@@ -356,6 +357,7 @@ ggplot(
   )
 
 
+# experiment 2 gershman 2018
 l_choice_probs_e2 <- map(l_results_exp2, safely(choice_probs_e2))
 l_choice_probs_results_e2 <- map(l_choice_probs_e2, "result")
 
@@ -384,13 +386,16 @@ tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
   relocate(trial, .after = "block") %>% left_join(
     tbl_exp2 %>% 
       select(
-        subject, block, trial, choice,
+        subject, block, trial, choice, previous_choice,
         repeat_choice, nr_previous_switches, run_nr, run_length
-        ) %>% mutate(block = as.character(block)),
+      ) %>% mutate(block = as.character(block)),
     by = c("subject", "block", "trial")
-  ) 
+  )
 
+tbl_exp2_features_learned <- tbl_exp2_features_learned[complete.cases(tbl_exp2_features_learned), ]
+tbl_rb_features_learned <- tbl_rb_features_learned[complete.cases(tbl_rb_features_learned), ]
 
+# on average, there should be no relation between bandit and choice prob
 ggplot(
   tbl_exp2_features_learned %>% 
     select(subject, trial, p_1, p_2) %>%
@@ -409,6 +414,82 @@ ggplot(
     x = "Trial ID",
     y = "Bandit Nr."
   )
+
+
+# Fit Choices -------------------------------------------------------------
+
+
+
+tbl_cor <- cor(
+  tbl_rb_features_learned[
+    complete.cases(tbl_rb_features_learned),
+    c(
+      "p_1", "p_2", "p_3", "p_4", "m_1", "m_2", "m_3", "m_4", 
+      "v_1", "v_2", "v_3", "v_4", "run_length_lagged", 
+      "nr_previous_switches_lagged"
+    )
+  ]
+) %>% as.data.frame() %>% as_tibble()
+tbl_cor$x <- colnames(tbl_cor)
+tbl_cor$x <- fct_inorder(tbl_cor$x)
+levels(tbl_cor$x) <- c(
+    "PMU1", "PMU2", "PMU3", "PMU4", "M1", "M2", "M3", "M4", 
+    "V1", "V2", "V3", "V4", "Run Length (Lagged)", "Nr. Previous Switches (Lagged)"
+)
+colnames(tbl_cor) <- c(levels(tbl_cor$x), "x")
+tbl_cor <- tbl_cor %>% pivot_longer(cols = -x) 
+tbl_cor$name <- fct_inorder(tbl_cor$name)
+tbl_cor %>%
+  ggplot(aes(x, name)) +
+  geom_tile(aes(fill = value)) +
+  scale_fill_viridis_c() +
+  geom_text(aes(label = str_remove(round(value, 2), "^0+")), color = "white", size = 5) +
+  theme(
+    axis.text.x = element_text(angle = 90), 
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+    ) +
+  scale_y_discrete(limits = rev) +
+  scale_fill_viridis_c(name = "Correlation")
+
+
+
+
+# Fit Switches ------------------------------------------------------------
+
+tbl_exp2_features_learned$m_prev <- pmap_dbl(
+  tbl_exp2_features_learned[, c("m_1", "m_2", "previous_choice")], 
+  ~ c(..1, ..2)[..3]
+  )
+tbl_exp2_features_learned$v_prev <- pmap_dbl(
+  tbl_exp2_features_learned[, c("v_1", "v_2", "previous_choice")], 
+  ~ c(..1, ..2)[..3]
+)
+tbl_exp2_features_learned$p_prev <- pmap_dbl(
+  tbl_exp2_features_learned[, c("p_1", "p_2", "previous_choice")], 
+  ~ c(..1, ..2)[..3]
+)
+
+
+
+tbl_rb_features_learned$p_prev <- pmap_dbl(
+  tbl_rb_features_learned[, c("p_1", "p_2", "p_3", "p_4", "previous_deck")], 
+  ~ c(..1, ..2, ..3, ..4)[..5]
+)
+
+tbl_rb_features_learned$m_diff <- pmap_dbl(
+  tbl_rb_features_learned[, c("m_1", "m_2", "m_3", "m_4", "previous_deck")], 
+  ~ c(..1, ..2, ..3, ..4)[..5] - max(c(..1, ..2, ..3, ..4)[-..5])
+)
+
+tbl_rb_features_learned$v_diff <- pmap_dbl(
+  tbl_rb_features_learned[, c("v_1", "v_2", "v_3", "v_4", "previous_deck")], 
+  ~ max(c(..1, ..2, ..3, ..4)[-..5] - c(..1, ..2, ..3, ..4)[..5])
+)
+
+
+write_csv(tbl_exp2_features_learned, "open-data/gershman-2018-e2-addon-features.csv")
+write_csv(tbl_rb_features_learned, "open-data/speekenbrink-konstantinidis-2015-addon-features.csv")
 
 
 
