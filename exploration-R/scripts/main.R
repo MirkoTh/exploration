@@ -158,8 +158,11 @@ tbl_exp2 <- tbl_exp2 %>%
     subject = as.character(subject),
     run_nr = cumsum(switch_choice)
   ) %>% 
-  group_by(subject, run_nr) %>%
-  mutate(run_length = cumsum(repeat_choice) + 1)
+  group_by(subject, block, run_nr) %>%
+  mutate(run_length = cumsum(repeat_choice)) %>%
+  ungroup() %>% 
+  mutate(run_length = lag(run_length)) %>%
+  replace_na(list(run_length = 0))
 tbl_exp2$subject <- fct_inorder(tbl_exp2$subject)
 
 
@@ -222,7 +225,7 @@ tbl_rb <- tbl_rb %>% group_by(id2) %>%
   mutate(run_nr = cumsum(switch_deck)) %>%
   group_by(id2, cond, run_nr) %>%
   mutate(
-    run_length = cumsum(repeat_deck) + 1
+    run_length = cumsum(repeat_deck)
   ) %>% group_by(id2, cond) %>%
   mutate(
     nr_previous_switches_lagged = runSum(x = switch_deck, n = 10, cumulative = FALSE),
