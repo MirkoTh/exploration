@@ -5,6 +5,9 @@ library(gridExtra)
 library(mvtnorm)
 library(zoo)
 library(TTR)
+library(future)
+library(furrr)
+
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
@@ -15,7 +18,7 @@ walk(home_grown, source)
 
 
 mu1 <- c(-60, -20, 20, 60)
-nr_trials <- 200
+nr_trials <- 400
 sigma_xi_sq <- 16
 sigma_epsilon_sq <- 16
 lambda <- .9836
@@ -48,52 +51,37 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 
-# Generate Choices Thompson Sampling --------------------------------------
+# Generate Choices Softmax --------------------------------------
 
 
-params <- list(
-  "sigma_prior" = 100,
-  "mu_prior" = 0,
-  "sigma_xi_sq" = 16,
-  "sigma_epsilon_sq" = 16,
-  "gamma" = 1
-)
-
-
-
-
-
-
-tbl_rewards <- tbl_bandits %>% select(-trial_id)
-tbl_results <- simulate_kalman_learning(tbl_rewards, params)
-tbl_results <- tbl_results[1:nrow(tbl_bandits), ]
-
-
-simulate_kalman_learning <- function(tbl_rewards, params, seed = 4321) {
+simulate_kalman_learning <- function(sigma_prior, mu_prior, sigma_xi_sq, sigma_epsilon_sq, gamma, tbl_rewards, seed = 4321) {
   #' 
-  #' @description simulate choices from a Kalman filter with soft max choice model 
-  #' @param tbl_rewards rewards to be selected on all trials
+  #' @description simulate choices from a Kalman filter with soft max choice model
+  #' @param sigma_prior prior variance
+  #' @param mu_prior prior mean
   #' @param sigma_xi_sq innovation variance
   #' @param sigma_epsilon_sq error variance
+  #' @param gamma softmax inverse temperature
+  #' @param tbl_rewards rewards to be selected on all trials
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
   
   set.seed(seed)
   nt <- nrow(tbl_rewards) # number of time points
   no <- ncol(tbl_rewards) # number of options
-  m <- matrix(params[["mu_prior"]], ncol = no, nrow = nt + 1) # to hold the posterior means
-  v <- matrix(params[["sigma_prior"]], ncol = no, nrow = nt + 1) # to hold the posterior variances
+  m <- matrix(mu_prior, ncol = no, nrow = nt + 1) # to hold the posterior means
+  v <- matrix(sigma_prior, ncol = no, nrow = nt + 1) # to hold the posterior variances
   choices <- rep(0, nt + 1) # to hold the choices of the RL agent
   rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
   
   for(t in 1:nt) {
-    p <- softmax_choice_prob(matrix(m[t, ], 1, ncol(m)), params[["gamma"]])
+    p <- softmax_choice_prob(matrix(m[t, ], 1, ncol(m)), gamma)
     # choose an option according to these probabilities
     choices[t] <- sample(1:4, size = 1, prob = p)
     # get the reward of the choice
     rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
     kt <- rep(0, no)
     # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + params[["sigma_xi_sq"]])/(v[t,choices[t]] + params[["sigma_epsilon_sq"]] + params[["sigma_xi_sq"]])
+    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
     # compute the posterior means
     m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
     # compute the posterior variances
@@ -142,6 +130,70 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
 }
 
 
-params_init <- c(log(13), log(10), log(.8))
-result_optim <- optim(params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4)
-exp(result_optim$par)
+
+n_participants <- 100
+sigma_xi_sq <- rnorm(n_participants, 16, 3)
+sigma_epsilon_sq <- rnorm(n_participants, 16, 3)
+s_gamma <- -1
+while(s_gamma < 0){
+  gamma <- rnorm(n_participants, 1, .25)
+  s_gamma <- min(gamma)
+}
+
+tbl_params_softmax <- tibble(
+  sigma_prior = rep(100, n_participants),
+  mu_prior = rep(0, n_participants),
+  sigma_xi_sq,
+  sigma_epsilon_sq,
+  gamma
+)
+
+plan(multisession, workers = availableCores() - 2)
+l_choices_simulated <- future_pmap(
+  tbl_params_softmax, simulate_kalman_learning, 
+  tbl_rewards = tbl_rewards, .progress = TRUE, 
+  .options = furrr_options(seed = NULL)
+)
+
+
+fit_softmax_wrapper <- function(tbl_results) {
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(log(13), log(10), log(.8))
+  result_optim <- optim(params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4)
+  exp(result_optim$par)
+}
+
+l_softmax <- future_map(
+  l_choices_simulated, 
+  safely(fit_softmax_wrapper), .progress = TRUE, 
+  .options = furrr_options(seed = NULL)
+  )
+
+tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
+colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
+tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
+  mutate(participant_id = 1:nrow(tbl_results_softmax))
+
+cor(tbl_results_softmax$sigma_xi_sq, tbl_results_softmax$sigma_xi_sq_ml)
+# [1] 0.3901223 with 200 trials and 100 participants
+ggplot(tbl_results_softmax, aes(sigma_xi_sq, sigma_xi_sq_ml)) +
+  geom_point()
+
+cor(tbl_results_softmax$sigma_epsilon_sq, tbl_results_softmax$sigma_epsilon_sq_ml)
+ggplot(tbl_results_softmax, aes(sigma_epsilon_sq, sigma_epsilon_sq_ml)) +
+  geom_point()
+
+cor(tbl_results_softmax$gamma, tbl_results_softmax$gamma_ml)
+ggplot(tbl_results_softmax, aes(gamma, gamma_ml)) +
+  geom_point()
+
+
+upper_and_lower_bounds <- function(par, lo, hi) {
+  log(((par - lo) / (hi - lo)) / (1 - (par - lo) / (hi - lo)))
+}
+
+upper_and_lower_bounds_revert <- function(par, lo, hi) {
+  lo + ((hi - lo) / (1 + exp(-par)))
+}
+
+
