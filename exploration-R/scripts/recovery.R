@@ -53,7 +53,7 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 # Generate Choices Softmax --------------------------------------
 
-simulate_kalman_learning <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, gamma, simulate_data, seed, tbl_rewards) {
+simulate_softmax <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, gamma, simulate_data, seed, tbl_rewards) {
   #' 
   #' @description simulate choices from a Kalman filter with soft max choice model
   #' @param sigma_prior prior variance
@@ -107,6 +107,60 @@ simulate_kalman_learning <- function(sigma_prior, mu_prior, nr_trials, lambda, s
 }
 
 
+simulate_thompson <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, simulate_data, seed, tbl_rewards) {
+  #' 
+  #' @description simulate choices from a Kalman filter with soft max choice model
+  #' @param sigma_prior prior variance
+  #' @param mu_prior prior mean
+  #' @param sigma_xi_sq innovation variance
+  #' @param sigma_epsilon_sq error variance
+  #' @param simulate_data should new data be generated for every participant
+  #' @param seed seed value of iteration
+  #' @param tbl_rewards if data are not simulated, take this tbl instead
+  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' 
+  if (simulate_data) {
+    tbl_rewards <- generate_restless_bandits(
+      sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
+    ) %>% select(-trial_id)
+  }
+  
+  set.seed(seed)
+  nt <- nrow(tbl_rewards) # number of time points
+  no <- ncol(tbl_rewards) # number of options
+  m <- matrix(mu_prior, ncol = no, nrow = nt + 1) # to hold the posterior means
+  v <- matrix(sigma_prior, ncol = no, nrow = nt + 1) # to hold the posterior variances
+  choices <- rep(0, nt + 1) # to hold the choices of the RL agent
+  rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
+  
+  for(t in 1:nt) {
+    p <- thompson_choice_prob_map(matrix(m[t, ], 1, ncol(m)), matrix(v[t, ], 1, ncol(v)), no)
+    # choose an option according to these probabilities
+    choices[t] <- sample(1:4, size = 1, prob = p)
+    # get the reward of the choice
+    rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
+    kt <- rep(0, no)
+    # set the Kalman gain for the chosen option
+    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
+    # compute the posterior means
+    m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
+    # compute the posterior variances
+    v[t + 1, ] <- (1 - kt) * (v[t, ])
+    v[t + 1, ] <- t(apply(matrix(v[t + 1, ], nrow = 1), 1, function(x) pmax(x, .0001)))
+  }
+  
+  tbl_m <- as.data.frame(m)
+  # constrain v from becoming to small
+  v <- t(apply(v, 1, function(x) pmax(x, .0001)))
+  tbl_v <- as.data.frame(v)
+  colnames(tbl_m) <- str_c("m_", 1:no)
+  colnames(tbl_v) <- str_c("v_", 1:no)
+  tbl_return <- tibble(cbind(tbl_m, tbl_v, choices, rewards))
+  
+  return(tbl_return)
+}
+
+
 softmax_choice_prob <- function(ms, gamma) {
   #' 
   #' @description soft max choice rule
@@ -138,11 +192,31 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
 }
 
 
-fit_softmax_wrapper <- function(tbl_results) {
+fit_kalman_thompson <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description kalman thompson fitting wrapper
+  #' 
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
+  tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
+  p_choices <- thompson_choice_prob_map(
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(), 
+    nr_options
+  ) %>% as.data.frame() %>% as_tibble()
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmax(lik, .0000001)
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-sllik)
+}
+
+
+fit_thompson_wrapper <- function(tbl_results) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(.2, 0, 3))
-  result_optim <- optim(params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4)
-  c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30), upper_and_lower_bounds_revert(result_optim$par[3], 0, 3))
+  params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30))
+  result_optim <- optim(params_init, fit_kalman_thompson, tbl_results = tbl_results, nr_options = 4)
+  c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30))
 }
 
 upper_and_lower_bounds <- function(par, lo, hi) {
@@ -191,7 +265,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_softmax,
-    simulate_kalman_learning, 
+    simulate_softmax, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
@@ -210,6 +284,59 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     mutate(participant_id = 1:nrow(tbl_results_softmax))
   
   return(tbl_results_softmax)
+}
+
+
+simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, lambda) {
+  # create a tbl with simulation & model parameters
+  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  tbl_params_thompson <- tibble(
+    sigma_prior = rep(10, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    nr_trials = nr_trials,
+    lambda = lambda,
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    simulate_data = simulate_data,
+    seed
+  )
+  
+  # simulate data
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_thompson,
+    simulate_thompson, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_thompson <- future_map(
+    l_choices_simulated, 
+    safely(fit_thompson_wrapper), 
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  tbl_results_thompson <- as.data.frame(reduce(map(l_thompson, "result"), rbind)) %>% as_tibble()
+  colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")
+  tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_thompson))
+  
+  return(tbl_results_thompson)
 }
 
 
@@ -312,10 +439,106 @@ plot_my_heatmap <- function(tbl_x) {
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
+
+
+
+# Main Experiment Kalman & Thompson ---------------------------------------
+
+
+simulate_data <- c(TRUE, FALSE)
+nr_participants <- c(200)
+nr_trials <- c(200, 400)
+
+tbl_params_thompson <- crossing(
+  simulate_data, nr_participants, nr_trials
+)
+
+l_results_thompson <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda)
+
+counter <- 1
+l_results_c <- list()
+for (tbl_r in l_results_thompson) {
+  l_results_c[[counter]] <- as_tibble(cbind(
+    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_thompson[counter, ]
+  ))
+  counter = counter + 1
+}
+
+tbl_cor_thompson <- reduce(l_results_c, rbind) %>%
+  group_by(simulate_data, nr_participants, nr_trials) %>%
+  summarize(
+    r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
+    r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml)
+  ) %>% ungroup()
+
+tbl_cor_thompson_long <- tbl_cor_thompson %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
+  pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
+
+pd <- position_dodge(width = .9)
+ggplot(tbl_cor_thompson_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+  geom_label(
+    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+    position = pd, label.padding = unit(.1, "lines")
+  ) + geom_hline(
+    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+  ) + facet_grid(name ~ simulate_data) +
+  theme_bw() +
+  scale_fill_viridis_d(name = "Nr. Trials") +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_cartesian(ylim = c(-.1, 1.1)) +
+  labs(
+    x = "Gamma (Mean)",
+    y = "Correlation"
+  )
+
+l_cors_params <- map(
+  l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+)
+
+counter <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_softmax[counter, ]
+  ))
+  counter = counter + 1
+}
+
+
+plot_my_heatmap <- function(tbl_x) {
+  ggplot(
+    tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:3])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml, gamma_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml"),
+        name = factor(name),
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml")
+      ) , 
+    aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c("Gamma = ", tbl_x[1, "gamma_mn"], ",\nSimulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+}
+
+l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap)
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
+
 # notes
 # danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
-# daw et al. 2006 fit kalman filter, but provide no recovery studies
-# speekenbrink & konstantinidis (2015) fit kalman model, but provide no recovery studies
+# daw et al. 2006 fit kalman filter with two variances being estimated, but provide no recovery studies
+# speekenbrink & konstantinidis (2015) fit kalman model also with two variances being estimated, but provide no recovery studies
 
 
 # todos
