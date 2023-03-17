@@ -69,7 +69,7 @@ simulate_kalman_learning <- function(sigma_prior, mu_prior, nr_trials, lambda, s
   if (simulate_data) {
     tbl_rewards <- generate_restless_bandits(
       sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
-      ) %>% select(-trial_id)
+    ) %>% select(-trial_id)
   }
   
   set.seed(seed)
@@ -185,7 +185,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   # simulate data
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-    ) %>% 
+  ) %>% 
     select(-trial_id)
   
   plan(multisession, workers = availableCores() - 2)
@@ -231,15 +231,12 @@ tbl_params_softmax <- crossing(
 
 l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda)
 
-
-
-
 counter <- 1
 l_results_c <- list()
 for (tbl_r in l_results_softmax) {
   l_results_c[[counter]] <- as_tibble(cbind(
     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
-    ))
+  ))
   counter = counter + 1
 }
 
@@ -249,8 +246,71 @@ tbl_cor_softmax <- reduce(l_results_c, rbind) %>%
     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
     r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml),
     r_gamma = cor(gamma, gamma_ml)
-    ) %>% ungroup()
+  ) %>% ungroup()
 
+tbl_cor_softmax_long <- tbl_cor_softmax %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon, "Gamma" = r_gamma) %>%
+  pivot_longer(cols = c(Gamma, `Sigma Xi`, `Sigma Epsilon`))
+
+pd <- position_dodge(width = .9)
+ggplot(tbl_cor_softmax_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+  geom_label(
+    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+    position = pd, label.padding = unit(.1, "lines")
+  ) + geom_hline(
+    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+  ) + facet_grid(name ~ simulate_data) +
+  theme_bw() +
+  scale_fill_viridis_d(name = "Nr. Trials") +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_cartesian(ylim = c(-.1, 1.1)) +
+  labs(
+    x = "Gamma (Mean)",
+    y = "Correlation"
+  )
+
+l_cors_params <- map(
+  l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+)
+
+counter <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_softmax[counter, ]
+  ))
+  counter = counter + 1
+}
+
+
+plot_my_heatmap <- function(tbl_x) {
+  ggplot(
+    tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:3])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml, gamma_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml"),
+        name = factor(name),
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml")
+      ) , 
+    aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c("Gamma = ", tbl_x[1, "gamma_mn"], ",\nSimulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+}
+
+l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap)
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
 # notes
 # danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
