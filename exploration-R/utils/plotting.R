@@ -430,3 +430,49 @@ save_my_pdf <- function(pl, path_fl, w, h) {
   grid.draw(pl)
   dev.off()
 }
+
+
+plot_my_heatmap_softmax <- function(tbl_x) {
+  ggplot(
+    tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:3])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml, gamma_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml"),
+        name = factor(name),
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml")
+      ) , 
+    aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c("Gamma = ", tbl_x[1, "gamma_mn"], ",\nSimulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+}
+
+
+plot_my_heatmap_thompson <- function(tbl_x) {
+  ggplot(
+    tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:2])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml"),
+        name = factor(name),
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml")
+      ) , 
+    aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c("Simulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+}
