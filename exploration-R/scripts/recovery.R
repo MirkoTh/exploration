@@ -18,7 +18,7 @@ walk(home_grown, source)
 
 
 mu1 <- c(-60, -20, 20, 60)
-nr_trials <- 400
+nr_trials <- 200
 sigma_xi_sq <- 16
 sigma_epsilon_sq <- 16
 lambda <- .9836
@@ -53,8 +53,7 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 # Generate Choices Softmax --------------------------------------
 
-
-simulate_kalman_learning <- function(sigma_prior, mu_prior, sigma_xi_sq, sigma_epsilon_sq, gamma, tbl_rewards, seed = 4321) {
+simulate_kalman_learning <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, gamma, simulate_data, seed, tbl_rewards) {
   #' 
   #' @description simulate choices from a Kalman filter with soft max choice model
   #' @param sigma_prior prior variance
@@ -62,8 +61,16 @@ simulate_kalman_learning <- function(sigma_prior, mu_prior, sigma_xi_sq, sigma_e
   #' @param sigma_xi_sq innovation variance
   #' @param sigma_epsilon_sq error variance
   #' @param gamma softmax inverse temperature
-  #' @param tbl_rewards rewards to be selected on all trials
+  #' @param simulate_data should new data be generated for every participant
+  #' @param seed seed value of iteration
+  #' @param tbl_rewards if data are not simulated, take this tbl instead
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' 
+  if (simulate_data) {
+    tbl_rewards <- generate_restless_bandits(
+      sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
+      ) %>% select(-trial_id)
+  }
   
   set.seed(seed)
   nt <- nrow(tbl_rewards) # number of time points
@@ -99,6 +106,7 @@ simulate_kalman_learning <- function(sigma_prior, mu_prior, sigma_xi_sq, sigma_e
   return(tbl_return)
 }
 
+
 softmax_choice_prob <- function(ms, gamma) {
   #' 
   #' @description soft max choice rule
@@ -115,9 +123,9 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
   #' 
   #' @description kalman softmax fitting wrapper
   #' 
-  sigma_xi_sq <- exp(x[[1]])
-  sigma_epsilon_sq <- exp(x[[2]])
-  gamma <- exp(x[[3]])
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
+  gamma <- upper_and_lower_bounds_revert(x[[3]], 0, 3)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
@@ -130,63 +138,12 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
 }
 
 
-
-n_participants <- 100
-sigma_xi_sq <- rnorm(n_participants, 16, 3)
-sigma_epsilon_sq <- rnorm(n_participants, 16, 3)
-s_gamma <- -1
-while(s_gamma < 0){
-  gamma <- rnorm(n_participants, 1, .25)
-  s_gamma <- min(gamma)
-}
-
-tbl_params_softmax <- tibble(
-  sigma_prior = rep(100, n_participants),
-  mu_prior = rep(0, n_participants),
-  sigma_xi_sq,
-  sigma_epsilon_sq,
-  gamma
-)
-
-plan(multisession, workers = availableCores() - 2)
-l_choices_simulated <- future_pmap(
-  tbl_params_softmax, simulate_kalman_learning, 
-  tbl_rewards = tbl_rewards, .progress = TRUE, 
-  .options = furrr_options(seed = NULL)
-)
-
-
 fit_softmax_wrapper <- function(tbl_results) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(log(13), log(10), log(.8))
+  params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(.2, 0, 3))
   result_optim <- optim(params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4)
-  exp(result_optim$par)
+  c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30), upper_and_lower_bounds_revert(result_optim$par[3], 0, 3))
 }
-
-l_softmax <- future_map(
-  l_choices_simulated, 
-  safely(fit_softmax_wrapper), .progress = TRUE, 
-  .options = furrr_options(seed = NULL)
-  )
-
-tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
-colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
-tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
-  mutate(participant_id = 1:nrow(tbl_results_softmax))
-
-cor(tbl_results_softmax$sigma_xi_sq, tbl_results_softmax$sigma_xi_sq_ml)
-# [1] 0.3901223 with 200 trials and 100 participants
-ggplot(tbl_results_softmax, aes(sigma_xi_sq, sigma_xi_sq_ml)) +
-  geom_point()
-
-cor(tbl_results_softmax$sigma_epsilon_sq, tbl_results_softmax$sigma_epsilon_sq_ml)
-ggplot(tbl_results_softmax, aes(sigma_epsilon_sq, sigma_epsilon_sq_ml)) +
-  geom_point()
-
-cor(tbl_results_softmax$gamma, tbl_results_softmax$gamma_ml)
-ggplot(tbl_results_softmax, aes(gamma, gamma_ml)) +
-  geom_point()
-
 
 upper_and_lower_bounds <- function(par, lo, hi) {
   log(((par - lo) / (hi - lo)) / (1 - (par - lo) / (hi - lo)))
@@ -195,5 +152,122 @@ upper_and_lower_bounds <- function(par, lo, hi) {
 upper_and_lower_bounds_revert <- function(par, lo, hi) {
   lo + ((hi - lo) / (1 + exp(-par)))
 }
+# gamma <- rnorm(nr_participants, .16, .06)
+# gamma <- rnorm(nr_participants, .3, .1)
+
+simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda) {
+  # create a tbl with simulation & model parameters
+  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  
+  s_gamma <- -1
+  while(s_gamma < 0){
+    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
+    s_gamma <- min(gamma)
+  }
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  tbl_params_softmax <- tibble(
+    sigma_prior = rep(10, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    nr_trials = nr_trials,
+    lambda = lambda,
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    gamma,
+    simulate_data = simulate_data,
+    seed
+  )
+  
+  # simulate data
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+    ) %>% 
+    select(-trial_id)
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_softmax,
+    simulate_kalman_learning, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_softmax <- future_map(
+    l_choices_simulated, 
+    safely(fit_softmax_wrapper), .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
+  colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
+  tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_softmax))
+  
+  return(tbl_results_softmax)
+}
+
+
+
+# Main Experiment Kalman & Softmax ----------------------------------------
+
+
+tbl_gammas <- tibble(
+  gamma_mn = c(.16, .5, 1),
+  gamma_sd = c(.03, .1, .2)
+)
+simulate_data <- c(TRUE, FALSE)
+nr_participants <- c(200)
+nr_trials <- c(200, 400)
+
+tbl_params_softmax <- crossing(
+  tbl_gammas, simulate_data, nr_participants, nr_trials
+)
+
+l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda)
+
+
+
+
+counter <- 1
+l_results_c <- list()
+for (tbl_r in l_results_softmax) {
+  l_results_c[[counter]] <- as_tibble(cbind(
+    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
+    ))
+  counter = counter + 1
+}
+
+tbl_cor_softmax <- reduce(l_results_c, rbind) %>%
+  group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  summarize(
+    r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
+    r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml),
+    r_gamma = cor(gamma, gamma_ml)
+    ) %>% ungroup()
+
+
+# notes
+# danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
+# daw et al. 2006 fit kalman filter, but provide no recovery studies
+# speekenbrink & konstantinidis (2015) fit kalman model, but provide no recovery studies
+
+
+# todos
+# summarize results of current simulation study
+# fix one of sigma_xi or sigma_epsilon
+# adapt code to use different choice model
+# -> simulation and fitting functions
+# thompson sampling & ucb
+
+
+
+
+
 
 
