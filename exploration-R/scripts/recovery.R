@@ -478,15 +478,16 @@ tbl_cor_thompson_long <- tbl_cor_thompson %>%
   ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
   pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
 
-pd <- position_dodge(width = .9)
-ggplot(tbl_cor_thompson_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
-  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+pd <- position_dodge(width = 150)
+ggplot(tbl_cor_thompson_long, aes(nr_trials, value, group = as.factor(simulate_data))) +
+  geom_col(aes(fill = as.factor(simulate_data)), position = pd) +
   geom_label(
     aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
     position = pd, label.padding = unit(.1, "lines")
   ) + geom_hline(
     yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-  ) + facet_grid(name ~ simulate_data) +
+  ) +
+  facet_wrap(~ name) +
   theme_bw() +
   scale_fill_viridis_d(name = "Nr. Trials") +
   scale_x_discrete(expand = c(0, 0)) +
@@ -498,28 +499,28 @@ ggplot(tbl_cor_thompson_long, aes(as.factor(gamma_mn), value, group = as.factor(
   )
 
 l_cors_params <- map(
-  l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+  l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")])
 )
 
 counter <- 1
 for (tbl_r in l_cors_params) {
   l_cors_params[[counter]] <- as_tibble(cbind(
-    tbl_r, tbl_params_softmax[counter, ]
+    tbl_r, tbl_params_thompson[counter, ]
   ))
   counter = counter + 1
 }
 
 
-plot_my_heatmap <- function(tbl_x) {
+plot_my_heatmap_thompson <- function(tbl_x) {
   ggplot(
     tbl_x %>% 
-      mutate(my_vars = colnames(tbl_x[1:3])) %>%
-      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml, gamma_ml)) %>%
+      mutate(my_vars = colnames(tbl_x[1:2])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml)) %>%
       mutate(
         my_vars = factor(my_vars),
-        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml"),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml"),
         name = factor(name),
-        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml")
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml")
       ) , 
     aes(my_vars, name)) +
     geom_tile(aes(fill = value)) +
@@ -529,11 +530,11 @@ plot_my_heatmap <- function(tbl_x) {
     theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
     scale_x_discrete(expand = c(0, 0)) +
     scale_y_discrete(expand = c(0, 0)) +
-    labs(title = str_c("Gamma = ", tbl_x[1, "gamma_mn"], ",\nSimulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+    labs(title = str_c("Simulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
 }
 
-l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap)
-grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
+l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_thompson)
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 # notes
 # danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
@@ -542,11 +543,8 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
 
 # todos
-# summarize results of current simulation study
 # fix one of sigma_xi or sigma_epsilon
-# adapt code to use different choice model
-# -> simulation and fitting functions
-# thompson sampling & ucb
+# add ucb choice rule
 
 
 
