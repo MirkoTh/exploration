@@ -861,6 +861,13 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
   
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+    )
+  cat(progress_msg)
+  
   return(tbl_results_softmax)
 }
 

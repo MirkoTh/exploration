@@ -84,24 +84,10 @@ tbl_cor_softmax_long <- tbl_cor_softmax %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`, `Sigma Epsilon`))
 
 pd <- position_dodge(width = .9)
-ggplot(tbl_cor_softmax_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
-  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
-  geom_label(
-    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
-    position = pd, label.padding = unit(.1, "lines")
-  ) + geom_hline(
-    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-  ) + facet_grid(name ~ simulate_data) +
-  theme_bw() +
-  scale_fill_viridis_d(name = "Nr. Trials") +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_cartesian(ylim = c(-.1, 1.1)) +
-  labs(
-    x = "Gamma (Mean)",
-    y = "Correlation"
-  )
+plot_cor_recovery(tbl_cor_softmax_long, pd)
 
+
+# cors between pars
 l_cors_params <- map(
   l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
 )
@@ -113,7 +99,6 @@ for (tbl_r in l_cors_params) {
   ))
   counter = counter + 1
 }
-
 
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
@@ -157,25 +142,12 @@ tbl_cor_thompson_long <- tbl_cor_thompson %>%
   pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
 
 pd <- position_dodge(width = 150)
-ggplot(tbl_cor_thompson_long, aes(nr_trials, value, group = as.factor(simulate_data))) +
-  geom_col(aes(fill = as.factor(simulate_data)), position = pd) +
-  geom_label(
-    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
-    position = pd, label.padding = unit(.1, "lines")
-  ) + geom_hline(
-    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-  ) +
-  facet_wrap(~ name) +
-  theme_bw() +
-  scale_fill_viridis_d(name = "Nr. Trials") +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_cartesian(ylim = c(-.1, 1.1)) +
-  labs(
-    x = "Gamma (Mean)",
-    y = "Correlation"
-  )
+plot_cor_recovery(tbl_cor_thompson_long)
+#   facet_wrap(~ name) +
+# possibly adopt plot_cor_recovery function, if error here
 
+
+# cors between pars
 l_cors_params <- map(
   l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")])
 )
@@ -238,24 +210,10 @@ tbl_cor_softmax_1var_long <- tbl_cor_softmax_1var %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`))
 
 pd <- position_dodge(width = .9)
-ggplot(tbl_cor_softmax_1var_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
-  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
-  geom_label(
-    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
-    position = pd, label.padding = unit(.1, "lines")
-  ) + geom_hline(
-    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-  ) + facet_grid(name ~ simulate_data) +
-  theme_bw() +
-  scale_fill_viridis_d(name = "Nr. Trials") +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_cartesian(ylim = c(-.1, 1.1)) +
-  labs(
-    x = "Gamma (Mean)",
-    y = "Correlation"
-  )
+plot_cor_recovery(tbl_cor_softmax_1var_long)
 
+
+# cors between pars
 l_cors_params <- map(
   l_results_c_1var, ~ cor(.x[, c("sigma_xi_sq_ml", "gamma_ml")])
 )
@@ -271,17 +229,6 @@ for (tbl_r in l_cors_params) {
 
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax, nr_var = 1)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
-
-
-# notes
-# danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
-# daw et al. 2006 fit kalman filter with two variances being estimated, but provide no recovery studies
-# speekenbrink & konstantinidis (2015) fit kalman model also with two variances being estimated, but provide no recovery studies
-
-
-# todos
-# fix both sigma_xi and sigma_epsilon
-# add ucb choice rule
 
 
 
@@ -326,20 +273,16 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   pivot_longer(cols = c(Gamma))
 
 pd <- position_dodge(width = .9)
-ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
-  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
-  geom_label(
-    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
-    position = pd, label.padding = unit(.1, "lines")
-  ) + geom_hline(
-    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-  ) + facet_grid(name ~ simulate_data) +
-  theme_bw() +
-  scale_fill_viridis_d(name = "Nr. Trials") +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
-  coord_cartesian(ylim = c(-.1, 1.1)) +
-  labs(
-    x = "Gamma (Mean)",
-    y = "Correlation"
-  )
+plot_cor_recovery(tbl_cor_softmax_0var_long, pd)
+
+
+# notes
+# danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
+# daw et al. 2006 fit kalman filter with two variances being estimated, but provide no recovery studies
+# speekenbrink & konstantinidis (2015) fit kalman model also with two variances being estimated, but provide no recovery studies
+
+
+# todos
+# add ucb choice rule
+
+

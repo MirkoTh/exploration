@@ -487,3 +487,25 @@ plot_my_heatmap_thompson <- function(tbl_x) {
     scale_y_discrete(expand = c(0, 0)) +
     labs(title = str_c("Simulate Data by Participant = ", tbl_x[1, "simulate_data"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
 }
+
+
+plot_cor_recovery <- function(tbl_cor, pd) {
+  ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+    geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+    geom_label(
+      aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+      position = pd, label.padding = unit(.1, "lines")
+    ) + geom_hline(
+      yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+    ) + facet_grid(name ~ simulate_data) +
+    theme_bw() +
+    scale_fill_viridis_d(name = "Nr. Trials") +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    coord_cartesian(ylim = c(-.1, 1.1)) +
+    labs(
+      x = "Gamma (Mean)",
+      y = "Correlation"
+    )
+  
+}
