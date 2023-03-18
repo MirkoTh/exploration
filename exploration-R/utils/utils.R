@@ -533,13 +533,13 @@ simulate_softmax <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_
   #' @param tbl_rewards if data are not simulated, take this tbl instead
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
   #' 
+  set.seed(seed)
   if (simulate_data) {
     tbl_rewards <- generate_restless_bandits(
       sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
     ) %>% select(-trial_id)
   }
   
-  set.seed(seed)
   nt <- nrow(tbl_rewards) # number of time points
   no <- ncol(tbl_rewards) # number of options
   m <- matrix(mu_prior, ncol = no, nrow = nt + 1) # to hold the posterior means
@@ -563,7 +563,7 @@ simulate_softmax <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_
   }
   
   tbl_m <- as.data.frame(m)
-  # constrain v from becoming to small
+  # prevent v from becoming too small
   v <- t(apply(v, 1, function(x) pmax(x, .0001)))
   tbl_v <- as.data.frame(v)
   colnames(tbl_m) <- str_c("m_", 1:no)
@@ -659,6 +659,26 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
 }
 
 
+fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description kalman softmax fitting wrapper, only optimize one of the
+  #' two available variances, fix the other to the true value
+  #' 
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_epsilon_sq <- 16
+  gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
+  tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
+  p_choices <- softmax_choice_prob(
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    gamma
+  )
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-sllik)
+}
+
+
 fit_kalman_thompson <- function(x, tbl_results, nr_options) {
   #' 
   #' @description kalman thompson fitting wrapper
@@ -686,15 +706,50 @@ fit_thompson_wrapper <- function(tbl_results) {
   c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30))
 }
 
+
+fit_softmax_wrapper <- function(tbl_results) {
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(
+    upper_and_lower_bounds(15, 0, 30), 
+    upper_and_lower_bounds(15, 0, 30),
+    upper_and_lower_bounds(.2, 0, 3)
+  )
+  result_optim <- optim(
+    params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4
+  )
+  c(
+    upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
+    upper_and_lower_bounds_revert(result_optim$par[3], 0, 3)
+    )
+}
+
+
+fit_softmax_one_variance_wrapper <- function(tbl_results) {
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(
+    upper_and_lower_bounds(15, 0, 30), 
+    upper_and_lower_bounds(.2, 0, 3)
+  )
+  result_optim <- optim(
+    params_init, fit_kalman_softmax_xi_variance, 
+    tbl_results = tbl_results, nr_options = 4
+  )
+  c(
+    upper_and_lower_bounds_revert(result_optim$par[1], 0, 30),
+    upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
+  )
+}
+
+
 upper_and_lower_bounds <- function(par, lo, hi) {
   log(((par - lo) / (hi - lo)) / (1 - (par - lo) / (hi - lo)))
 }
 
+
 upper_and_lower_bounds_revert <- function(par, lo, hi) {
   lo + ((hi - lo) / (1 + exp(-par)))
 }
-# gamma <- rnorm(nr_participants, .16, .06)
-# gamma <- rnorm(nr_participants, .3, .1)
+
 
 simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda) {
   # create a tbl with simulation & model parameters
@@ -725,7 +780,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   
   # simulate data
   tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   
@@ -754,6 +809,67 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
 }
 
 
+simulate_and_fit_softmax_one_variance <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda
+    ) {
+  # create a tbl with simulation & model parameters
+  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  sigma_epsilon_sq <- 16
+  
+  s_gamma <- -1
+  while(s_gamma < 0){
+    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
+    s_gamma <- min(gamma)
+  }
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  tbl_params_softmax <- tibble(
+    sigma_prior = rep(10, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    nr_trials = nr_trials,
+    lambda = lambda,
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    gamma,
+    simulate_data = simulate_data,
+    seed
+  )
+  
+  # simulate data
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_softmax,
+    simulate_softmax, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_softmax <- future_map(
+    l_choices_simulated, 
+    safely(fit_softmax_one_variance_wrapper), .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
+  colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml")
+  tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_softmax))
+  
+  return(tbl_results_softmax)
+}
+
+
+
 simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, lambda) {
   # create a tbl with simulation & model parameters
   sigma_xi_sq <- rnorm(nr_participants, 16, 3)
@@ -777,7 +893,7 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   
   # simulate data
   tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   

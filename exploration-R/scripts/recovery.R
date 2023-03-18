@@ -64,7 +64,13 @@ tbl_params_softmax <- crossing(
   tbl_gammas, simulate_data, nr_participants, nr_trials
 )
 
-l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda)
+fit_or_load <- "load"
+if (fit_or_load == "fit")  {
+  l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda)
+  saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_softmax <- readRDS("exploration-R/data/recovery-softmax-two-variances.RDS")
+}
 
 counter <- 1
 l_results_c <- list()
@@ -72,11 +78,14 @@ for (tbl_r in l_results_softmax) {
   l_results_c[[counter]] <- as_tibble(cbind(
     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
   ))
-  counter = counter + 1
+  counter <- counter + 1
 }
 
 tbl_cor_softmax <- reduce(l_results_c, rbind) %>%
   group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  filter(
+    gamma_ml < 2.9 & sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29
+  )   %>%
   summarize(
     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
     r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml),
@@ -126,8 +135,6 @@ l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
 
-
-
 # Main Experiment Kalman & Thompson ---------------------------------------
 
 
@@ -151,6 +158,7 @@ for (tbl_r in l_results_thompson) {
 }
 
 tbl_cor_thompson <- reduce(l_results_c, rbind) %>%
+  filter(sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29) %>%
   group_by(simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
@@ -211,8 +219,83 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 # add ucb choice rule
 
 
+# Main Experiment Kalman & Softmax: Fit Only Xi Variance--------------------
 
 
+# take same combination of hyperparameters as before
+
+fit_or_load <- "load"
+if (fit_or_load == "fit")  {
+  l_results_softmax_1var <- pmap(
+    tbl_params_softmax, 
+    simulate_and_fit_softmax_one_variance, 
+    lambda = lambda
+  )
+  saveRDS(l_results_softmax_1var, "exploration-R/data/recovery-softmax-one-variance.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_softmax_1var <- readRDS("exploration-R/data/recovery-softmax-one-variance.RDS")
+}
+
+counter <- 1
+l_results_c_1var <- list()
+for (tbl_r in l_results_softmax_1var) {
+  l_results_c_1var[[counter]] <- as_tibble(cbind(
+    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
+  ))
+  counter <- counter + 1
+}
+
+tbl_cor_softmax_1var <- reduce(l_results_c_1var, rbind) %>%
+  group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  filter(
+    gamma_ml < 2.9 & sigma_xi_sq_ml < 29
+  ) %>%
+  summarize(
+    r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
+    r_gamma = cor(gamma, gamma_ml)
+  ) %>% ungroup()
+
+tbl_cor_softmax_1var_long <- tbl_cor_softmax_1var %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% rename("Sigma Xi" = r_sigma_xi, "Gamma" = r_gamma) %>%
+  pivot_longer(cols = c(Gamma, `Sigma Xi`))
+
+pd <- position_dodge(width = .9)
+ggplot(tbl_cor_softmax_1var_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+  geom_label(
+    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+    position = pd, label.padding = unit(.1, "lines")
+  ) + geom_hline(
+    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+  ) + facet_grid(name ~ simulate_data) +
+  theme_bw() +
+  scale_fill_viridis_d(name = "Nr. Trials") +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_cartesian(ylim = c(-.1, 1.1)) +
+  labs(
+    x = "Gamma (Mean)",
+    y = "Correlation"
+  )
+
+l_cors_params <- map(
+  l_results_c_1var, ~ cor(.x[, c("sigma_xi_sq_ml", "gamma_ml")])
+)
+
+counter <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_softmax[counter, ]
+  ))
+  counter = counter + 1
+}
+
+
+l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax, nr_var = 1)
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
 
 

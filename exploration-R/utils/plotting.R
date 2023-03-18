@@ -432,9 +432,9 @@ save_my_pdf <- function(pl, path_fl, w, h) {
 }
 
 
-plot_my_heatmap_softmax <- function(tbl_x) {
-  ggplot(
-    tbl_x %>% 
+plot_my_heatmap_softmax <- function(tbl_x, nr_vars = 2) {
+  if (nr_vars == 2) {
+    tbl_cor <- tbl_x %>% 
       mutate(my_vars = colnames(tbl_x[1:3])) %>%
       pivot_longer(cols = c(sigma_xi_sq_ml, sigma_epsilon_sq_ml, gamma_ml)) %>%
       mutate(
@@ -442,8 +442,19 @@ plot_my_heatmap_softmax <- function(tbl_x) {
         my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml"),
         name = factor(name),
         name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Sigma Epsilon" = "sigma_epsilon_sq_ml", "Gamma" = "gamma_ml")
-      ) , 
-    aes(my_vars, name)) +
+      )
+  } else if (nr_vars == 1) {
+    tbl_cor <- tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:2])) %>%
+      pivot_longer(cols = c(sigma_xi_sq_ml, gamma_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Sigma Xi" = "sigma_xi_sq_ml", "Gamma" = "gamma_ml"),
+        name = factor(name),
+        name = fct_recode(name, "Sigma Xi" = "sigma_xi_sq_ml", "Gamma" = "gamma_ml")
+      )
+  }
+  ggplot(tbl_cor, aes(my_vars, name)) +
     geom_tile(aes(fill = value)) +
     scale_fill_gradient2(name = "") +
     geom_label(aes(label = str_c("r = ", round(value, 2)))) +
