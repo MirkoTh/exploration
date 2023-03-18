@@ -22,22 +22,6 @@ sigma_xi_sq <- 16
 sigma_epsilon_sq <- 16
 lambda <- .9836
 
-generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials) {
-  nr_bandits <- length(mu1)
-  mus <- matrix(nrow = nr_trials, ncol = nr_bandits)
-  mus[1, ] <- mu1
-  for (t in 2:nr_trials) {
-    mus[t, ] <- lambda * mus[t-1, ] + rnorm(nr_bandits, 0, sqrt(sigma_xi_sq))
-  }
-  noise <- matrix(
-    rnorm(nr_trials * nr_bandits, 0, sqrt(sigma_epsilon_sq)),
-    nrow = nr_trials, ncol = nr_bandits
-  )
-  as_tibble(as.data.frame(mus + noise)) %>% 
-    mutate(trial_id = 1:nr_trials) %>%
-    rename("Bandit 1" = V1, "Bandit 2" = V2, "Bandit 3" = V3, "Bandit 4" = V4)
-}
-
 tbl_bandits <- generate_restless_bandits(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials)
 
 ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = name)) +

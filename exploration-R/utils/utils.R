@@ -917,3 +917,28 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   
   return(tbl_results_thompson)
 }
+
+
+generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials) {
+  #' 
+  #' @description generate random walk data on bandits with independent means
+  #' @param sigma_xi_sq innovation variance
+  #' @param sigma_epsilon_sq noise variance
+  #' @param mu1 initial means of different bandits
+  #' @param lambda decay parameter to keep bandit means closer to 0
+  #' @param nr_trials number of trials to generate
+  #' @return a tbl with values for all trials and all bandits
+  nr_bandits <- length(mu1)
+  mus <- matrix(nrow = nr_trials, ncol = nr_bandits)
+  mus[1, ] <- mu1
+  for (t in 2:nr_trials) {
+    mus[t, ] <- lambda * mus[t-1, ] + rnorm(nr_bandits, 0, sqrt(sigma_xi_sq))
+  }
+  noise <- matrix(
+    rnorm(nr_trials * nr_bandits, 0, sqrt(sigma_epsilon_sq)),
+    nrow = nr_trials, ncol = nr_bandits
+  )
+  as_tibble(as.data.frame(mus + noise)) %>% 
+    mutate(trial_id = 1:nr_trials) %>%
+    rename("Bandit 1" = V1, "Bandit 2" = V2, "Bandit 3" = V3, "Bandit 4" = V4)
+}
