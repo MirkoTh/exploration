@@ -66,7 +66,7 @@ tbl_params_softmax <- crossing(
 
 fit_or_load <- "load"
 if (fit_or_load == "fit")  {
-  l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda)
+  l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda, nr_vars = 2)
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
 } else if (fit_or_load == "load")  {
   l_results_softmax <- readRDS("exploration-R/data/recovery-softmax-two-variances.RDS")
@@ -208,16 +208,6 @@ for (tbl_r in l_cors_params) {
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_thompson)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
-# notes
-# danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
-# daw et al. 2006 fit kalman filter with two variances being estimated, but provide no recovery studies
-# speekenbrink & konstantinidis (2015) fit kalman model also with two variances being estimated, but provide no recovery studies
-
-
-# todos
-# fix one of sigma_xi or sigma_epsilon
-# add ucb choice rule
-
 
 # Main Experiment Kalman & Softmax: Fit Only Xi Variance--------------------
 
@@ -228,8 +218,9 @@ fit_or_load <- "load"
 if (fit_or_load == "fit")  {
   l_results_softmax_1var <- pmap(
     tbl_params_softmax, 
-    simulate_and_fit_softmax_one_variance, 
-    lambda = lambda
+    simulate_and_fit_softmax, 
+    lambda = lambda,
+    nr_vars = 1
   )
   saveRDS(l_results_softmax_1var, "exploration-R/data/recovery-softmax-one-variance.RDS")
 } else if (fit_or_load == "load")  {
@@ -298,4 +289,73 @@ l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax, nr_var = 1)
 grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
 
 
+# notes
+# danwitz et al. 2022 only fit softmax temperature param, but keep var_xi and var_eps fixed to true values
+# daw et al. 2006 fit kalman filter with two variances being estimated, but provide no recovery studies
+# speekenbrink & konstantinidis (2015) fit kalman model also with two variances being estimated, but provide no recovery studies
 
+
+# todos
+# fix both sigma_xi and sigma_epsilon
+# add ucb choice rule
+
+
+
+# Softmax: Fix Variances --------------------------------------------------
+
+fit_or_load <- "load"
+if (fit_or_load == "fit")  {
+  l_results_softmax_0var <- pmap(
+    tbl_params_softmax, 
+    simulate_and_fit_softmax, 
+    lambda = lambda,
+    nr_vars = 0
+  )
+  saveRDS(l_results_softmax_0var, "exploration-R/data/recovery-softmax-no-variance.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_softmax_0var <- readRDS("exploration-R/data/recovery-softmax-no-variance.RDS")
+}
+
+counter <- 1
+l_results_c_0var <- list()
+for (tbl_r in l_results_softmax_0var) {
+  l_results_c_0var[[counter]] <- as_tibble(cbind(
+    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
+  ))
+  counter <- counter + 1
+}
+
+tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
+  group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  filter(
+    gamma_ml < 2.9
+  ) %>%
+  summarize(
+    r_gamma = cor(gamma, gamma_ml)
+  ) %>% ungroup()
+
+tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% rename("Gamma" = r_gamma) %>%
+  pivot_longer(cols = c(Gamma))
+
+pd <- position_dodge(width = .9)
+ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+  geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+  geom_label(
+    aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+    position = pd, label.padding = unit(.1, "lines")
+  ) + geom_hline(
+    yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+  ) + facet_grid(name ~ simulate_data) +
+  theme_bw() +
+  scale_fill_viridis_d(name = "Nr. Trials") +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  coord_cartesian(ylim = c(-.1, 1.1)) +
+  labs(
+    x = "Gamma (Mean)",
+    y = "Correlation"
+  )

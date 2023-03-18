@@ -659,6 +659,26 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
 }
 
 
+fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description kalman softmax fitting wrapper, only optimize one of the
+  #' two available variances, fix the other to the true value
+  #' 
+  sigma_xi_sq <- 16
+  sigma_epsilon_sq <- 16
+  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
+  tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
+  p_choices <- softmax_choice_prob(
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    gamma
+  )
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-sllik)
+}
+
+
 fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options) {
   #' 
   #' @description kalman softmax fitting wrapper, only optimize one of the
@@ -720,7 +740,7 @@ fit_softmax_wrapper <- function(tbl_results) {
   c(
     upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
     upper_and_lower_bounds_revert(result_optim$par[3], 0, 3)
-    )
+  )
 }
 
 
@@ -741,6 +761,19 @@ fit_softmax_one_variance_wrapper <- function(tbl_results) {
 }
 
 
+fit_softmax_no_variance_wrapper <- function(tbl_results) {
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(
+    upper_and_lower_bounds(.2, 0, 3)
+  )
+  result_optim <- optimize(
+    fit_kalman_softmax_no_variance, c(-10.308, 12.611),
+    tbl_results = tbl_results, nr_options = 4
+  )
+  c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
+}
+
+
 upper_and_lower_bounds <- function(par, lo, hi) {
   log(((par - lo) / (hi - lo)) / (1 - (par - lo) / (hi - lo)))
 }
@@ -751,10 +784,17 @@ upper_and_lower_bounds_revert <- function(par, lo, hi) {
 }
 
 
-simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda) {
+simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda, nr_vars) {
   # create a tbl with simulation & model parameters
-  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  if (nr_vars == 1) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  } else if (nr_vars == 2) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  }  
   
   s_gamma <- -1
   while(s_gamma < 0){
@@ -793,75 +833,31 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     .options = furrr_options(seed = NULL)
   )
   
+  if (nr_vars == 0) {
+    my_current_wrapper <- fit_softmax_no_variance_wrapper
+  } else if (nr_vars == 1) {
+    my_current_wrapper <- fit_softmax_one_variance_wrapper
+  } else if (nr_vars == 2) {
+    my_current_wrapper <- fit_softmax_wrapper
+  } 
   plan(multisession, workers = availableCores() - 2)
   l_softmax <- future_map(
     l_choices_simulated, 
-    safely(fit_softmax_wrapper), .progress = TRUE, 
+    safely(my_current_wrapper), .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
+  
   
   tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
-  colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
-  tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
-    mutate(participant_id = 1:nrow(tbl_results_softmax))
   
-  return(tbl_results_softmax)
-}
-
-
-simulate_and_fit_softmax_one_variance <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, lambda
-    ) {
-  # create a tbl with simulation & model parameters
-  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  sigma_epsilon_sq <- 16
+  if (nr_vars == 0) {
+    colnames(tbl_results_softmax) <- c("gamma_ml")
+  } else if (nr_vars == 1) {
+    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml")
+  }  else if (nr_vars == 2) {
+    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
+  } 
   
-  s_gamma <- -1
-  while(s_gamma < 0){
-    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
-    s_gamma <- min(gamma)
-  }
-  s_seeds <- -1
-  while(s_seeds < nr_participants) {
-    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
-    s_seeds <- length(unique(seed))
-  }
-  tbl_params_softmax <- tibble(
-    sigma_prior = rep(10, nr_participants),
-    mu_prior = rep(0, nr_participants),
-    nr_trials = nr_trials,
-    lambda = lambda,
-    sigma_xi_sq,
-    sigma_epsilon_sq,
-    gamma,
-    simulate_data = simulate_data,
-    seed
-  )
-  
-  # simulate data
-  tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
-    select(-trial_id)
-  
-  plan(multisession, workers = availableCores() - 2)
-  l_choices_simulated <- future_pmap(
-    tbl_params_softmax,
-    simulate_softmax, 
-    tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  plan(multisession, workers = availableCores() - 2)
-  l_softmax <- future_map(
-    l_choices_simulated, 
-    safely(fit_softmax_one_variance_wrapper), .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
-  colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml")
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
   
