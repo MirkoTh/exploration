@@ -5,13 +5,13 @@
 # - switches (i.e., switching behavior)
 #   - same two models as above, but condition means, variances, and pmus on previous choice
 
-library(tidyverse)     # for awesome plotting
-library(rpart)       # direct engine for decision tree application
-library(caret)       # meta engine for decision tree application
+library(tidyverse)
+library(rpart)
+library(caret)
 library(dirichletprocess)
-library(rpart.plot)  # for plotting decision trees
-library(vip)         # for feature importance
-library(pdp)         # for feature effects
+library(rpart.plot)
+library(vip)
+library(pdp)
 library(rgl)
 
 
@@ -19,8 +19,10 @@ tbl_e2 <- read_csv("open-data/gershman-2018-e2-addon-features.csv")
 tbl_rb <- read_csv("open-data/speekenbrink-konstantinidis-2015-addon-features.csv")
 
 tbl_e2_switches <- tbl_e2 %>% 
-  select(subject, nr_previous_switches, run_nr, run_length, p_prev, m_prev, v_prev, repeat_choice)
-
+  select(
+    subject, nr_previous_switches, run_nr, run_length, 
+    p_prev, m_prev, v_prev, repeat_choice
+  )
 
 
 # Experiment 2 Gershman (2018) --------------------------------------------
@@ -74,10 +76,46 @@ strategies_one_subject <- function(subject_id, tbl_data) {
   return(m)
 }
 
+baseline_one_subject <- function(subject_id, tbl_data) {
+  m <- train(
+    as.factor(repeat_choice) ~ p_prev, #m_prev + v_prev,
+    data = tbl_data %>% filter(subject == subject_id),
+    method = "rpart",
+    trControl = trainControl(method = "cv", number = 10),
+    tuneLength = 20
+  )
+  return(m)
+}
+
 subjs <- unique(tbl_e2_switches$subject)
-l_ms <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches)
+l_ms_strategy <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches)
+l_ms_baseline <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches)
 
 
+# model deviances
+
+rpart_deviance <- function(mo) {
+  mo$finalModel$frame %>%
+    filter(var == "<leaf>") %>%
+    mutate(
+      deviance_i = -2 * (yval2[, 2] * log(pmax(0.001, yval2[, 4])) + 
+                             yval2[, 3] * log(pmax(0.001, yval2[, 5])))
+      ) %>%
+    summarize(deviance_total = sum(deviance_i)) %>%
+    as_vector()
+}
+
+rpart_deviance(l_ms_strategy[[7]])
+rpart_deviance(l_ms_baseline[[7]])
+sort(map_dbl(l_ms_baseline, rpart_deviance_log) / map_dbl(l_ms, rpart_deviance_log))
+
+
+
+
+
+
+
+# variable importance
 make_my_list <- function(x, y) {
   tbl_design <- tibble(name = c("p_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
   # tbl_design <- tibble(name = c("m_prev", "v_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
@@ -91,7 +129,7 @@ tbl_results <- map2(l_ms, subjs, make_my_list) %>%
   pivot_wider(id_cols = id, values_from = value, names_from = name)
 
 
-nrow <- 4
+nrow <- 2
 ncol <- 3
 my_subjects_e2 <- sample(unique(tbl_e2_switches$subject), nrow * ncol, replace = FALSE)
 par(mfrow=c(nrow, ncol))
@@ -106,7 +144,7 @@ plot3d(
   radius = 1,
   xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
   #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
-  )
+)
 
 ggplot(tbl_results, aes(run_length, nr_previous_switches)) +
   geom_point()
@@ -146,7 +184,7 @@ tbl_rb <- tbl_rb %>% select(-run_length) %>%
     m_prev = m_diff,
     v_prev = v_diff,
     subject = id2
-    )
+  )
 
 tbl_cor <- cor(
   tbl_rb[
@@ -215,7 +253,4 @@ plot3d(
 
 ggplot(tbl_results, aes(run_length, nr_previous_switches)) +
   geom_point()
-
-
-
 
