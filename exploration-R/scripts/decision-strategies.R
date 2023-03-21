@@ -20,7 +20,7 @@ tbl_rb <- read_csv("open-data/speekenbrink-konstantinidis-2015-addon-features.cs
 
 tbl_e2_switches <- tbl_e2 %>% 
   select(
-    subject, nr_previous_switches, run_nr, run_length, 
+    subject, block, trial, nr_previous_switches, run_nr, run_length, 
     p_prev, m_prev, v_prev, repeat_choice
   )
 
@@ -67,7 +67,7 @@ tbl_cor %>%
 
 strategies_one_subject <- function(subject_id, tbl_data) {
   m <- train(
-    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, #m_prev + v_prev,
+    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, # + m_prev + v_prev,
     data = tbl_data %>% filter(subject == subject_id),
     method = "rpart",
     trControl = trainControl(method = "cv", number = 10),
@@ -78,7 +78,7 @@ strategies_one_subject <- function(subject_id, tbl_data) {
 
 baseline_one_subject <- function(subject_id, tbl_data) {
   m <- train(
-    as.factor(repeat_choice) ~ p_prev, #m_prev + v_prev,
+    as.factor(repeat_choice) ~ p_prev, # + m_prev + v_prev,
     data = tbl_data %>% filter(subject == subject_id),
     method = "rpart",
     trControl = trainControl(method = "cv", number = 10),
@@ -87,9 +87,11 @@ baseline_one_subject <- function(subject_id, tbl_data) {
   return(m)
 }
 
+tbl_e2_switches$is_test <- tbl_e2_switches$block >= 16
+
 subjs <- unique(tbl_e2_switches$subject)
-l_ms_strategy <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches)
-l_ms_baseline <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches)
+l_ms_strategy <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
+l_ms_baseline <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
 
 
 # model deviances
@@ -98,21 +100,61 @@ rpart_deviance <- function(mo) {
   mo$finalModel$frame %>%
     filter(var == "<leaf>") %>%
     mutate(
-      deviance_i = -2 * (yval2[, 2] * log(pmax(0.001, yval2[, 4])) + 
-                             yval2[, 3] * log(pmax(0.001, yval2[, 5])))
-      ) %>%
+      deviance_i = -2 * (yval2[, 2] * log(pmax(1e-10, yval2[, 4])) + 
+                           yval2[, 3] * log(pmax(1e-10, yval2[, 5])))
+    ) %>%
     summarize(deviance_total = sum(deviance_i)) %>%
     as_vector()
 }
 
-rpart_deviance(l_ms_strategy[[7]])
-rpart_deviance(l_ms_baseline[[7]])
-sort(map_dbl(l_ms_baseline, rpart_deviance_log) / map_dbl(l_ms, rpart_deviance_log))
+tbl_deviances_cv <- tibble(
+  subject = subjs,
+  deviance_cv_baseline = map_dbl(l_ms_baseline, rpart_deviance),
+  deviance_cv_strategy = map_dbl(l_ms_strategy, rpart_deviance),
+  prop_improvement_cv = 1 - deviance_cv_strategy/deviance_cv_baseline
+)
+
+# on test set
+
+rpart_deviance_test_set <- function(subj, tbl_e2_switches, subjs){
+  subj_idx <- which(subjs == subj)
+  tbl_baseline <- cbind(
+    tbl_e2_switches %>% filter(is_test & subject == subj) %>% select(repeat_choice),
+    predict(l_ms_baseline[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
+  )
+  tbl_strategy <- cbind(
+    tbl_e2_switches %>% filter(is_test & subject == subj) %>% select(repeat_choice),
+    predict(l_ms_strategy[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
+  )
+  tibble(
+    subject = subj,
+    deviance_test_baseline = -2 * sum(pmap_dbl(tbl_baseline, ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1])))),
+    deviance_test_strategy = -2 * sum(pmap_dbl(tbl_strategy, ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1])))),
+    prop_improvement_test = 1 - deviance_test_strategy / deviance_test_baseline
+  )
+}
+
+tbl_deviance_test <- map(
+  subjs, 
+  rpart_deviance_test_set, 
+  tbl_e2_switches = tbl_e2_switches, subjs = subjs
+) %>%
+  reduce(rbind)
 
 
+tbl_deviances <- tbl_deviances_cv %>% 
+  left_join(tbl_deviance_test, by = "subject", suffix = c("_cv", "_test"))
 
 
+tbl_deviances %>% group_by(prop_improvement_cv > 0) %>% count()
+tbl_deviances %>% group_by(prop_improvement_test > 0) %>% count()
+tbl_deviances %>% group_by(prop_improvement_cv > 0 & prop_improvement_test > 0) %>% count()
 
+par(mfrow=c(2, 2))
+rpart.plot(l_ms_strategy[[which(subjs == 7)]]$finalModel, main = "Prop. Improvement = .61", col.main = "forestgreen", col.sub = "black")
+rpart.plot(l_ms_strategy[[which(subjs == 18)]]$finalModel, main = "Prop. Improvement = .47", col.main = "forestgreen", col.sub = "black")
+rpart.plot(l_ms_strategy[[which(subjs == 24)]]$finalModel, main = "Prop. Improvement = .32", col.main = "forestgreen", col.sub = "black")
+rpart.plot(l_ms_strategy[[which(subjs == 36)]]$finalModel, main = "Prop. Improvement = 0", col.main = "tomato4", col.sub = "black")
 
 
 # variable importance
