@@ -407,8 +407,9 @@ repeat_tibble <- function(tbl_df, n_reps) {
 }
 
 
-kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
+kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq, m0 = NULL, v0 = NULL) {
   #' Kalman filter without choice model given chosen options by participants
+  #' setting the prior variance to the true error variance if not provided
   #' 
   #' @description applies Kalman filter equations for a given bandit task with existing choices by participants
   #' @param tbl_df with made choices and collected rewards as columns
@@ -418,10 +419,16 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
   #' @return a tbl with by-trial posterior means and variances for all bandits
   rewards <- tbl_df$rewards
   choices <- tbl_df$choices
-  m0 <- 0
+  
   nt <- length(rewards) # number of time points
+  if (is.null(m0)) {
+    m0 <- 0
+  }
+  if (is.null(v0)) {
+    v0 <- sigma_epsilon_sq
+  }
   m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
-  v <- matrix(sigma_epsilon_sq, ncol = no, nrow = nt + 1) # to hold the posterior variances
+  v <- matrix(v0, ncol = no, nrow = nt + 1) # to hold the posterior variances
   
   for(t in 1:nt) {
     kt <- rep(0, no)
@@ -430,7 +437,7 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq) {
     # compute the posterior means
     m[t+1,] <- m[t,] + kt*(rewards[t] - m[t,])
     # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,])
+    v[t+1,] <- (1-kt)*(v[t,] + sigma_xi_sq)
   }
   tbl_m <- as.data.frame(m)
   # constrain v from becoming to small
@@ -559,7 +566,7 @@ simulate_softmax <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_
     # compute the posterior means
     m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
     # compute the posterior variances
-    v[t + 1, ] <- (1 - kt) * (v[t, ])
+    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
   }
   
   tbl_m <- as.data.frame(m)
@@ -612,7 +619,7 @@ simulate_thompson <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi
     # compute the posterior means
     m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
     # compute the posterior variances
-    v[t + 1, ] <- (1 - kt) * (v[t, ])
+    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
     v[t + 1, ] <- t(apply(matrix(v[t + 1, ], nrow = 1), 1, function(x) pmax(x, .0001)))
   }
   
