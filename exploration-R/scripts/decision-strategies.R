@@ -185,22 +185,20 @@ tbl_deviances %>% group_by(prop_improvement_cv > 0) %>% count()
 tbl_deviances %>% group_by(prop_improvement_test > 0) %>% count()
 tbl_deviances %>% group_by(prop_improvement_cv > 0 & prop_improvement_test > 0) %>% count()
 
-
+my_treeplot <- function(m, t) {
+  prp(m, faclen=0, extra=105, roundint=F, digits=2, box.palette = "-GnRd", main = t)
+}
 par(mfrow=c(2, 2))
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 20)]]$finalModel, "Prop. Improvement = .80")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .51")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 24)]]$finalModel, "Prop. Improvement = .44")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
 
-my_treeplot <- function(m, t) {
-  prp(m, faclen=0, extra=105, roundint=F, digits=2, box.palette = "-GnRd", main = t)
-}
 
-draw.tree(l_ms_strategy_dev_test[[which(subjs == 7)]]$finalModel, cex = 1, digits = 2, nodeinfo = TRUE)
 deviance_on_all_participants <- function(i, j, l_ms_strategy_dev_test, tbl_e2_switches, subjs) {
   subj_idx <- which(subjs == i)
   -2 * sum(pmap_dbl(cbind(
-    tbl_e2_switches %>% filter(subject == j) %>% select(repeat_choice), 
+    tbl_e2_switches %>% filter(subject == j) %>% dplyr::select(repeat_choice), 
     predict(l_ms_strategy_all[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(subject == j))
   ), ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1]))))
 }
@@ -211,40 +209,37 @@ isnjs <- crossing(i = is, j = js)
 isnjs$deviance <- pmap_dbl(isnjs, deviance_on_all_participants, l_ms_strategy_dev_test, tbl_e2_switches, subjs)
 deviance_self <- isnjs %>% filter(i == j)
 isnjs <- isnjs %>% 
-  left_join(deviance_self %>% select(-i), by = "j", suffix = c("_all", "_self")) %>%
+  left_join(deviance_self %>% dplyr::select(-i), by = "j", suffix = c("_all", "_self")) %>%
   mutate(prop_self = deviance_all / deviance_self)
 
 
 ggplot(isnjs, aes(j, i)) +
-  geom_tile(aes(fill = log(prop_self))) +
-  scale_fill_gradient2(midpoint = 1.5, name = "Log(Deviance(j)/\nDeviance(i))") +
+  geom_tile(aes(fill = log(prop_self, 10))) +
+  scale_fill_gradient2(name = "Log10(Deviance(Best Model)/\nDeviance(Other Model))") +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   theme_bw() +
   labs(x = "Data Set Participant", y = "Model Fit on Participant")
+
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 35)]]$finalModel, "Participant-Specific Model")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 13)]]$finalModel, "Participant-Specific Model")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 36)]]$finalModel, "Participant-Specific Model")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 39)]]$finalModel, "Participant-Specific Model")
+
 
 
 # variable importance
 make_my_list <- function(x, y) {
   tbl_design <- tibble(name = c("p_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
   # tbl_design <- tibble(name = c("m_prev", "v_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
-  tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$variable.importance))) %>% pivot_longer(cols = -id) %>% select(-id)
+  tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$variable.importance))) %>% pivot_longer(cols = -id) %>% dplyr::select(-id)
   # tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$coefficients[2:4]))) %>% pivot_longer(cols = -id) %>% select(-id)
   tbl_design %>% left_join(tbl_results, by = "name")
 }
 
-tbl_results <- map2(l_ms, subjs, make_my_list) %>%
+tbl_results <- map2(l_ms_strategy_all, subjs, make_my_list) %>%
   reduce(rbind) %>% replace_na(list(value = 0)) %>%
   pivot_wider(id_cols = id, values_from = value, names_from = name)
-
-
-nrow <- 2
-ncol <- 3
-my_subjects_e2 <- sample(unique(tbl_e2_switches$subject), nrow * ncol, replace = FALSE)
-par(mfrow=c(nrow, ncol))
-for (i in 1:(nrow*ncol)){
-  rpart.plot(l_ms[[my_subjects_e2[i]]]$finalModel, cex = 1)
-}
 
 
 plot3d(
@@ -274,11 +269,26 @@ ggplot(tbl_cluster_wss, aes(n_clusters, wss)) +
   geom_point() +
   geom_line()
 
-# dpmm clustering
-its <- 1000
-dp <- DirichletProcessMvnormal(tbl_results[, c("p_prev", "run_length", "nr_previous_switches")] %>% as.matrix())
-dp <- Fit(dp, its)
-plot(dp)
+tbl_results$cluster <- predict(
+  results_kmeans[[4]], tbl_results[, c("p_prev", "run_length", "nr_previous_switches")]
+  )
+cols_viridis <- tibble(
+  cluster = as.character(seq(1, 4, by = 1)),
+  color = c("#fde725", "#5ec962", "#21918c", "#3b528b"),
+  clustername = c("Only PMU", "PMU & Switches", "Hi PMU & Switches", "Mixture")
+)
+tbl_results <- tbl_results %>% left_join(cols_viridis, by = "cluster")
+
+plot3d(
+  x=tbl_results$p_prev, y=tbl_results$run_length, z=tbl_results$nr_previous_switches, 
+  type = 's', 
+  radius = 1,
+  xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
+  col = tbl_results$color
+  #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
+)
+legend3d("topright", legend = cols_viridis$clustername, pch = 16, col = cols_viridis$color, cex=1.3, inset=c(0.02))
+
 
 
 
