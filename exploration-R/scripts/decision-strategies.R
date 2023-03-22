@@ -13,6 +13,8 @@ library(rpart.plot)
 library(vip)
 library(pdp)
 library(rgl)
+library(arm)
+library(ISLR)
 
 
 tbl_e2 <- read_csv("open-data/gershman-2018-e2-addon-features.csv")
@@ -63,19 +65,6 @@ tbl_cor %>%
 # var prev and pmu prev, but same as above
 # rest is more or less ok
 
-
-
-strategies_one_subject <- function(subject_id, tbl_data) {
-  m <- train(
-    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, # + m_prev + v_prev,
-    data = tbl_data %>% filter(subject == subject_id),
-    method = "rpart",
-    trControl = trainControl(method = "cv", number = 10),
-    tuneLength = 20
-  )
-  return(m)
-}
-
 baseline_one_subject <- function(subject_id, tbl_data) {
   m <- train(
     as.factor(repeat_choice) ~ p_prev, # + m_prev + v_prev,
@@ -87,11 +76,57 @@ baseline_one_subject <- function(subject_id, tbl_data) {
   return(m)
 }
 
+logistic_one_subject <- function(subject_id, tbl_data) {
+  m <- train(
+    as.factor(repeat_choice) ~ p_prev + m_prev + v_prev,
+    data = tbl_data %>% filter(subject == subject_id),
+    method = "bayesglm",
+    trControl = trainControl(method = "cv", number = 10),
+    tuneLength = 20
+  )
+  return(m)
+}
+
+strategies_one_subject <- function(subject_id, tbl_data) {
+  m <- train(
+    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, #+ m_prev + v_prev,
+    data = tbl_data %>% filter(subject == subject_id),
+    method = "rpart",
+    trControl = trainControl(method = "cv", number = 10),
+    tuneLength = 20
+  )
+  return(m)
+}
 tbl_e2_switches$is_test <- tbl_e2_switches$block >= 16
 
 subjs <- unique(tbl_e2_switches$subject)
-l_ms_strategy <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
-l_ms_baseline <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
+l_ms_strategy_dev_test <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
+l_ms_baseline_dev_test <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
+l_ms_strategy_all <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches)
+l_ms_logistic_all <- map(subjs, logistic_one_subject, tbl_data = tbl_e2_switches)
+
+tbl_comparison <- tibble(
+  parametric = map_dbl(l_ms_logistic_all, ~ .x$finalModel$deviance),
+  heuristic = map_dbl(l_ms_strategy_all, rpart_deviance)
+) %>% 
+  mutate(difference = parametric - heuristic)
+tbl_agg <- tbl_comparison %>% count(n_better = difference > 0) %>%
+  mutate(n_better = factor(n_better, labels = c("Logistic", "Heuristic"))) %>%
+  pivot_wider(names_from = n_better, values_from = n)
+
+
+ggplot(tbl_comparison, aes(difference)) +
+  geom_histogram(fill = "skyblue2", color = "white") +
+  geom_label(
+    data = tbl_agg, aes(
+      x = 30, y = 5, label = str_c(
+        "Nr. Wins Logistic: ", Logistic, "\n",
+        "Nr. Wins Heuristic: ", Heuristic)
+      )) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0), breaks = seq(-50, 50, by = 10)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Difference in Deviance", y = "Nr. Participants")
 
 
 # model deviances
@@ -109,8 +144,8 @@ rpart_deviance <- function(mo) {
 
 tbl_deviances_cv <- tibble(
   subject = subjs,
-  deviance_cv_baseline = map_dbl(l_ms_baseline, rpart_deviance),
-  deviance_cv_strategy = map_dbl(l_ms_strategy, rpart_deviance),
+  deviance_cv_baseline = map_dbl(l_ms_baseline_dev_test, rpart_deviance),
+  deviance_cv_strategy = map_dbl(l_ms_strategy_dev_test, rpart_deviance),
   prop_improvement_cv = 1 - deviance_cv_strategy/deviance_cv_baseline
 )
 
@@ -119,12 +154,12 @@ tbl_deviances_cv <- tibble(
 rpart_deviance_test_set <- function(subj, tbl_e2_switches, subjs){
   subj_idx <- which(subjs == subj)
   tbl_baseline <- cbind(
-    tbl_e2_switches %>% filter(is_test & subject == subj) %>% select(repeat_choice),
-    predict(l_ms_baseline[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
+    tbl_e2_switches %>% filter(is_test & subject == subj) %>% dplyr::select(repeat_choice),
+    predict(l_ms_baseline_dev_test[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
   )
   tbl_strategy <- cbind(
-    tbl_e2_switches %>% filter(is_test & subject == subj) %>% select(repeat_choice),
-    predict(l_ms_strategy[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
+    tbl_e2_switches %>% filter(is_test & subject == subj) %>% dplyr::select(repeat_choice),
+    predict(l_ms_strategy_dev_test[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(is_test & subject == subj))
   )
   tibble(
     subject = subj,
@@ -150,11 +185,43 @@ tbl_deviances %>% group_by(prop_improvement_cv > 0) %>% count()
 tbl_deviances %>% group_by(prop_improvement_test > 0) %>% count()
 tbl_deviances %>% group_by(prop_improvement_cv > 0 & prop_improvement_test > 0) %>% count()
 
+
 par(mfrow=c(2, 2))
-rpart.plot(l_ms_strategy[[which(subjs == 7)]]$finalModel, main = "Prop. Improvement = .61", col.main = "forestgreen", col.sub = "black")
-rpart.plot(l_ms_strategy[[which(subjs == 18)]]$finalModel, main = "Prop. Improvement = .47", col.main = "forestgreen", col.sub = "black")
-rpart.plot(l_ms_strategy[[which(subjs == 24)]]$finalModel, main = "Prop. Improvement = .32", col.main = "forestgreen", col.sub = "black")
-rpart.plot(l_ms_strategy[[which(subjs == 36)]]$finalModel, main = "Prop. Improvement = 0", col.main = "tomato4", col.sub = "black")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 20)]]$finalModel, "Prop. Improvement = .80")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .51")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 24)]]$finalModel, "Prop. Improvement = .44")
+my_treeplot(l_ms_strategy_dev_test[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
+
+my_treeplot <- function(m, t) {
+  prp(m, faclen=0, extra=105, roundint=F, digits=2, box.palette = "-GnRd", main = t)
+}
+
+draw.tree(l_ms_strategy_dev_test[[which(subjs == 7)]]$finalModel, cex = 1, digits = 2, nodeinfo = TRUE)
+deviance_on_all_participants <- function(i, j, l_ms_strategy_dev_test, tbl_e2_switches, subjs) {
+  subj_idx <- which(subjs == i)
+  -2 * sum(pmap_dbl(cbind(
+    tbl_e2_switches %>% filter(subject == j) %>% select(repeat_choice), 
+    predict(l_ms_strategy_all[[subj_idx]]$finalModel, newdata = tbl_e2_switches %>% filter(subject == j))
+  ), ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1]))))
+}
+
+is <- subjs
+js <- subjs
+isnjs <- crossing(i = is, j = js)
+isnjs$deviance <- pmap_dbl(isnjs, deviance_on_all_participants, l_ms_strategy_dev_test, tbl_e2_switches, subjs)
+deviance_self <- isnjs %>% filter(i == j)
+isnjs <- isnjs %>% 
+  left_join(deviance_self %>% select(-i), by = "j", suffix = c("_all", "_self")) %>%
+  mutate(prop_self = deviance_all / deviance_self)
+
+
+ggplot(isnjs, aes(j, i)) +
+  geom_tile(aes(fill = log(prop_self))) +
+  scale_fill_gradient2(midpoint = 1.5, name = "Log(Deviance(j)/\nDeviance(i))") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_bw() +
+  labs(x = "Data Set Participant", y = "Model Fit on Participant")
 
 
 # variable importance
