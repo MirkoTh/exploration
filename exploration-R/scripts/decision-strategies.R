@@ -102,8 +102,32 @@ tbl_e2_switches$is_test <- tbl_e2_switches$block >= 16
 subjs <- unique(tbl_e2_switches$subject)
 l_ms_strategy_dev_test <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
 l_ms_baseline_dev_test <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
+l_ms_baseline_all <- map(subjs, baseline_one_subject, tbl_data = tbl_e2_switches)
 l_ms_strategy_all <- map(subjs, strategies_one_subject, tbl_data = tbl_e2_switches)
 l_ms_logistic_all <- map(subjs, logistic_one_subject, tbl_data = tbl_e2_switches)
+
+n_splits <- map_dbl(
+  l_ms_strategy_all, ~ .x$finalModel$frame %>% 
+    filter(var != "<leaf>") %>% 
+    count() %>% as_vector()
+)
+mean(n_splits)
+table(n_splits)
+
+tbl_logistic <- map(
+  l_ms_logistic_all, ~ .x$finalModel$coefficients
+) %>% reduce(rbind) %>%
+  as.data.frame() %>%
+  as_tibble()
+tbl_logistic %>% mutate(subject = subjs) %>% pivot_longer(-subject) %>%
+  ggplot(aes(value, group = name)) +
+  geom_histogram(aes(fill = name), color = "white") +
+  facet_wrap(~ name, scales = "free_x") +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_viridis_d(name = "Parameter")
+
 
 tbl_comparison <- tibble(
   parametric = map_dbl(l_ms_logistic_all, ~ .x$finalModel$deviance),
@@ -122,7 +146,7 @@ ggplot(tbl_comparison, aes(difference)) +
       x = 30, y = 5, label = str_c(
         "Nr. Wins Logistic: ", Logistic, "\n",
         "Nr. Wins Heuristic: ", Heuristic)
-      )) +
+    )) +
   theme_bw() +
   scale_x_continuous(expand = c(0, 0), breaks = seq(-50, 50, by = 10)) +
   scale_y_continuous(expand = c(0, 0)) +
@@ -144,8 +168,8 @@ rpart_deviance <- function(mo) {
 
 tbl_deviances_cv <- tibble(
   subject = subjs,
-  deviance_cv_baseline = map_dbl(l_ms_baseline_dev_test, rpart_deviance),
-  deviance_cv_strategy = map_dbl(l_ms_strategy_dev_test, rpart_deviance),
+  deviance_cv_baseline = map_dbl(l_ms_baseline_all, rpart_deviance),
+  deviance_cv_strategy = map_dbl(l_ms_strategy_all, rpart_deviance),
   prop_improvement_cv = 1 - deviance_cv_strategy/deviance_cv_baseline
 )
 
@@ -189,13 +213,13 @@ my_treeplot <- function(m, t) {
   prp(m, faclen=0, extra=105, roundint=F, digits=2, box.palette = "-GnRd", main = t)
 }
 par(mfrow=c(2, 2))
-my_treeplot(l_ms_strategy_dev_test[[which(subjs == 20)]]$finalModel, "Prop. Improvement = .80")
-my_treeplot(l_ms_strategy_dev_test[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .51")
-my_treeplot(l_ms_strategy_dev_test[[which(subjs == 24)]]$finalModel, "Prop. Improvement = .44")
-my_treeplot(l_ms_strategy_dev_test[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
+my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .80")
+my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .51")
+my_treeplot(l_ms_strategy_all[[which(subjs == 24)]]$finalModel, "Prop. Improvement = .44")
+my_treeplot(l_ms_strategy_all[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
 
 
-deviance_on_all_participants <- function(i, j, l_ms_strategy_dev_test, tbl_e2_switches, subjs) {
+deviance_on_all_participants <- function(i, j, l_ms_strategy_all, tbl_e2_switches, subjs) {
   subj_idx <- which(subjs == i)
   -2 * sum(pmap_dbl(cbind(
     tbl_e2_switches %>% filter(subject == j) %>% dplyr::select(repeat_choice), 
@@ -203,10 +227,13 @@ deviance_on_all_participants <- function(i, j, l_ms_strategy_dev_test, tbl_e2_sw
   ), ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1]))))
 }
 
+l_ms_strategy_all[[which(subjs == 13)]]$finalModel
+l_ms_strategy_all[[which(subjs == 1)]]$finalModel
+
 is <- subjs
 js <- subjs
 isnjs <- crossing(i = is, j = js)
-isnjs$deviance <- pmap_dbl(isnjs, deviance_on_all_participants, l_ms_strategy_dev_test, tbl_e2_switches, subjs)
+isnjs$deviance <- pmap_dbl(isnjs, deviance_on_all_participants, l_ms_strategy_all, tbl_e2_switches, subjs)
 deviance_self <- isnjs %>% filter(i == j)
 isnjs <- isnjs %>% 
   left_join(deviance_self %>% dplyr::select(-i), by = "j", suffix = c("_all", "_self")) %>%
@@ -221,7 +248,7 @@ ggplot(isnjs, aes(j, i)) +
   theme_bw() +
   labs(x = "Data Set Participant", y = "Model Fit on Participant")
 
-my_treeplot(l_ms_strategy_dev_test[[which(subjs == 35)]]$finalModel, "Participant-Specific Model")
+my_treeplot(l_ms_strategy_all[[35]]$finalModel, "Participant-Specific Model")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 13)]]$finalModel, "Participant-Specific Model")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 36)]]$finalModel, "Participant-Specific Model")
 my_treeplot(l_ms_strategy_dev_test[[which(subjs == 39)]]$finalModel, "Participant-Specific Model")
@@ -271,11 +298,11 @@ ggplot(tbl_cluster_wss, aes(n_clusters, wss)) +
 
 tbl_results$cluster <- predict(
   results_kmeans[[4]], tbl_results[, c("p_prev", "run_length", "nr_previous_switches")]
-  )
+)
 cols_viridis <- tibble(
   cluster = as.character(seq(1, 4, by = 1)),
   color = c("#fde725", "#5ec962", "#21918c", "#3b528b"),
-  clustername = c("Only PMU", "PMU & Switches", "Hi PMU & Switches", "Mixture")
+  clustername = c("Only PMU", "PMU & Switches", "Hi PMU & Switches", "PMU, Switches, & Run Length")
 )
 tbl_results <- tbl_results %>% left_join(cols_viridis, by = "cluster")
 
@@ -287,9 +314,7 @@ plot3d(
   col = tbl_results$color
   #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
 )
-legend3d("topright", legend = cols_viridis$clustername, pch = 16, col = cols_viridis$color, cex=1.3, inset=c(0.02))
-
-
+legend3d("topright", legend = cols_viridis$clustername, pch = 16, col = cols_viridis$color, cex=1.2, inset=c(0.02))
 
 
 
