@@ -159,8 +159,10 @@ n_splits <- map_dbl(
     filter(var != "<leaf>") %>% 
     count() %>% as_vector()
 )
+
 mean(n_splits)
 table(n_splits)
+table(n_splits)/length(n_splits)
 
 tbl_logistic <- map(
   l_ms_logistic_all, ~ .x$finalModel$coefficients
@@ -175,6 +177,7 @@ tbl_logistic_long <- tbl_logistic %>%
   dplyr::select(-Intercept) %>%
   pivot_longer(-subject) %>%
   mutate(name = fct_inorder(factor(name)))
+cor(tbl_logistic[, c("PMU", "Value Diff.", "Var. Diff.")])
 
 ggplot(tbl_logistic_long, aes(value, group = name)) +
   geom_histogram(aes(fill = name), color = "white") +
@@ -352,24 +355,66 @@ deviance_on_all_participants <- function(i, j, l_ms_strategy_all, tbl_e2_switche
   ), ~ log(pmax(1e-10, c(..2, ..3)[as.numeric(..1) + 1]))))
 }
 
-
 is <- subjs
 js <- subjs
 isnjs <- crossing(i = is, j = js)
 isnjs$deviance <- pmap_dbl(isnjs, deviance_on_all_participants, l_ms_strategy_all, tbl_e2_switches, subjs)
 deviance_self <- isnjs %>% filter(i == j)
 isnjs <- isnjs %>% 
-  left_join(deviance_self %>% dplyr::select(-i), by = "j", suffix = c("_all", "_self")) %>%
+  left_join(
+    deviance_self %>% 
+      dplyr::select(-i), by = "j", suffix = c("_all", "_self")
+  ) %>%
   mutate(prop_self = deviance_all / deviance_self)
 
-pl_deviance_variability <- ggplot(isnjs, aes(prop_self)) + 
-  geom_histogram(binwidth = .25, fill = "#21918c", color = "white") + 
+
+isnjs_excl_self <- isnjs %>%
+  filter(i != j) %>%
+  arrange(prop_self) %>%
+  mutate(cumprop = rank(prop_self)/max(rank(prop_self)))
+mn_isnjs <- mean(isnjs_excl_self$prop_self)
+md_isnjs <- median(isnjs_excl_self$prop_self)
+idx_mn <- min(which((isnjs_excl_self$prop_self >= mn_isnjs) == 1))
+cumprop_mn <- isnjs_excl_self$cumprop[idx_mn]
+
+deviance_random <- -2*(log(.5) * nrow(data_obs))
+deviance_self$random <- deviance_random
+deviance_self$prop_random <- deviance_self$random / deviance_self$deviance
+rd_model <- mean(deviance_self$prop_random)
+idx_rd <- min(which((isnjs_excl_self$prop_self >= rd_model) == 1))
+cumprop_rd <- isnjs_excl_self$cumprop[idx_rd]
+
+pl_deviance_variability <- ggplot(isnjs_excl_self, aes(prop_self, cumprop)) +
+  geom_line() +
   coord_cartesian(xlim = c(0, 5)) +
+  geom_segment(aes(y = .5, yend = .5, x = 0, xend = md_isnjs)) +
+  geom_segment(aes(y = 0, yend = .5, x = md_isnjs, xend = md_isnjs)) +
+  geom_segment(aes(y = cumprop_mn, yend = cumprop_mn, x = 0, xend = mn_isnjs)) +
+  geom_segment(aes(y = 0, yend = cumprop_mn, x = mn_isnjs, xend = mn_isnjs)) +
+  geom_segment(aes(y = cumprop_rd, yend = cumprop_rd, x = 0, xend = rd_model)) +
+  geom_segment(aes(y = 0, yend = cumprop_rd, x = rd_model, xend = rd_model)) +
+  geom_label(aes(
+    x = 4, y = .55, label = str_c(
+      "Median = ", round(md_isnjs, 2),
+      "\nMean = ", round(mn_isnjs, 2),
+      "\nRandom = ", round(rd_model, 2)
+      )
+    )) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Prop. Deviance", y = "Empirical CDF")
+save_my_pdf(pl_deviance_variability, "figures/deviance-variability.pdf", 3.75, 3.5)
+
+
+
+ggplot(isnjs, aes(prop_self)) + 
+  geom_histogram(binwidth = .25, fill = "#21918c", color = "white") + 
+  coord_cartesian(xlim = c(0, 15)) +
   theme_bw() +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   labs(x = "Deviance Ratio", y = "Nr. Comparisons")
-save_my_pdf(pl_deviance_variability, "figures/deviance-variability.pdf", 3, 3)
 
 ggplot(isnjs, aes(j, i)) +
   geom_tile(aes(fill = prop_self)) +
