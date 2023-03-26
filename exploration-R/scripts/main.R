@@ -233,7 +233,7 @@ tbl_rb <- tbl_rb %>% group_by(id2) %>%
     nr_previous_switches_cumsum = lag(cumsum(switch_deck)),
     nr_previous_switches_lagged = coalesce(nr_previous_switches_lagged, nr_previous_switches_cumsum),
     run_length_lagged = lag(run_length)
-  ) %>% select(-nr_previous_switches_cumsum) %>%
+  ) %>% dplyr::select(-nr_previous_switches_cumsum) %>%
   replace_na(list(nr_previous_switches_lagged = 0, run_length_lagged = 0)) %>%
   mutate(avg_switches = mean(nr_previous_switches_lagged)) %>%
   ungroup() %>% arrange(avg_switches)
@@ -291,7 +291,7 @@ l_rb <- map(l_rb, function(x) {
 })
 
 l_results_rb <- map(l_rb, kalman_learning, no = no_rb, sigma_xi_sq = sigma_xi_sq_rb, sigma_epsilon_sq = sigma_epsilon_sq_rb)
-l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2)
+l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2, m0 = 0, v0 = 1000)
 
 
 
@@ -334,7 +334,7 @@ tbl_rb_features_learned <- tbl_rb_features_learned %>%
       length(unique(tbl_rb_features_learned$id2))
     )) %>% left_join(
       tbl_rb %>% ungroup() %>%
-        select(
+        dplyr::select(
           id2, trial, trend, volatility, deck, previous_deck,
           repeat_deck, run_nr, run_length, nr_previous_switches_lagged, run_length_lagged
         ) %>% mutate(id2 = as.character(id2)),
@@ -343,7 +343,7 @@ tbl_rb_features_learned <- tbl_rb_features_learned %>%
 
 ggplot(
   tbl_rb_features_learned %>% 
-    select(id2, trial, p_1, p_2, p_3, p_4) %>%
+    dplyr::select(id2, trial, p_1, p_2, p_3, p_4) %>%
     pivot_longer(cols = c(p_1, p_2, p_3, p_4)) %>%
     mutate(name = factor(name, labels = 1:4))
   , aes(trial, name)) +
@@ -382,18 +382,23 @@ tbl_exp2_features_learned <- pmap(
 tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
   mutate(
     val_diff = m_1 - m_2,
-    ru = v_1 - v_2,
+    ru = sqrt(v_1) - sqrt(v_2),
+    tu = sqrt(v_1 + v_2),
+    thompson = val_diff / tu,
     p_diff = p_1 - p_2,
     trial = rep(1:(max(tbl_exp2$trial) + 1), (max(as.numeric(subject)) * max(as.numeric(block))))
   ) %>% relocate(where(is.character), .before = p_1) %>%
   relocate(trial, .after = "block") %>% left_join(
     tbl_exp2 %>% 
-      select(
+      dplyr::select(
         subject, block, trial, choice, previous_choice,
         repeat_choice, nr_previous_switches, run_nr, run_length
       ) %>% mutate(block = as.character(block)),
     by = c("subject", "block", "trial")
   )
+
+cor(tbl_exp2_features_learned[, c("val_diff", "ru", "thompson", "p_diff")])
+
 
 tbl_exp2_features_learned <- tbl_exp2_features_learned[complete.cases(tbl_exp2_features_learned), ]
 tbl_rb_features_learned <- tbl_rb_features_learned[complete.cases(tbl_rb_features_learned), ]
@@ -401,7 +406,7 @@ tbl_rb_features_learned <- tbl_rb_features_learned[complete.cases(tbl_rb_feature
 # on average, there should be no relation between bandit and choice prob
 ggplot(
   tbl_exp2_features_learned %>% 
-    select(subject, trial, p_1, p_2) %>%
+    dplyr::select(subject, trial, p_1, p_2) %>%
     pivot_longer(cols = c(p_1, p_2)) %>%
     mutate(name = factor(name, labels = 1:2)) %>%
     group_by(subject, trial, name) %>% summarize(value = mean(value))
@@ -420,7 +425,6 @@ ggplot(
 
 
 # Fit Choices -------------------------------------------------------------
-
 
 
 tbl_cor <- cor(
@@ -462,11 +466,11 @@ tbl_cor %>%
 
 tbl_exp2_features_learned$m_prev <- pmap_dbl(
   tbl_exp2_features_learned[, c("m_1", "m_2", "previous_choice")], 
-  ~ c(..1, ..2)[..3]
+  ~ c(..1, ..2)[..3] - c(..1, ..2)[abs(..3 - 3)]
   )
 tbl_exp2_features_learned$v_prev <- pmap_dbl(
   tbl_exp2_features_learned[, c("v_1", "v_2", "previous_choice")], 
-  ~ c(..1, ..2)[..3]
+  ~ c(..1, ..2)[..3] - c(..1, ..2)[abs(..3 - 3)]
 )
 tbl_exp2_features_learned$p_prev <- pmap_dbl(
   tbl_exp2_features_learned[, c("p_1", "p_2", "previous_choice")], 
