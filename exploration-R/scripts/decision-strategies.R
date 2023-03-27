@@ -4,17 +4,19 @@
 #   - use run length and nr previous switches as additional predictors
 # - switches (i.e., switching behavior)
 #   - same two models as above, but condition means, variances, and pmus on previous choice
-
-library(tidyverse)
-library(rpart)
-library(caret)
-library(dirichletprocess)
-library(rpart.plot)
 library(vip)
 library(pdp)
 library(rgl)
 library(arm)
 library(ISLR)
+library(tidyverse)
+library(rpart)
+library(caret)
+library(dirichletprocess)
+library(rpart.plot)
+library(furrr)
+library(future)
+
 
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
@@ -49,7 +51,7 @@ tbl_e2_switches <- tbl_e2 %>%
 tbl_cor <- cor(
   tbl_e2_switches[
     complete.cases(tbl_e2_switches),
-    c("Nr. Switches", "run_nr", "L(Run)", "PMU", "Value Diff.", "V Diff.", "repeat_choice")
+    c("nr_previous_switches", "run_nr", "run_length", "p_prev", "m_prev", "v_prev", "repeat_choice")
   ]
 ) %>% as.data.frame() %>% as_tibble()
 tbl_cor$x <- colnames(tbl_cor)
@@ -76,7 +78,7 @@ pl_var_cor <- tbl_cor %>%
   scale_y_discrete(limits = rev, expand = c(0, 0)) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_fill_gradient2(name = "Correlation", high = "#440154", low = "#21918c") +
-  scale_color_gradient2(high = "white", low = "black", guide = "none", midpoint = .9)
+  scale_color_gradient2(high = "white", low = "black", guide = "none", midpoint = .3)
 # some are: run_nr and nr_prev_switches -> exclude one of them
 # mean prev and pmu prev, but they are not entered together into model anyway
 # var prev and pmu prev, but same as above
@@ -134,21 +136,39 @@ tbl_e2_switches_z <- tbl_e2_switches %>%
     v_prev = scale(v_prev)[, 1]
   ) %>% ungroup()
 
-l_ms_strategy_dev_test <- map2(subjs, seeds, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
-l_ms_baseline_dev_test <- map2(subjs, seeds, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test))
-l_ms_baseline_all <- map2(subjs, seeds, baseline_one_subject, tbl_data = tbl_e2_switches)
-l_ms_strategy_all <- map2(subjs, seeds, strategies_one_subject, tbl_data = tbl_e2_switches)
+
+plan(multisession, workers = future::availableCores() - 4)
+
+l_ms_strategy_dev_test <- future_map2(
+  subjs, seeds, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test),
+  .progress = TRUE, .options = furrr_options(seed = TRUE)
+  )
+l_ms_baseline_dev_test <- future_map2(
+  subjs, seeds, baseline_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test),
+  .progress = TRUE, .options = furrr_options(seed = TRUE)
+  )
+l_ms_baseline_all <- future_map2(
+  subjs, seeds, baseline_one_subject, tbl_data = tbl_e2_switches,
+  .progress = TRUE, .options = furrr_options(seed = TRUE)
+  )
+l_ms_strategy_all <- future_map2(
+  subjs, seeds, strategies_one_subject, tbl_data = tbl_e2_switches,
+  .progress = TRUE, .options = furrr_options(seed = TRUE)
+  )
 
 # make sure logistic model converges
 converge <- -1
 while (converge == -1){
   tryCatch(
     warning = function(cnd) {
-      cat("did not converge")
+      cat("did not converge\n")
       converge <- -1
     }, {
       seeds <- round(rnorm(length(subjs), 1000000, 10000), 0)
-      l_ms_logistic_all <- map2(subjs, seeds, logistic_one_subject, tbl_data = tbl_e2_switches_z)
+      l_ms_logistic_all <- future_map2(
+        subjs, seeds, logistic_one_subject, tbl_data = tbl_e2_switches_z,
+        .progress = TRUE, .options = furrr_options(seed = TRUE)
+        )
       converge <- "get out"
     }
   )
@@ -335,18 +355,6 @@ l_ms_strategy_all <- map(
     return(x)
   } )
 
-pdf(file="figures/exemplary-heuristics.pdf", 4, 4)
-par(mfrow=c(2, 2))
-my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .61")
-my_treeplot(l_ms_strategy_all[[which(subjs == 15)]]$finalModel, "Prop. Improvement = .58")
-my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .48")
-my_treeplot(l_ms_strategy_all[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
-dev.off()
-
-save_my_pdf(pl_var_cor, "figures/heuristics-var-corr.pdf", 5.5, 5)
-pl_log_and_dev <- arrangeGrob(pl_logistic_violin, pl_deviance_comp, nrow = 1)
-save_my_pdf(pl_log_and_dev, "figures/heuristics-logistic-model-comparison.pdf", 8, 4)
-
 deviance_on_all_participants <- function(i, j, l_ms_strategy_all, tbl_e2_switches, subjs) {
   subj_idx <- which(subjs == i)
   -2 * sum(pmap_dbl(cbind(
@@ -377,7 +385,7 @@ md_isnjs <- median(isnjs_excl_self$prop_self)
 idx_mn <- min(which((isnjs_excl_self$prop_self >= mn_isnjs) == 1))
 cumprop_mn <- isnjs_excl_self$cumprop[idx_mn]
 
-deviance_random <- -2*(log(.5) * nrow(data_obs))
+deviance_random <- -2*(log(.5) * nrow(tbl_e2_switches %>% filter(subject == 1)))
 deviance_self$random <- deviance_random
 deviance_self$prop_random <- deviance_self$random / deviance_self$deviance
 rd_model <- mean(deviance_self$prop_random)
@@ -404,9 +412,38 @@ pl_deviance_variability <- ggplot(isnjs_excl_self, aes(prop_self, cumprop)) +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   labs(x = "Prop. Deviance", y = "Empirical CDF")
+
+
+
+# Plotting ----------------------------------------------------------------
+
+
+pdf(file="figures/exemplary-heuristics.pdf", 4, 4)
+par(mfrow=c(2, 2))
+my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .61")
+my_treeplot(l_ms_strategy_all[[which(subjs == 15)]]$finalModel, "Prop. Improvement = .58")
+my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .48")
+my_treeplot(l_ms_strategy_all[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
+dev.off()
+
+save_my_pdf(pl_var_cor, "figures/heuristics-var-corr.pdf", 5.5, 5)
+pl_log_and_dev <- arrangeGrob(pl_logistic_violin, pl_deviance_comp, nrow = 1)
+save_my_pdf(pl_log_and_dev, "figures/heuristics-logistic-model-comparison.pdf", 8, 4)
+
 save_my_pdf(pl_deviance_variability, "figures/deviance-variability.pdf", 3.75, 3.5)
 
+vp.BottomRight <- viewport(height=unit(.5, "npc"), width=unit(0.5, "npc"), 
+                           just=c("left","top"), 
+                           y=0.5, x=0.5)
 
+pdf(file="figures/exemplary-heuristics-and-heuristics-variability.pdf", 7.5, 5.5)
+par(mfrow=c(2,2))
+my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .61")
+my_treeplot(l_ms_strategy_all[[which(subjs == 15)]]$finalModel, "Prop. Improvement = .58")
+my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .48")
+# plot the ggplot using the print command
+print(pl_deviance_variability, vp=vp.BottomRight)
+dev.off()
 
 ggplot(isnjs, aes(prop_self)) + 
   geom_histogram(binwidth = .25, fill = "#21918c", color = "white") + 
