@@ -291,7 +291,7 @@ l_rb <- map(l_rb, function(x) {
 })
 
 l_results_rb <- map(l_rb, kalman_learning, no = no_rb, sigma_xi_sq = sigma_xi_sq_rb, sigma_epsilon_sq = sigma_epsilon_sq_rb)
-l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2, m0 = 0, v0 = 1000)
+l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2, m0 = 0, v0 = 100)
 
 
 
