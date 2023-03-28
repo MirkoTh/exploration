@@ -116,9 +116,11 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
 nr_trials <- c(200, 400)
+cond_on_choices <- c(TRUE, FALSE)
+
 
 tbl_params_thompson <- crossing(
-  simulate_data, nr_participants, nr_trials
+  simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
 
