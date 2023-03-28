@@ -527,7 +527,10 @@ choice_probs_e2 <- function(l_results_by_id) {
 
 
 
-simulate_softmax <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, gamma, simulate_data, seed, tbl_rewards) {
+simulate_softmax <- function(
+    sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, 
+    gamma, simulate_data, seed, tbl_rewards
+) {
   #' 
   #' @description simulate choices from a Kalman filter with soft max choice model
   #' @param sigma_prior prior variance
@@ -814,7 +817,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     s_seeds <- length(unique(seed))
   }
   tbl_params_softmax <- tibble(
-    sigma_prior = rep(10, nr_participants),
+    sigma_prior = rep(1000, nr_participants),
     mu_prior = rep(0, nr_participants),
     nr_trials = nr_trials,
     lambda = lambda,
@@ -872,7 +875,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
     simulate data = ", simulate_data, ", nr participants = ", nr_participants,
     " nr trials = ", nr_trials, "\n"
-    )
+  )
   cat(progress_msg)
   
   return(tbl_results_softmax)
