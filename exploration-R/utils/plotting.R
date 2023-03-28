@@ -489,23 +489,44 @@ plot_my_heatmap_thompson <- function(tbl_x) {
 }
 
 
-plot_cor_recovery <- function(tbl_cor, pd) {
-  ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+plot_cor_recovery <- function(tbl_cor, pd, is_thompson = FALSE) {
+  if (!is_thompson) {
+    pl <- ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
     geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+    geom_label(
+      aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+      position = pd, label.padding = unit(.1, "lines")
+    ) + facet_grid(name ~ simulate_data)  + 
+      geom_hline(
+      yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+      ) +
+    labs(
+      x = "Gamma (Mean)",
+      y = "Correlation"
+    ) + scale_fill_viridis_d(name = "Nr. Trials")
+
+  } else {
+    pl <- ggplot(tbl_cor, aes(as.factor(nr_trials), value, group = as.factor(simulate_data))) +
+    geom_col(aes(fill = as.factor(simulate_data)), position = pd) +
     geom_label(
       aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
       position = pd, label.padding = unit(.1, "lines")
     ) + geom_hline(
       yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
-    ) + facet_grid(name ~ simulate_data) +
-    theme_bw() +
-    scale_fill_viridis_d(name = "Nr. Trials") +
-    scale_x_discrete(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0)) +
-    coord_cartesian(ylim = c(-.1, 1.1)) +
+    ) + facet_wrap(~ name) +
+    scale_fill_viridis_d(name = "") +
     labs(
-      x = "Gamma (Mean)",
+      x = "Nr. Trials",
       y = "Correlation"
     )
+  }
+  
+  pl +
+    theme_bw() +
+    theme(strip.background = element_rect(fill = "white")) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    coord_cartesian(ylim = c(-.1, 1.1))
+  
   
 }
