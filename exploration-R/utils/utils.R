@@ -688,7 +688,7 @@ simulate_thompson <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi
   colnames(tbl_v) <- str_c("v_", 1:no)
   tbl_return <- tibble(cbind(tbl_m, tbl_v, choices, rewards))
   
-  return(tbl_return)
+  return(list(tbl_return = tbl_return, tbl_rewards = tbl_rewards))
 }
 
 
@@ -771,7 +771,7 @@ fit_kalman_softmax_no_variance_choose <- function(x, tbl_results, tbl_rewards, n
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
   l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, gamma, choicemodel = "softmax")
-  p_choices <-l_learned$c_probs
+  p_choices <- as.data.frame(l_learned$c_probs)
   
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
@@ -809,30 +809,7 @@ fit_kalman_softmax_xi_variance_choose <- function(x, tbl_results, tbl_rewards, n
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
   l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, gamma, choicemodel = "softmax")
-  p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
-    gamma
-  )
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
-  llik <- log(lik)
-  sllik <- sum(llik)
-  return(-sllik)
-}
-
-
-fit_kalman_softmax_xi_variance_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
-  #' @description kalman softmax fitting wrapper, only optimize one of the
-  #' two available variances, fix the other to the true value
-  #' 
-  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
-  sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
-  l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, gamma, choicemodel = "softmax")
-  p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
-    gamma
-  )
+  p_choices <- as.data.frame(l_learned$c_probs)
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
@@ -867,7 +844,7 @@ fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) 
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
   l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, NULL, choicemodel = "thompson")
-  p_choices <- l_learned$c_probs
+  p_choices <- as.data.frame(l_learned$c_probs)
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
@@ -876,11 +853,12 @@ fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) 
 }
 
 
-fit_thompson_wrapper <- function(tbl_results) {
+fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30))
   if (condition_on_observed_choices) {
     result_optim <- optim(params_init, fit_kalman_thompson, tbl_results = tbl_results, nr_options = 4)
+    r <- c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30))
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_thompson_choose,
@@ -889,8 +867,9 @@ fit_thompson_wrapper <- function(tbl_results) {
       control = DEoptim.control(trace = 10),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
+    r <- upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30)
   }
-  c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30))
+  return(r)
 }
 
 
@@ -905,6 +884,10 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
     result_optim <- optim(
       params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4
     )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
+      upper_and_lower_bounds_revert(result_optim$par[3], 0, 3)
+      )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_choose, 
@@ -913,12 +896,13 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
       control = DEoptim.control(trace = 10),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], 0, 3)
+    )
   }
   
-  c(
-    upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
-    upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], 0, 3)
-  )
+  return(r)
 }
 
 
@@ -933,6 +917,10 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
       params_init, fit_kalman_softmax_xi_variance, 
       tbl_results = tbl_results, nr_options = 4
     )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$par[1], 0, 30),
+      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
+    )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_xi_variance_choose, 
@@ -940,11 +928,12 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
       upper = c(19.51929, 17.21671),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
-  }
-  c(
-      upper_and_lower_bounds_revert(result_optim$par[1], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 30),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
     )
+  }
+  
 }
 
 
@@ -958,6 +947,7 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
     fit_kalman_softmax_no_variance, c(-10.308, 12.611),
     tbl_results = tbl_results, nr_options = 4
   )
+  r <- c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_no_variance_choose,
@@ -966,7 +956,7 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
   }
-  c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
+  r <- c(upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3))
 }
 
 
@@ -1046,9 +1036,18 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
+    
+  # replace empty results with NAs
+  l_results <- map(l_softmax, "result")
+  idx <- 1
+  for (p in l_results){
+    if (is.null(p)){
+      l_results[[idx]] <- c(NA, NA)
+    }
+    idx <- idx + 1
+  }
   
-  
-  tbl_results_softmax <- as.data.frame(reduce(map(l_softmax, "result"), rbind)) %>% as_tibble()
+  tbl_results_softmax <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   
   if (nr_vars == 0) {
     colnames(tbl_results_softmax) <- c("gamma_ml")
@@ -1056,7 +1055,8 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml")
   }  else if (nr_vars == 2) {
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
-  } 
+  }
+
   
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
@@ -1073,7 +1073,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
 
 
 
-simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, lambda) {
+simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, cond_on_choices, lambda) {
   # create a tbl with simulation & model parameters
   sigma_xi_sq <- rnorm(nr_participants, 16, 3)
   sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
@@ -1110,14 +1110,26 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   )
   
   plan(multisession, workers = availableCores() - 2)
-  l_thompson <- future_map(
-    l_choices_simulated, 
+  l_thompson <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
     safely(fit_thompson_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
   
-  tbl_results_thompson <- as.data.frame(reduce(map(l_thompson, "result"), rbind)) %>% as_tibble()
+  # replace empty results with NAs
+  l_results <- map(l_thompson, "result")
+  idx <- 1
+  for (p in l_results){
+    if (is.null(p)){
+      l_results[[idx]] <- c(NA, NA)
+    }
+    idx <- idx + 1
+  }
+
+  tbl_results_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")
   tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
     mutate(participant_id = 1:nrow(tbl_results_thompson))
