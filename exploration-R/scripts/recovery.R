@@ -43,12 +43,14 @@ tbl_gammas <- tibble(
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
 nr_trials <- c(200, 400)
+cond_on_choices <- c(TRUE, FALSE)
+
 
 tbl_params_softmax <- crossing(
-  tbl_gammas, simulate_data, nr_participants, nr_trials
+  tbl_gammas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
 if (fit_or_load == "fit")  {
   l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda, nr_vars = 2)
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
@@ -120,7 +122,6 @@ tbl_params_thompson <- crossing(
 )
 
 
-fit_or_load <- "load"
 if (fit_or_load == "fit")  {
   l_results_thompson <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda)
   saveRDS(l_results_thompson, "exploration-R/data/recovery-thompson-two-variances.RDS")
@@ -181,7 +182,6 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 # take same combination of hyperparameters as before
 
-fit_or_load <- "load"
 if (fit_or_load == "fit")  {
   l_results_softmax_1var <- pmap(
     tbl_params_softmax, 
@@ -245,7 +245,6 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 # Softmax: Fix Variances --------------------------------------------------
 
-fit_or_load <- "load"
 if (fit_or_load == "fit")  {
   l_results_softmax_0var <- pmap(
     tbl_params_softmax, 
