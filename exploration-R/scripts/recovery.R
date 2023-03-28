@@ -37,8 +37,8 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1),
-  gamma_sd = c(.03, .1, .2)
+  gamma_mn = c(.16, .5, 1, 2),
+  gamma_sd = c(.03, .1, .2, .3)
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
@@ -88,8 +88,12 @@ plot_cor_recovery(tbl_cor_softmax_long, pd)
 
 
 # cors between pars
+f_clean_cor <- function(x) {
+  x <- x[x$gamma_ml < 2.9 & x$sigma_xi_sq_ml < 29 & x$sigma_epsilon_sq_ml < 29, ]
+    cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+  }
 l_cors_params <- map(
-  l_results_c, ~ cor(.x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+  l_results_c, f_clean_cor
 )
 
 counter <- 1
@@ -101,7 +105,7 @@ for (tbl_r in l_cors_params) {
 }
 
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
-grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 # Main Experiment Kalman & Thompson ---------------------------------------
@@ -115,7 +119,14 @@ tbl_params_thompson <- crossing(
   simulate_data, nr_participants, nr_trials
 )
 
-l_results_thompson <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda)
+
+fit_or_load <- "load"
+if (fit_or_load == "fit")  {
+  l_results_thompson <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda)
+  saveRDS(l_results_thompson, "exploration-R/data/recovery-thompson-two-variances.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_thompson <- readRDS("exploration-R/data/recovery-thompson-two-variances.RDS")
+}
 
 counter <- 1
 l_results_c <- list()
@@ -142,7 +153,7 @@ tbl_cor_thompson_long <- tbl_cor_thompson %>%
   pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
 
 pd <- position_dodge(width = 150)
-plot_cor_recovery(tbl_cor_thompson_long)
+plot_cor_recovery(tbl_cor_thompson_long, pd, is_thompson = TRUE)
 #   facet_wrap(~ name) +
 # possibly adopt plot_cor_recovery function, if error here
 
@@ -210,7 +221,7 @@ tbl_cor_softmax_1var_long <- tbl_cor_softmax_1var %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_1var_long)
+plot_cor_recovery(tbl_cor_softmax_1var_long, pd, is_thompson = FALSE)
 
 
 # cors between pars
@@ -228,7 +239,7 @@ for (tbl_r in l_cors_params) {
 
 
 l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax, nr_var = 1)
-grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 3))
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 
