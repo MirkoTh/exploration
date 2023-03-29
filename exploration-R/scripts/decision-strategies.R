@@ -16,7 +16,8 @@ library(dirichletprocess)
 library(rpart.plot)
 library(furrr)
 library(future)
-
+library(gridExtra)
+library(grid)
 
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
@@ -57,7 +58,7 @@ tbl_cor <- cor(
 tbl_cor$x <- colnames(tbl_cor)
 tbl_cor$x <- fct_inorder(tbl_cor$x)
 levels(tbl_cor$x) <- c(
-  "Nr. Prev. Switches", "Run Nr.", "Run Length", "PMU Prev.", "Mean Diff. Prev.", "Var. Diff. Prev", "Repeat Choice"
+  "Nr Switches", "Run Nr", "Run Length", "PMU", "Mean Diff", "Var Diff", "Rep Choice"
 )
 colnames(tbl_cor) <- c(levels(tbl_cor$x), "x")
 tbl_cor <- tbl_cor %>% pivot_longer(cols = -x) 
@@ -77,7 +78,7 @@ pl_var_cor <- tbl_cor %>%
   ) +
   scale_y_discrete(limits = rev, expand = c(0, 0)) +
   scale_x_discrete(expand = c(0, 0)) +
-  scale_fill_gradient2(name = "Correlation", high = "#440154", low = "#21918c") +
+  scale_fill_gradient2(name = "Correlation", high = "#440154", low = "#21918c", guide = "none") +
   scale_color_gradient2(high = "white", low = "black", guide = "none", midpoint = .3)
 # some are: run_nr and nr_prev_switches -> exclude one of them
 # mean prev and pmu prev, but they are not entered together into model anyway
@@ -88,7 +89,7 @@ pl_var_cor <- tbl_cor %>%
 baseline_one_subject <- function(subject_id, seed, tbl_data) {
   set.seed(seed)
   m <- train(
-    as.factor(repeat_choice) ~ p_prev, # + "Value Diff." + "V Diff.",
+    as.factor(repeat_choice) ~ m_prev, # + "Value Diff." + "V Diff.",
     data = tbl_data %>% filter(subject == subject_id),
     method = "rpart",
     trControl = trainControl(method = "cv", number = 10),
@@ -112,7 +113,7 @@ logistic_one_subject <- function(subject_id, seed, tbl_data) {
 strategies_one_subject <- function(subject_id, seed, tbl_data) {
   set.seed(seed)
   m <- train(
-    as.factor(repeat_choice) ~ nr_previous_switches + run_length + p_prev, #+ m_prev + v_prev,
+    as.factor(repeat_choice) ~ nr_previous_switches + run_length + m_prev, #+ m_prev + v_prev,
     data = tbl_data %>% filter(subject == subject_id),
     method = "rpart",
     trControl = trainControl(method = "cv", number = 10),
@@ -137,7 +138,7 @@ tbl_e2_switches_z <- tbl_e2_switches %>%
   ) %>% ungroup()
 
 
-plan(multisession, workers = future::availableCores() - 4)
+plan(multisession, workers = 1)#future::availableCores() - 4)
 
 l_ms_strategy_dev_test <- future_map2(
   subjs, seeds, strategies_one_subject, tbl_data = tbl_e2_switches %>% filter(!is_test),
@@ -190,14 +191,14 @@ tbl_logistic <- map(
   as.data.frame() %>%
   as_tibble()
 
-colnames(tbl_logistic) <- c("Intercept", "PMU", "Value Diff.", "Var. Diff.")
+colnames(tbl_logistic) <- c("Intercept", "PMU", "Value Diff", "Var Diff")
 tbl_logistic_long <- tbl_logistic %>% 
   mutate(subject = subjs) %>% 
-  relocate(PMU, .after = `Var. Diff.`) %>%
+  relocate(PMU, .after = `Var Diff`) %>%
   dplyr::select(-Intercept) %>%
   pivot_longer(-subject) %>%
   mutate(name = fct_inorder(factor(name)))
-cor(tbl_logistic[, c("PMU", "Value Diff.", "Var. Diff.")])
+cor(tbl_logistic[, c("PMU", "Value Diff", "Var Diff")])
 
 ggplot(tbl_logistic_long, aes(value, group = name)) +
   geom_histogram(aes(fill = name), color = "white") +
@@ -279,7 +280,7 @@ pl_deviance_comp <- ggplot(tbl_comparison, aes(difference)) +
   geom_histogram(fill = "#21918c", color = "white") +
   geom_label(
     data = tbl_agg, aes(
-      x = -47.5, y = 3.5, label = str_c(
+      x = -25, y = 4.5, label = str_c(
         "#Wins Logistic: ", Logistic, "\n",
         "#Wins Heuristic: ", Heuristic)
     )) +
@@ -341,7 +342,8 @@ my_treeplot <- function(m, t) {
 l_ms_strategy_all[[which(subjs == 35)]]$finalModel$frame <- l_ms_strategy_all[[which(subjs == 35)]]$finalModel$frame %>%
   mutate(
     var = str_replace(var, "p_prev", "PMU"),
-    var = str_replace(var, "nr_previous_switches", "Nr. Prev. Switches")
+    var = str_replace(var, "nr_previous_switches", "Nr. Prev. Switches"),
+    var = str_replace(var, "m_prev", "Value Diff.")
   )
 
 l_ms_strategy_all <- map(
@@ -350,7 +352,8 @@ l_ms_strategy_all <- map(
       mutate(
         var = str_replace(var, "p_prev", "PMU"),
         var = str_replace(var, "nr_previous_switches", "Nr. Prev. Switches"),
-        var = str_replace(var, "run_length", "L(Run)")
+        var = str_replace(var, "run_length", "L(Run)"),
+        var = str_replace(var, "m_prev", "Value Diff.")
       )
     return(x)
   } )
@@ -402,7 +405,7 @@ pl_deviance_variability <- ggplot(isnjs_excl_self, aes(prop_self, cumprop)) +
   geom_segment(aes(y = cumprop_rd, yend = cumprop_rd, x = 0, xend = rd_model)) +
   geom_segment(aes(y = 0, yend = cumprop_rd, x = rd_model, xend = rd_model)) +
   geom_label(aes(
-    x = 4, y = .55, label = str_c(
+    x = 3.5, y = .375, label = str_c(
       "Median = ", round(md_isnjs, 2),
       "\nMean = ", round(mn_isnjs, 2),
       "\nRandom = ", round(rd_model, 2)
@@ -421,16 +424,20 @@ pl_deviance_variability <- ggplot(isnjs_excl_self, aes(prop_self, cumprop)) +
 pdf(file="figures/exemplary-heuristics.pdf", 4, 4)
 par(mfrow=c(2, 2))
 my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .61")
-my_treeplot(l_ms_strategy_all[[which(subjs == 15)]]$finalModel, "Prop. Improvement = .58")
-my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .48")
+my_treeplot(l_ms_strategy_all[[which(subjs == 20)]]$finalModel, "Prop. Improvement = .54")
+my_treeplot(l_ms_strategy_all[[which(subjs == 7)]]$finalModel, "Prop. Improvement = .40")
 my_treeplot(l_ms_strategy_all[[which(subjs == 36)]]$finalModel, "Prop. Improvement = 0")
 dev.off()
 
 save_my_pdf(pl_var_cor, "figures/heuristics-var-corr.pdf", 5.5, 5)
 pl_log_and_dev <- arrangeGrob(pl_logistic_violin, pl_deviance_comp, nrow = 1)
 save_my_pdf(pl_log_and_dev, "figures/heuristics-logistic-model-comparison.pdf", 8, 4)
-
 save_my_pdf(pl_deviance_variability, "figures/deviance-variability.pdf", 3.75, 3.5)
+
+
+pl_cor_and_logistic <- arrangeGrob(pl_var_cor, pl_logistic_violin, nrow = 1)
+save_my_pdf(pl_log_and_dev, "figures/heuristics-logistic-model-comparison.pdf", 8, 4)
+save_my_pdf(pl_cor_and_logistic, "figures/var-corr-and-logistic-violin.pdf", 9, 4.5)
 
 vp.BottomRight <- viewport(height=unit(.5, "npc"), width=unit(0.5, "npc"), 
                            just=c("left","top"), 
@@ -439,8 +446,8 @@ vp.BottomRight <- viewport(height=unit(.5, "npc"), width=unit(0.5, "npc"),
 pdf(file="figures/exemplary-heuristics-and-heuristics-variability.pdf", 7.5, 5.5)
 par(mfrow=c(2,2))
 my_treeplot(l_ms_strategy_all[[which(subjs == 35)]]$finalModel, "Prop. Improvement = .61")
-my_treeplot(l_ms_strategy_all[[which(subjs == 15)]]$finalModel, "Prop. Improvement = .58")
-my_treeplot(l_ms_strategy_all[[which(subjs == 10)]]$finalModel, "Prop. Improvement = .48")
+my_treeplot(l_ms_strategy_all[[which(subjs == 20)]]$finalModel, "Prop. Improvement = .54")
+my_treeplot(l_ms_strategy_all[[which(subjs == 7)]]$finalModel, "Prop. Improvement = .40")
 # plot the ggplot using the print command
 print(pl_deviance_variability, vp=vp.BottomRight)
 dev.off()
@@ -464,7 +471,7 @@ ggplot(isnjs, aes(j, i)) +
 
 # variable importance
 make_my_list <- function(x, y) {
-  tbl_design <- tibble(name = c("p_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
+  tbl_design <- tibble(name = c("m_prev", "run_length", "nr_previous_switches")) %>% mutate(id = y)
   # tbl_design <- tibble(name = c("Value Diff.", "V Diff.", "L(Run)", "Nr. Switches")) %>% mutate(id = y)
   tbl_results <- as_tibble(data.frame(id = y, t(x$finalModel$variable.importance))) %>% 
     pivot_longer(cols = -id) %>% 
@@ -477,13 +484,13 @@ tbl_results <- map2(l_ms_strategy_all, subjs, make_my_list) %>%
   reduce(rbind) %>% replace_na(list(value = 0)) %>%
   pivot_wider(id_cols = id, values_from = value, names_from = name)
 tbl_results <- tbl_results %>% 
-  rename(PMU = p_prev, `L(Run)` = run_length, `Nr. Switches` = nr_previous_switches)
+  rename(`Val Diff` = m_prev, `L(Run)` = run_length, `Nr. Switches` = nr_previous_switches)
 
 plot3d(
-  x=tbl_results$PMU, y=tbl_results$`L(Run)`, z=tbl_results$`Nr. Switches`, 
+  x=tbl_results$`Val Diff`, y=tbl_results$`L(Run)`, z=tbl_results$`Nr. Switches`, 
   type = 's', 
   radius = 1,
-  xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
+  xlab="Val Diff", ylab="Run Length", zlab="Nr. Prev. Switches",
   #xlim = c(0, 15), ylim = c(0, 5), zlim = c(0, 5)
 )
 
@@ -494,7 +501,7 @@ ggplot(tbl_results, aes(`L(Run)`, `Nr. Switches`)) +
 # kmeans clustering
 results_kmeans <- list()
 for (k in 1:10) {
-  results_kmeans[[k]] <- kmeans(tbl_results[, c("PMU", "L(Run)", "Nr. Switches")], k)
+  results_kmeans[[k]] <- kmeans(tbl_results[, c("Val Diff", "L(Run)", "Nr. Switches")], k)
 }
 
 tbl_cluster_wss <- tibble(
@@ -506,17 +513,18 @@ ggplot(tbl_cluster_wss, aes(n_clusters, wss)) +
   geom_point() +
   geom_line()
 
-tbl_results$cluster <- results_kmeans[[5]]$cluster
+tbl_results$cluster <- results_kmeans[[4]]$cluster
 
 cols_viridis <- tibble(
-  cluster = seq(1, 5, by = 1),
-  color = c("#fde725", "#5ec962", "#21918c", "#3b528b", "#440154"),
-  clustername = c("PMU & Run Length", "PMU & Switches", "All Three #1", "All Three #2", "Only PMU")
+  cluster = seq(1, 4, by = 1),
+  color = c("#fde725", "#5ec962", "#21918c", "#3b528b", "#440154")[1:4],
+  clustername = c("PMU & Run Length", "PMU & Switches", "All Three #1", "All Three #2", "Only PMU")[1:4]
 )
 tbl_results <- tbl_results %>% left_join(cols_viridis, by = "cluster")
+tbl_results %>% group_by(cluster) %>% summarize(mean(`Val Diff`), mean(`L(Run)`), mean(`Nr. Switches`), n())
 
 plot3d(
-  x=tbl_results$PMU, y=tbl_results$"L(Run)", z=tbl_results$"Nr. Switches", 
+  x=tbl_results$`Val Diff`, y=tbl_results$"L(Run)", z=tbl_results$"Nr. Switches", 
   type = 's', 
   radius = 1,
   xlab="PMU Prev.", ylab="Run Length", zlab="Nr. Prev. Switches",
