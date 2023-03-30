@@ -505,43 +505,6 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
 }
 
 
-thompson_choice_prob_map <- function(m, v, no) {
-  #' Thompson sampling implemented with pmvnorm
-  #' 
-  #' @description takes prior means and variances and computes p(highest) 
-  #' given all pairwise comparisons between response options
-  #' @param m matrix with prior predictive means for each bandit in a column
-  #' and every time point in a row
-  #' @param v matrix with prior predictive variance for each bandit in a columns
-  #' and every time point in a row
-  #' @param no number of response options
-  #' @return a tbl with by-trial posterior means and variances for all bandits
-  
-  # construct the transformation matrix for the difference scores for the first option  
-  A <- list()
-  if (no == 4) {
-    A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
-    # construct an array to contain the transformation matrices for all options
-    A[[1]] <- A1
-    # transformation of each other option is just a shuffle of the one for option 1
-    A[[2]] <- A1[,c(2,1,3,4)]
-    A[[3]] <- A1[,c(2,3,1,4)]
-    A[[4]] <- A1[,c(2,3,4,1)]
-  } else if (no == 2) {
-    A[[1]] <- matrix(c(1, -1), nrow = 1)
-    A[[2]] <- matrix(c(-1, 1), nrow = 1)
-  }
-  
-  # initialize a matrix for the choice probabilities
-  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
-  # loop through all trials
-  for(t in 1:nrow(m)) {
-    # iterate over all options
-    prob[t, ] <- map_dbl(A, normprobs, mt = m[t, ], vt = v[t, ])
-  }
-  return(prob)
-}
-
 
 normprobs <- function(A_current, mt, vt){
   #' @description computes probabilities of current bandit being larger than other bandits
@@ -613,7 +576,7 @@ simulate_kalman <- function(
   rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
   
   for(t in 1:nt) {
-    p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(v[t, ], 1, ncol(v)), sigma_xi_sq, params_decision[[1]])
+    p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(v[t, ], 1, ncol(v)), sigma_xi_sq, params_decision)
     # choose an option according to these probabilities
     choices[t] <- sample(1:4, size = 1, prob = p)
     # get the reward of the choice
@@ -639,115 +602,17 @@ simulate_kalman <- function(
 }
 
 
-
-simulate_softmax <- function(
-    sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, 
-    gamma, simulate_data, seed, tbl_rewards
-) {
+choice_prob <- function(m, v, sigma_xi_sq, pars) {
   #' 
-  #' @description simulate choices from a Kalman filter with soft max choice model
-  #' @param sigma_prior prior variance
-  #' @param mu_prior prior mean
-  #' @param sigma_xi_sq innovation variance
-  #' @param sigma_epsilon_sq error variance
-  #' @param gamma soft max inverse temperature
-  #' @param simulate_data should new data be generated for every participant
-  #' @param seed seed value of iteration
-  #' @param tbl_rewards if data are not simulated, take this tbl instead
-  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' @description choose choice model
+  #' @return matrix with choice probabilities
   #' 
-  set.seed(seed)
-  if (simulate_data) {
-    tbl_rewards <- generate_restless_bandits(
-      sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
-    ) %>% select(-trial_id)
-  }
-  
-  nt <- nrow(tbl_rewards) # number of time points
-  no <- ncol(tbl_rewards) # number of options
-  m <- matrix(mu_prior, ncol = no, nrow = nt + 1) # to hold the posterior means
-  v <- matrix(sigma_prior, ncol = no, nrow = nt + 1) # to hold the posterior variances
-  choices <- rep(0, nt + 1) # to hold the choices of the RL agent
-  rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
-  
-  for(t in 1:nt) {
-    p <- softmax_choice_prob(matrix(m[t, ], 1, ncol(m)), gamma)
-    # choose an option according to these probabilities
-    choices[t] <- sample(1:4, size = 1, prob = p)
-    # get the reward of the choice
-    rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
-    kt <- rep(0, no)
-    # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
-    # compute the posterior means
-    m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
-    # compute the posterior variances
-    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
-  }
-  
-  tbl_m <- as.data.frame(m)
-  # prevent v from becoming too small
-  v <- t(apply(v, 1, function(x) pmax(x, .0001)))
-  tbl_v <- as.data.frame(v)
-  colnames(tbl_m) <- str_c("m_", 1:no)
-  colnames(tbl_v) <- str_c("v_", 1:no)
-  tbl_return <- tibble(cbind(tbl_m, tbl_v, choices, rewards))
-  
-  return(list(tbl_return = tbl_return, tbl_rewards = tbl_rewards))
-}
-
-
-simulate_thompson <- function(sigma_prior, mu_prior, nr_trials, lambda, sigma_xi_sq, sigma_epsilon_sq, simulate_data, seed, tbl_rewards) {
-  #' 
-  #' @description simulate choices from a Kalman filter with soft max choice model
-  #' @param sigma_prior prior variance
-  #' @param mu_prior prior mean
-  #' @param sigma_xi_sq innovation variance
-  #' @param sigma_epsilon_sq error variance
-  #' @param simulate_data should new data be generated for every participant
-  #' @param seed seed value of iteration
-  #' @param tbl_rewards if data are not simulated, take this tbl instead
-  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
-  #' 
-  if (simulate_data) {
-    tbl_rewards <- generate_restless_bandits(
-      sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
-    ) %>% select(-trial_id)
-  }
-  
-  set.seed(seed)
-  nt <- nrow(tbl_rewards) # number of time points
-  no <- ncol(tbl_rewards) # number of options
-  m <- matrix(mu_prior, ncol = no, nrow = nt + 1) # to hold the posterior means
-  v <- matrix(sigma_prior, ncol = no, nrow = nt + 1) # to hold the posterior variances
-  choices <- rep(0, nt + 1) # to hold the choices of the RL agent
-  rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
-  
-  for(t in 1:nt) {
-    p <- thompson_choice_prob_map(matrix(m[t, ], 1, ncol(m)), matrix(v[t, ], 1, ncol(v)), no)
-    # choose an option according to these probabilities
-    choices[t] <- sample(1:4, size = 1, prob = p)
-    # get the reward of the choice
-    rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
-    kt <- rep(0, no)
-    # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
-    # compute the posterior means
-    m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
-    # compute the posterior variances
-    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
-    v[t + 1, ] <- t(apply(matrix(v[t + 1, ], nrow = 1), 1, function(x) pmax(x, .0001)))
-  }
-  
-  tbl_m <- as.data.frame(m)
-  # constrain v from becoming to small
-  v <- t(apply(v, 1, function(x) pmax(x, .0001)))
-  tbl_v <- as.data.frame(v)
-  colnames(tbl_m) <- str_c("m_", 1:no)
-  colnames(tbl_v) <- str_c("v_", 1:no)
-  tbl_return <- tibble(cbind(tbl_m, tbl_v, choices, rewards))
-  
-  return(list(tbl_return = tbl_return, tbl_rewards = tbl_rewards))
+  switch(pars$choicemodel,
+         softmax = softmax_choice_prob(m, pars$gamma),
+         thompson = thompson_choice_prob_map(m, v, pars$no),
+         ucb = ucb_choice_prob(m, v, sigma_xi_sq, pars$gamma, pars$beta),
+         stop("Invalid choicemodel")
+  )
 }
 
 
@@ -761,6 +626,59 @@ softmax_choice_prob <- function(ms, gamma) {
   prob <- prob / rowSums(prob)
   return(prob)
 }
+
+
+thompson_choice_prob_map <- function(m, v, no) {
+  #' Thompson sampling implemented with pmvnorm
+  #' 
+  #' @description takes prior means and variances and computes p(highest) 
+  #' given all pairwise comparisons between response options
+  #' @param m matrix with prior predictive means for each bandit in a column
+  #' and every time point in a row
+  #' @param v matrix with prior predictive variance for each bandit in a columns
+  #' and every time point in a row
+  #' @param no number of response options
+  #' @return a tbl with by-trial posterior means and variances for all bandits
+  
+  # construct the transformation matrix for the difference scores for the first option  
+  A <- list()
+  if (no == 4) {
+    A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
+    # construct an array to contain the transformation matrices for all options
+    A[[1]] <- A1
+    # transformation of each other option is just a shuffle of the one for option 1
+    A[[2]] <- A1[,c(2,1,3,4)]
+    A[[3]] <- A1[,c(2,3,1,4)]
+    A[[4]] <- A1[,c(2,3,4,1)]
+  } else if (no == 2) {
+    A[[1]] <- matrix(c(1, -1), nrow = 1)
+    A[[2]] <- matrix(c(-1, 1), nrow = 1)
+  }
+  
+  # initialize a matrix for the choice probabilities
+  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
+  # loop through all trials
+  for(t in 1:nrow(m)) {
+    # iterate over all options
+    prob[t, ] <- map_dbl(A, normprobs, mt = m[t, ], vt = v[t, ])
+  }
+  return(prob)
+}
+
+
+ucb_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta) {
+  #' 
+  #' @description soft max choice rule with exploration bonus
+  #' @param ms posterior means of the bandits
+  #' @param vs posterior variances of the bandits
+  #' @param gamma inverse temperature parameter
+  #' @param beta ucb parameter
+  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  prob <- exp(gamma * ms + beta * sqrt(vs + sigma_xi_sq))
+  prob <- prob / rowSums(prob)
+  return(prob)
+}
+
 
 
 fit_kalman_softmax <- function(x, tbl_results, nr_options) {
@@ -1054,11 +972,13 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   tbl_params_softmax <- tibble(
     sigma_prior = rep(1000, nr_participants),
     mu_prior = rep(0, nr_participants),
-    nr_trials = nr_trials,
-    lambda = lambda,
     sigma_xi_sq,
     sigma_epsilon_sq,
-    gamma,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map(
+      gamma, ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+    ),
     simulate_data = simulate_data,
     seed
   )
@@ -1069,10 +989,11 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   ) %>% 
     select(-trial_id)
   
+  
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_softmax,
-    simulate_softmax, 
+    simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
@@ -1145,10 +1066,13 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   tbl_params_thompson <- tibble(
     sigma_prior = rep(1000, nr_participants),
     mu_prior = rep(0, nr_participants),
-    nr_trials = nr_trials,
-    lambda = lambda,
     sigma_xi_sq,
     sigma_epsilon_sq,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map(
+      seed, ~ list(choicemodel = "thompson", no = 4)
+    ),
     simulate_data = simulate_data,
     seed
   )
@@ -1162,7 +1086,7 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_thompson,
-    simulate_thompson, 
+    simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
