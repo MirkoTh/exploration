@@ -44,7 +44,7 @@ tbl_gammas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
 
 
@@ -70,10 +70,11 @@ for (tbl_r in l_results_softmax) {
 }
 
 tbl_cor_softmax <- reduce(l_results_c, rbind) %>%
+  unnest_wider(params_decision) %>%
   group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
   filter(
     gamma_ml < 2.9 & sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29
-  )   %>%
+  ) %>%
   summarize(
     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
     r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml),
@@ -140,6 +141,7 @@ for (tbl_r in l_results_softmax_1var) {
 }
 
 tbl_cor_softmax_1var <- reduce(l_results_c_1var, rbind) %>%
+  unnest_wider(params_decision) %>%
   group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
   filter(
     gamma_ml < 2.9 & sigma_xi_sq_ml < 29
@@ -205,6 +207,7 @@ for (tbl_r in l_results_softmax_0var) {
 }
 
 tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
+  unnest_wider(params_decision) %>%
   group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
   filter(
     gamma_ml < 2.9
@@ -231,7 +234,7 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd)
 
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
 
 
@@ -257,6 +260,7 @@ for (tbl_r in l_results_thompson) {
 }
 
 tbl_cor_thompson <- reduce(l_results_c, rbind) %>%
+  unnest_wider(params_decision) %>%
   filter(sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29) %>%
   group_by(simulate_data, nr_participants, nr_trials) %>%
   summarize(
@@ -309,16 +313,16 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 
 tbl_gammas <- tibble(
-  gamma_mn = .16,#c(.16, .5, 1, 2),
-  gamma_sd = .03#c(.03, .1, .2, .3)
+  gamma_mn = c(.16, .5, 1, 2),
+  gamma_sd = c(.03, .1, .2, .3)
 )
 tbl_betas <- tibble(
   beta_mn = .17,
   beta_sd = .05
 )
-simulate_data <- TRUE#c(TRUE, FALSE)
+simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- 200#c(200, 400)
+nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
 
 
@@ -329,7 +333,7 @@ tbl_params_ucb <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_ucb_0var <- pmap(tbl_params_ucb, simulate_and_fit_ucb, lambda = lambda, nr_vars = 0)
-  saveRDS(l_results_ucb, "exploration-R/data/recovery-ucb-no-variance.RDS")
+  saveRDS(l_results_ucb_0var, "exploration-R/data/recovery-ucb-no-variance.RDS")
 } else if (fit_or_load == "load")  {
   l_results_ucb_0var <- readRDS("exploration-R/data/recovery-ucb-no-variance.RDS")
 }
@@ -367,6 +371,6 @@ tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>%
   pivot_longer(cols = c(Gamma, Beta))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_ucb_0var_long, pd)
+plot_cor_recovery(tbl_cor_ucb_0var_long %>% mutate(gamma_mn = .16), pd)
 
 

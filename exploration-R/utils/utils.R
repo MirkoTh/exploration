@@ -865,7 +865,10 @@ fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed
   params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30))
   if (condition_on_observed_choices) {
     result_optim <- optim(params_init, fit_kalman_thompson, tbl_results = tbl_results, nr_options = 4)
-    r <- c(upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30))
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
+      result_optim$value
+      )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_thompson_choose,
@@ -874,7 +877,10 @@ fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed
       control = DEoptim.control(trace = 10),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
-    r <- upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30)
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
+      result_optim$optim$bestval
+    )
   }
   return(r)
 }
@@ -893,7 +899,8 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$par[3], 0, 3)
+      upper_and_lower_bounds_revert(result_optim$par[3], 0, 3),
+      result_optim$value
     )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
@@ -905,7 +912,8 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], 0, 3)
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], 0, 3),
+      result_optim$optim$bestval
     )
   }
   
@@ -926,7 +934,8 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
+      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
+      result_optim$value
     )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
@@ -937,7 +946,8 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3),
+      result_optim$optim$bestval
     )
   }
   
@@ -955,7 +965,10 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
       fit_kalman_softmax_no_variance, c(-10.308, 12.611),
       tbl_results = tbl_results, nr_options = 4
     )
-    r <- c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$minimum, 0, 3),
+      result_optim$objective
+      )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_no_variance_choose,
@@ -963,8 +976,13 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
       upper = 12.611,
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
+    
+    r <- c(
+    upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3),
+    result_optim$optim$bestval
+    )
   }
-  r <- c(upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3))
+  
   
   return(r)
 }
@@ -983,7 +1001,8 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1], 0, 3),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
+      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
+      result_optim$value
     )
   } else if (!condition_on_observed_choices) {
     stop("code not yet developed")
@@ -1083,7 +1102,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   idx <- 1
   for (p in l_results){
     if (is.null(p)){
-      l_results[[idx]] <- c(NA, NA)
+      l_results[[idx]] <- rep(NA, (nr_vars + 2))
     }
     idx <- idx + 1
   }
@@ -1091,11 +1110,11 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   tbl_results_softmax <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   
   if (nr_vars == 0) {
-    colnames(tbl_results_softmax) <- c("gamma_ml")
+    colnames(tbl_results_softmax) <- c("gamma_ml", "neg_ll")
   } else if (nr_vars == 1) {
-    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml")
+    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml", "neg_ll")
   }  else if (nr_vars == 2) {
-    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
+    colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "neg_ll")
   }
   
   
@@ -1168,13 +1187,13 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   idx <- 1
   for (p in l_results){
     if (is.null(p)){
-      l_results[[idx]] <- c(NA, NA)
+      l_results[[idx]] <- c(NA, NA, NA)
     }
     idx <- idx + 1
   }
   
   tbl_results_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
-  colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")
+  colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "neg_ll")
   tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
     mutate(participant_id = 1:nrow(tbl_results_thompson))
   
@@ -1262,11 +1281,11 @@ simulate_and_fit_ucb <- function(
   tbl_results_ucb <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   
   if (nr_vars == 0) {
-    colnames(tbl_results_ucb) <- c("gamma_ml", "beta_ml")
+    colnames(tbl_results_ucb) <- c("gamma_ml", "beta_ml", "neg_ll")
   } else if (nr_vars == 1) {
-    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml")
+    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "neg_ll")
   }  else if (nr_vars == 2) {
-    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml")
+    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "neg_ll")
   }
   
   
