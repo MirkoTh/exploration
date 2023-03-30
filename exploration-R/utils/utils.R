@@ -894,7 +894,7 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
       upper_and_lower_bounds_revert(result_optim$par[3], 0, 3)
-      )
+    )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_choose, 
@@ -941,6 +941,7 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
     )
   }
   
+  return(r)
 }
 
 
@@ -950,11 +951,11 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
     upper_and_lower_bounds(.2, 0, 3)
   )
   if (condition_on_observed_choices) {
-  result_optim <- optimize(
-    fit_kalman_softmax_no_variance, c(-10.308, 12.611),
-    tbl_results = tbl_results, nr_options = 4
-  )
-  r <- c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
+    result_optim <- optimize(
+      fit_kalman_softmax_no_variance, c(-10.308, 12.611),
+      tbl_results = tbl_results, nr_options = 4
+    )
+    r <- c(upper_and_lower_bounds_revert(result_optim$minimum, 0, 3))
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_no_variance_choose,
@@ -964,14 +965,16 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
     )
   }
   r <- c(upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3))
+  
+  return(r)
 }
 
 
 fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(
-    upper_and_lower_bounds(.2, 0, 3),
-    upper_and_lower_bounds(.2, 0, 3)
+    upper_and_lower_bounds(1.5, 0, 3),
+    upper_and_lower_bounds(0.001, 0, 3)
   )
   if (condition_on_observed_choices) {
     result_optim <- optim(
@@ -981,14 +984,16 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1], 0, 3),
       upper_and_lower_bounds_revert(result_optim$par[2], 0, 3)
-      )
+    )
   } else if (!condition_on_observed_choices) {
     stop("code not yet developed")
-  }
-  r <- c(
+    r <- c(
     upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 3),
     upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
-    )
+  )
+  }
+  
+  return(r)
 }
 
 
@@ -1072,7 +1077,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
-    
+  
   # replace empty results with NAs
   l_results <- map(l_softmax, "result")
   idx <- 1
@@ -1092,7 +1097,7 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
   }  else if (nr_vars == 2) {
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")
   }
-
+  
   
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
@@ -1167,13 +1172,118 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
     }
     idx <- idx + 1
   }
-
+  
   tbl_results_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")
   tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
     mutate(participant_id = 1:nrow(tbl_results_thompson))
   
   return(tbl_results_thompson)
+}
+
+
+simulate_and_fit_ucb <- function(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  # create a tbl with simulation & model parameters
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  if (nr_vars == 1) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  } else if (nr_vars == 2) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  }  
+  
+  s_gamma <- -1
+  while(s_gamma < 0){
+    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
+    s_gamma <- min(gamma)
+  }
+  s_beta <- -1
+  while(s_beta < 0) {
+    beta <- rnorm(nr_participants, beta_mn, beta_sd)
+    s_beta <- min(beta)
+  }
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  
+  tbl_params_ucb <- tibble(
+    sigma_prior = rep(1000, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map2(
+      gamma, beta, 
+      ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
+    ),
+    simulate_data = simulate_data,
+    seed = seed
+  )
+  
+  # simulate
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_ucb,
+    simulate_kalman, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # fit
+  plan(multisession, workers = availableCores() - 2)
+  l_ucb <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_ucb_no_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # replace empty results with NAs
+  l_results <- map(l_ucb, "result")
+  idx <- 1
+  for (p in l_results){
+    if (is.null(p)){
+      l_results[[idx]] <- c(NA, NA)
+    }
+    idx <- idx + 1
+  }
+  
+  tbl_results_ucb <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
+  
+  if (nr_vars == 0) {
+    colnames(tbl_results_ucb) <- c("gamma_ml", "beta_ml")
+  } else if (nr_vars == 1) {
+    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml")
+  }  else if (nr_vars == 2) {
+    colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml")
+  }
+  
+  
+  tbl_results_ucb <- as_tibble(cbind(tbl_params_ucb, tbl_results_ucb)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_ucb))
+  
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
+    " beta_mn = ", beta_mn, ", beta sd = ", beta_sd,
+    ", simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_ucb)
+  
 }
 
 
