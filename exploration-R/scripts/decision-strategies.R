@@ -52,13 +52,13 @@ tbl_e2_switches <- tbl_e2 %>%
 tbl_cor <- cor(
   tbl_e2_switches[
     complete.cases(tbl_e2_switches),
-    c("nr_previous_switches", "run_nr", "run_length", "p_prev", "m_prev", "v_prev", "repeat_choice")
+    c("nr_previous_switches", "run_length", "p_prev", "m_prev", "v_prev", "repeat_choice") #"run_nr", 
   ]
 ) %>% as.data.frame() %>% as_tibble()
 tbl_cor$x <- colnames(tbl_cor)
 tbl_cor$x <- fct_inorder(tbl_cor$x)
 levels(tbl_cor$x) <- c(
-  "Nr Switches", "Run Nr", "Run Length", "PMU", "Mean Diff", "Var Diff", "Rep Choice"
+  "Nr Switches", "Run Length", "PMU", "Mean Diff", "Var Diff", "Rep Choice" # "Run Nr", 
 )
 colnames(tbl_cor) <- c(levels(tbl_cor$x), "x")
 tbl_cor <- tbl_cor %>% pivot_longer(cols = -x) 
