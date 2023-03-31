@@ -489,8 +489,8 @@ plot_my_heatmap_thompson <- function(tbl_x) {
 }
 
 
-plot_cor_recovery <- function(tbl_cor, pd, is_thompson = FALSE) {
-  if (!is_thompson) {
+plot_cor_recovery <- function(tbl_cor, pd, expl_strat = "softmax") {
+  if (expl_strat == "softmax") {
     pl <- ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
     geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
     geom_label(
@@ -505,7 +505,7 @@ plot_cor_recovery <- function(tbl_cor, pd, is_thompson = FALSE) {
       y = "Correlation"
     ) + scale_fill_viridis_d(name = "Nr. Trials")
 
-  } else {
+  } else if (expl_strat == "thompson"){
     pl <- ggplot(tbl_cor, aes(as.factor(nr_trials), value, group = as.factor(simulate_data))) +
     geom_col(aes(fill = as.factor(simulate_data)), position = pd) +
     geom_label(
@@ -519,6 +519,20 @@ plot_cor_recovery <- function(tbl_cor, pd, is_thompson = FALSE) {
       x = "Nr. Trials",
       y = "Correlation"
     )
+  } else if (expl_strat == "ucb"){
+    pl <- ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +
+      geom_col(aes(fill = as.factor(nr_trials)), position = pd) +
+      geom_label(
+        aes(y = value - .1, label = str_c("r = ", round(value, 2))), 
+        position = pd, label.padding = unit(.1, "lines")
+      ) + facet_grid(interaction(simulate_data, name) ~ beta_mn)  + 
+      geom_hline(
+        yintercept = 1, color = "grey", alpha = 1, size = 1, linetype = "dotdash"
+      ) +
+      labs(
+        x = "Gamma (Mean)",
+        y = "Correlation"
+      ) + scale_fill_viridis_d(name = "Nr. Trials")
   }
   
   pl +

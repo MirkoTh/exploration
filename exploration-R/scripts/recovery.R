@@ -89,7 +89,7 @@ tbl_cor_softmax_long <- tbl_cor_softmax %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`, `Sigma Epsilon`))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_long, pd)
+plot_cor_recovery(tbl_cor_softmax_long, pd, "softmax")
 
 
 # cors between pars
@@ -159,7 +159,7 @@ tbl_cor_softmax_1var_long <- tbl_cor_softmax_1var %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_1var_long, pd, is_thompson = FALSE)
+plot_cor_recovery(tbl_cor_softmax_1var_long, pd, , "softmax")
 
 
 # cors between pars
@@ -224,7 +224,7 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   pivot_longer(cols = c(Gamma))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_0var_long, pd)
+plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 
@@ -275,8 +275,8 @@ tbl_cor_thompson_long <- tbl_cor_thompson %>%
   ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
   pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
 
-pd <- position_dodge(width = 150)
-plot_cor_recovery(tbl_cor_thompson_long, pd, is_thompson = TRUE)
+pd <- position_dodge(width = 1)
+plot_cor_recovery(tbl_cor_thompson_long, pd, "thompson")
 #   facet_wrap(~ name) +
 # possibly adopt plot_cor_recovery function, if error here
 
@@ -318,7 +318,7 @@ tbl_gammas <- tibble(
 )
 tbl_betas <- tibble(
   beta_mn = c(.17, .5),
-  beta_sd = c(.05, 1)
+  beta_sd = c(.05, .1)
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
@@ -372,6 +372,6 @@ tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>%
   pivot_longer(cols = c(Gamma, Beta))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_ucb_0var_long, pd)
+plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
