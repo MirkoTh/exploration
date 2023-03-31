@@ -1247,6 +1247,12 @@ simulate_and_fit_ucb <- function(
     seed = seed
   )
   
+  # simulate fixed data set
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
   # simulate
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
@@ -1273,7 +1279,7 @@ simulate_and_fit_ucb <- function(
   idx <- 1
   for (p in l_results){
     if (is.null(p)){
-      l_results[[idx]] <- c(NA, NA)
+      l_results[[idx]] <- c(NA, NA, NA)
     }
     idx <- idx + 1
   }

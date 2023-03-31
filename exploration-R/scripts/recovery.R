@@ -317,8 +317,8 @@ tbl_gammas <- tibble(
   gamma_sd = c(.03, .1, .2, .3)
 )
 tbl_betas <- tibble(
-  beta_mn = .17,
-  beta_sd = .05
+  beta_mn = c(.17, .5),
+  beta_sd = c(.05, 1)
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
@@ -342,14 +342,15 @@ counter <- 1
 l_results_c_0var <- list()
 for (tbl_r in l_results_ucb_0var) {
   l_results_c_0var[[counter]] <- as_tibble(cbind(
-    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_ucb[counter, ]
+    tbl_r %>% 
+      unnest_wider(params_decision) %>%
+      select(-c(simulate_data, nr_trials)), tbl_params_ucb[counter, ]
   ))
   counter <- counter + 1
 }
 
-tbl_cor_c_0var <- reduce(l_results_ucb_0var, rbind) %>%
-  unnest_wider(params_decision) %>% 
-  group_by(simulate_data, nr_trials) %>%
+tbl_cor_c_0var <- reduce(l_results_c_0var, rbind) %>%
+  group_by(gamma_mn, beta_mn, simulate_data, nr_trials) %>%
   filter(
     gamma_ml < 2.9 |
       beta_ml < 2.9
@@ -362,7 +363,7 @@ tbl_cor_c_0var <- reduce(l_results_ucb_0var, rbind) %>%
 tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>% 
   mutate(
     simulate_data = factor(simulate_data),
-    #simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
   ) %>% 
   rename(
     "Gamma" = r_gamma,
@@ -371,6 +372,6 @@ tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>%
   pivot_longer(cols = c(Gamma, Beta))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_ucb_0var_long %>% mutate(gamma_mn = .16), pd)
+plot_cor_recovery(tbl_cor_ucb_0var_long, pd)
 
 
