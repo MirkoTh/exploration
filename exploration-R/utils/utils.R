@@ -835,6 +835,43 @@ fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) 
 }
 
 
+fit_kalman_thompson_xi_variance <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description kalman thompson fitting wrapper
+  #' 
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_epsilon_sq <- 16
+  tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
+  p_choices <- thompson_choice_prob_map(
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(), 
+    nr_options
+  ) %>% as.data.frame() %>% as_tibble()
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmax(lik, .0000001)
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-sllik)
+}
+
+
+fit_kalman_thompson_xi_variance_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
+  #' 
+  #' @description kalman thompson fitting wrapper
+  #' 
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_epsilon_sq <- 16
+  params_choice <- list(choicemodel = "thompson")
+  l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, params_choice)
+  p_choices <- as.data.frame(l_learned$c_probs)
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmax(lik, .0000001)
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-sllik)
+}
+
+
 fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
   #' 
   #' @description Kalman soft max with ucb fitting wrapper,
@@ -868,7 +905,7 @@ fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
       result_optim$value
-      )
+    )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_thompson_choose,
@@ -879,6 +916,35 @@ fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
+      result_optim$optim$bestval
+    )
+  }
+  return(r)
+}
+
+
+fit_thompson_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(upper_and_lower_bounds(15, 0, 30))
+  if (condition_on_observed_choices) {
+    result_optim <- optimize(
+      fit_kalman_thompson_xi_variance, c(-10.308, 12.611), 
+      tbl_results = tbl_results, nr_options = 4
+    )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$minimum, 0, 30),
+      result_optim$objective
+    )
+  } else if (!condition_on_observed_choices) {
+    result_optim <- DEoptim(
+      fit_kalman_thompson_xi_variance_choose,
+      lower = c(-19.51929),
+      upper = c(19.51929),
+      control = DEoptim.control(trace = 10),
+      tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
+    )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 30),
       result_optim$optim$bestval
     )
   }
@@ -968,7 +1034,7 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
     r <- c(
       upper_and_lower_bounds_revert(result_optim$minimum, 0, 3),
       result_optim$objective
-      )
+    )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_no_variance_choose,
@@ -978,8 +1044,8 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
     )
     
     r <- c(
-    upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3),
-    result_optim$optim$bestval
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3),
+      result_optim$optim$bestval
     )
   }
   
@@ -1007,9 +1073,9 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
   } else if (!condition_on_observed_choices) {
     stop("code not yet developed")
     r <- c(
-    upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 3),
-    upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
-  )
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 3),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
+    )
   }
   
   return(r)
@@ -1133,10 +1199,20 @@ simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_parti
 
 
 
-simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, cond_on_choices, lambda) {
+simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars) {
   # create a tbl with simulation & model parameters
-  sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  
+  
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  if (nr_vars == 1) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  } else if (nr_vars == 2) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  }  
+  
   
   s_seeds <- -1
   while(s_seeds < nr_participants) {
@@ -1172,11 +1248,18 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
     .options = furrr_options(seed = NULL)
   )
   
+  # fit data
+  if (nr_vars == 1) {
+    my_current_wrapper <- fit_thompson_one_variance_wrapper
+  } else if (nr_vars == 2) {
+    my_current_wrapper <- fit_thompson_wrapper
+  } 
+  
   plan(multisession, workers = availableCores() - 2)
   l_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_thompson_wrapper), 
+    safely(my_current_wrapper), 
     condition_on_observed_choices = cond_on_choices,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
