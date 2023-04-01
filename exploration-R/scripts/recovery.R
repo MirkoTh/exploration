@@ -311,9 +311,9 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 if (fit_or_load == "fit")  {
   l_results_thompson_1var <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda, nr_vars = 1)
-  saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-two-variances.RDS")
+  saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-one-variance.RDS")
 } else if (fit_or_load == "load")  {
-  l_results_thompson_1var <- readRDS("exploration-R/data/recovery-thompson-two-variances.RDS")
+  l_results_thompson_1var <- readRDS("exploration-R/data/recovery-thompson-one-variance.RDS")
 }
 
 counter <- 1
@@ -327,19 +327,18 @@ for (tbl_r in l_results_thompson_1var) {
 
 tbl_cor_thompson_1var <- reduce(l_results_c, rbind) %>%
   unnest_wider(params_decision) %>%
-  filter(sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29) %>%
+  filter(sigma_xi_sq_ml < 29) %>%
   group_by(simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
-    r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml)
   ) %>% ungroup()
 
 tbl_cor_thompson_long_1var <- tbl_cor_thompson_1var %>% 
   mutate(
     simulate_data = factor(simulate_data),
     simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
-  ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
-  pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
+  ) %>% rename("Sigma Xi" = r_sigma_xi) %>%
+  pivot_longer(cols = c(`Sigma Xi`))
 
 pd <- position_dodge(width = 1)
 plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
