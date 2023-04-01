@@ -699,7 +699,7 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
@@ -717,7 +717,7 @@ fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -737,7 +737,7 @@ fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options) {
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -756,7 +756,7 @@ fit_kalman_softmax_no_variance_choose <- function(x, tbl_results, tbl_rewards, n
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -776,7 +776,7 @@ fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options) {
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -794,7 +794,7 @@ fit_kalman_softmax_xi_variance_choose <- function(x, tbl_results, tbl_rewards, n
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -814,7 +814,7 @@ fit_kalman_thompson <- function(x, tbl_results, nr_options) {
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -831,7 +831,7 @@ fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) 
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -851,7 +851,7 @@ fit_kalman_thompson_xi_variance <- function(x, tbl_results, nr_options) {
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -868,7 +868,7 @@ fit_kalman_thompson_xi_variance_choose <- function(x, tbl_results, tbl_rewards, 
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -892,7 +892,7 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-sllik)
+  return(-2*sllik)
 }
 
 
@@ -1158,7 +1158,6 @@ simulate_and_fit_softmax <- function(
   }  else if (nr_vars == 2) {
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "neg_ll")
   }
-  
   
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
