@@ -1093,40 +1093,16 @@ upper_and_lower_bounds_revert <- function(par, lo, hi) {
 }
 
 
-simulate_and_fit_softmax <- function(gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars) {
-  # create a tbl with simulation & model parameters
+simulate_and_fit_softmax <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
-  sigma_xi_sq <- rep(16, nr_participants)
-  sigma_epsilon_sq <- rep(16, nr_participants)
-  if (nr_vars == 1) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  } else if (nr_vars == 2) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
-  }  
   
-  s_gamma <- -1
-  while(s_gamma < 0){
-    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
-    s_gamma <- min(gamma)
-  }
-  s_seeds <- -1
-  while(s_seeds < nr_participants) {
-    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
-    s_seeds <- length(unique(seed))
-  }
-  tbl_params_softmax <- tibble(
-    sigma_prior = rep(1000, nr_participants),
-    mu_prior = rep(0, nr_participants),
-    sigma_xi_sq,
-    sigma_epsilon_sq,
-    lambda = lambda,
-    nr_trials = nr_trials,
-    params_decision = map(
-      gamma, ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
-    ),
-    simulate_data = simulate_data,
-    seed
+  tbl_params_softmax <- create_participant_sample_softmax(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nv_vars
   )
   
   # simulate data
@@ -1276,7 +1252,13 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   }
   
   tbl_results_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
-  colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "neg_ll")
+  
+  if (nr_vars == 1) {
+    colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "neg_ll")
+  }  else if (nr_vars == 2) {
+    colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "neg_ll")
+  }
+  
   tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
     mutate(participant_id = 1:nrow(tbl_results_thompson))
   
@@ -1417,4 +1399,61 @@ generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda
   as_tibble(as.data.frame(mus + noise)) %>% 
     mutate(trial_id = 1:nr_trials) %>%
     rename("Bandit 1" = V1, "Bandit 2" = V2, "Bandit 3" = V3, "Bandit 4" = V4)
+}
+
+
+
+create_participant_sample_softmax <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nr_vars
+) {
+  #' 
+  #' @description create pool of participants deciding according to soft max rule
+  #' with individual parameters fixed or sampled from normal distribution
+  #' @param gamma_mn average inverse temperature
+  #' @param gamma_sd population standard deviation of inverse temperature
+  #' @param simulate_data should by-trial rewards be generated once or by participant?
+  #' @param nr_participants number of participants
+  #' @param nr_trials number of choices in the restless bandit task
+  #' @param lambda decay parameter of random walk
+  #' @param nr_vars how many variances of the kalman filter are varied and fit
+  #' @return a tbl with by-participant parameters
+  
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  if (nr_vars == 1) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  } else if (nr_vars == 2) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  }
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  
+  
+  s_gamma <- -1
+  while(s_gamma < 0){
+    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
+    s_gamma <- min(gamma)
+  }
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  tbl_params_softmax <- tibble(
+    sigma_prior = rep(1000, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map(
+      gamma, ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+    ),
+    simulate_data = simulate_data,
+    seed
+  )
+  
+  return(tbl_params_softmax)
 }
