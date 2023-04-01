@@ -1458,6 +1458,46 @@ create_participant_sample_softmax <- function(
 }
 
 
+create_participant_sample_thompson <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nr_vars
+) {
+  
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  sigma_xi_sq <- rep(16, nr_participants)
+  sigma_epsilon_sq <- rep(16, nr_participants)
+  if (nr_vars == 1) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+  } else if (nr_vars == 2) {
+    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
+    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
+  }  
+  
+  
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  tbl_params_thompson <- tibble(
+    sigma_prior = rep(1000, nr_participants),
+    mu_prior = rep(0, nr_participants),
+    sigma_xi_sq,
+    sigma_epsilon_sq,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map(
+      seed, ~ list(choicemodel = "thompson", no = 4)
+    ),
+    simulate_data = simulate_data,
+    seed
+  )
+  
+  return(tbl_params_thompson)
+  
+}
+
+
 recover_softmax <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
@@ -1544,3 +1584,93 @@ recover_softmax <- function(
   
   return(tbl_recovered)
 }
+
+
+recover_thompson <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  #' 
+  #' @description generate choices according to soft max
+  #' and fit them with soft max, thompson, and ucb
+  
+  tbl_params_thompson <- create_participant_sample_thompson(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, 1)
+  
+  # simulate one fixed data set in case needed
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  # simulate choices given soft max choice model
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_thompson,
+    simulate_kalman, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # fit three candidate models on data generated with soft max choice model
+  l_softmax <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_softmax_no_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  l_thompson <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_thompson_one_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  l_ucb <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_ucb_no_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # read out neg lls
+  neg2ll_softmax <- map_dbl(map(l_softmax, "result"), 2)
+  neg2ll_thompson <- map_dbl(map(l_thompson, "result"), 2)
+  neg2ll_ucb <- map_dbl(map(l_ucb, "result"), 3)
+  
+  tbl_lls <- tibble(
+    participant_id = 1:nr_participants,
+    bic_softmax = log(nr_participants) + neg2ll_softmax,
+    bic_thompson = log(nr_participants) + neg2ll_thompson,
+    bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
+    aic_softmax = 2 + neg2ll_softmax,
+    aic_thompson = 2 + neg2ll_thompson,
+    aic_ucb = 4 + neg2ll_ucb
+  )
+  
+  tbl_models <- tibble(model = c("bic_softmax", "bic_thompson", "bic_ucb"))
+  
+  tbl_recovered <- tbl_lls %>% 
+    pivot_longer(cols = starts_with("bic"), names_to = "model") %>%
+    group_by(participant_id) %>%
+    mutate(min_bic = min(value)) %>%
+    ungroup() %>%
+    filter(value == min_bic) %>%
+    count(model)
+  
+  tbl_recovered <- left_join(tbl_models, tbl_recovered, by = "model") %>%
+    replace_na(list(n = 0))
+  
+  return(tbl_recovered)
+}
+
+
