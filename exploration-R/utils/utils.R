@@ -1177,35 +1177,9 @@ simulate_and_fit_softmax <- function(
 simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars) {
   # create a tbl with simulation & model parameters
   
-  
-  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
-  sigma_xi_sq <- rep(16, nr_participants)
-  sigma_epsilon_sq <- rep(16, nr_participants)
-  if (nr_vars == 1) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  } else if (nr_vars == 2) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
-  }  
-  
-  
-  s_seeds <- -1
-  while(s_seeds < nr_participants) {
-    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
-    s_seeds <- length(unique(seed))
-  }
-  tbl_params_thompson <- tibble(
-    sigma_prior = rep(1000, nr_participants),
-    mu_prior = rep(0, nr_participants),
-    sigma_xi_sq,
-    sigma_epsilon_sq,
-    lambda = lambda,
-    nr_trials = nr_trials,
-    params_decision = map(
-      seed, ~ list(choicemodel = "thompson", no = 4)
-    ),
-    simulate_data = simulate_data,
-    seed
+  tbl_params_thompson <- create_participant_sample_thompson(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nv_vars
   )
   
   # simulate data
@@ -1269,46 +1243,10 @@ simulate_and_fit_ucb <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
 ) {
-  # create a tbl with simulation & model parameters
-  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
-  sigma_xi_sq <- rep(16, nr_participants)
-  sigma_epsilon_sq <- rep(16, nr_participants)
-  if (nr_vars == 1) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-  } else if (nr_vars == 2) {
-    sigma_xi_sq <- rnorm(nr_participants, 16, 3)
-    sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
-  }  
   
-  s_gamma <- -1
-  while(s_gamma < 0){
-    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
-    s_gamma <- min(gamma)
-  }
-  s_beta <- -1
-  while(s_beta < 0) {
-    beta <- rnorm(nr_participants, beta_mn, beta_sd)
-    s_beta <- min(beta)
-  }
-  s_seeds <- -1
-  while(s_seeds < nr_participants) {
-    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
-    s_seeds <- length(unique(seed))
-  }
-  
-  tbl_params_ucb <- tibble(
-    sigma_prior = rep(1000, nr_participants),
-    mu_prior = rep(0, nr_participants),
-    sigma_xi_sq,
-    sigma_epsilon_sq,
-    lambda = lambda,
-    nr_trials = nr_trials,
-    params_decision = map2(
-      gamma, beta, 
-      ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
-    ),
-    simulate_data = simulate_data,
-    seed = seed
+  tbl_params_ucb <- create_participant_sample_ucb(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nv_vars
   )
   
   # simulate fixed data set
