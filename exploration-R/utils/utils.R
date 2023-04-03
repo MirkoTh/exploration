@@ -1364,9 +1364,6 @@ create_participant_sample_softmax <- function(
     sigma_xi_sq <- rnorm(nr_participants, 16, 3)
     sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
   }
-  sigma_xi_sq <- rep(16, nr_participants)
-  sigma_epsilon_sq <- rep(16, nr_participants)
-  
   
   s_gamma <- -1
   while(s_gamma < 0){
