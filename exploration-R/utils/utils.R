@@ -1494,9 +1494,9 @@ recover_softmax <- function(
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
-  tbl_params_softmax <- create_participant_sample_softmax(
+  tbl_params_participants <- create_participant_sample_softmax(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, 0)
+    nr_trials, lambda, nr_vars)
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
@@ -1505,7 +1505,7 @@ recover_softmax <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_softmax, tbl_rewareds, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices
     )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -1522,7 +1522,7 @@ recover_thompson <- function(
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
-  tbl_params_thompson <- create_participant_sample_thompson(
+  tbl_params_participants <- create_participant_sample_thompson(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, lambda, 1)
   
@@ -1533,7 +1533,7 @@ recover_thompson <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_thompson, tbl_rewareds, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices
     )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -1550,7 +1550,7 @@ recover_ucb <- function(
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
-  tbl_params_ucb <- create_participant_sample_ucb(
+  tbl_params_participants <- create_participant_sample_ucb(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
     nr_trials, lambda, 1)
   
@@ -1561,7 +1561,7 @@ recover_ucb <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_ucb, tbl_rewareds, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices
     )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -1578,7 +1578,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   # simulate choices given soft max choice model
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
-    tbl_params_softmax,
+    tbl_params_simulate,
     simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
