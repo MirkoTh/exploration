@@ -15,15 +15,6 @@ library(furrr)
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
-# simulate rewards of four armed restless bandit according to random walk
-# 1.
-# simulate choices according to soft max model with 0 variances
-# fit these choices with
-# soft max 0 variances
-# thompson 1 variance?
-# ucb 0 variances
-
-
 mu1 <- c(-60, -20, 20, 60)
 nr_trials <- 200
 sigma_xi_sq <- 16
@@ -38,12 +29,12 @@ fit_or_load <- "fit"
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16),
-  gamma_sd = c(.03)
+  gamma_mn = c(.16, .5, 1, 2)[1:2],
+  gamma_sd = c(.03, .1, .2, .3)[1:2]
 )
-simulate_data <- c(TRUE)
-nr_participants <- c(50)
-nr_trials <- c(50)
+simulate_data <- c(TRUE, FALSE)#[1]
+nr_participants <- c(200)
+nr_trials <- c(300, 500)[1]
 cond_on_choices <- c(TRUE)
 
 tbl_params_softmax <- crossing(
