@@ -60,8 +60,7 @@ recover_thompson(
   gamma_mn, gamma_sd, simulate_data, nr_participants,
   nr_trials, cond_on_choices, lambda, nr_vars = 1
 )
-
-
+# simulate from ucb with inverse temperature and exploration bonus
 recover_ucb(
   gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
   nr_trials, cond_on_choices, lambda, nr_vars = 0

@@ -1100,17 +1100,16 @@ simulate_and_fit_softmax <- function(
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   
-  tbl_params_softmax <- create_participant_sample_softmax(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nv_vars
-  )
-  
   # simulate data
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   
+  tbl_params_softmax <- create_participant_sample_softmax(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, nr_vars
+  )
   
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
@@ -1128,7 +1127,8 @@ simulate_and_fit_softmax <- function(
     my_current_wrapper <- fit_softmax_one_variance_wrapper
   } else if (nr_vars == 2) {
     my_current_wrapper <- fit_softmax_wrapper
-  } 
+  }
+  
   plan(multisession, workers = availableCores() - 2)
   l_softmax <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
@@ -1504,6 +1504,77 @@ recover_softmax <- function(
   ) %>% 
     select(-trial_id)
   
+  l_models_fit <- simulate_and_fit_models(
+    tbl_params_softmax, tbl_rewareds, cond_on_choices
+    )
+  
+  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  
+  return(l_goodness)
+}
+
+
+recover_thompson <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  #' 
+  #' @description generate choices according to soft max
+  #' and fit them with soft max, thompson, and ucb
+  
+  tbl_params_thompson <- create_participant_sample_thompson(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, 1)
+  
+  # simulate one fixed data set in case needed
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  l_models_fit <- simulate_and_fit_models(
+    tbl_params_thompson, tbl_rewareds, cond_on_choices
+    )
+  
+  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  
+  return(l_goodness)
+}
+
+
+recover_ucb <- function(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  #' 
+  #' @description generate choices according to soft max
+  #' and fit them with soft max, thompson, and ucb
+  
+  tbl_params_ucb <- create_participant_sample_ucb(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
+    nr_trials, lambda, 1)
+  
+  # simulate one fixed data set in case needed
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  l_models_fit <- simulate_and_fit_models(
+    tbl_params_ucb, tbl_rewareds, cond_on_choices
+    )
+  
+  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  
+  return(l_goodness)
+}
+
+
+simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_choices) {
+  #' 
+  #' @description simulate choices with specifications from tbl_params_simulate
+  #' and fit all models afterwards
+  
   # simulate choices given soft max choice model
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
@@ -1542,98 +1613,23 @@ recover_softmax <- function(
     .options = furrr_options(seed = NULL)
   )
   
-  # read out neg lls
-  neg2ll_softmax <- map_dbl(map(l_softmax, "result"), 2)
-  neg2ll_thompson <- map_dbl(map(l_thompson, "result"), 2)
-  neg2ll_ucb <- map_dbl(map(l_ucb, "result"), 3)
-  
-  tbl_lls <- tibble(
-    participant_id = 1:nr_participants,
-    bic_softmax = log(nr_participants) + neg2ll_softmax,
-    bic_thompson = log(nr_participants) + neg2ll_thompson,
-    bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
-    aic_softmax = 2 + neg2ll_softmax,
-    aic_thompson = 2 + neg2ll_thompson,
-    aic_ucb = 4 + neg2ll_ucb
-  )
-  
-  tbl_models <- tibble(model = c("bic_softmax", "bic_thompson", "bic_ucb"))
-  
-  tbl_recovered <- tbl_lls %>% 
-    pivot_longer(cols = starts_with("bic"), names_to = "model") %>%
-    group_by(participant_id) %>%
-    mutate(min_bic = min(value)) %>%
-    ungroup() %>%
-    filter(value == min_bic) %>%
-    count(model)
-  
-  tbl_recovered <- left_join(tbl_models, tbl_recovered, by = "model") %>%
-    replace_na(list(n = 0))
-  
-  return(tbl_recovered)
+  return(list(
+    softmax = l_softmax,
+    thompson = l_thompson,
+    ucb = l_ucb
+  ))
 }
 
 
-recover_thompson <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
+read_out_lls_and_ics <- function(l_models_fit) {
   #' 
-  #' @description generate choices according to soft max
-  #' and fit them with soft max, thompson, and ucb
-  
-  tbl_params_thompson <- create_participant_sample_thompson(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, 1)
-  
-  # simulate one fixed data set in case needed
-  tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
-    select(-trial_id)
-  
-  # simulate choices given soft max choice model
-  plan(multisession, workers = availableCores() - 2)
-  l_choices_simulated <- future_pmap(
-    tbl_params_thompson,
-    simulate_kalman, 
-    tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  # fit three candidate models on data generated with soft max choice model
-  l_softmax <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_softmax_no_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  l_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_thompson_one_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  l_ucb <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ucb_no_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
+  #' @description read out by-participant log likelihoods for each model
+  #' and summarize these results
   
   # read out neg lls
-  neg2ll_softmax <- map_dbl(map(l_softmax, "result"), 2)
-  neg2ll_thompson <- map_dbl(map(l_thompson, "result"), 2)
-  neg2ll_ucb <- map_dbl(map(l_ucb, "result"), 3)
+  neg2ll_softmax <- map_dbl(map(l_models_fit[["softmax"]], "result"), 2)
+  neg2ll_thompson <- map_dbl(map(l_models_fit[["thompson"]], "result"), 2)
+  neg2ll_ucb <- map_dbl(map(l_models_fit[["ucb"]], "result"), 3)
   
   tbl_lls <- tibble(
     participant_id = 1:nr_participants,
@@ -1658,93 +1654,8 @@ recover_thompson <- function(
   tbl_recovered <- left_join(tbl_models, tbl_recovered, by = "model") %>%
     replace_na(list(n = 0))
   
-  return(tbl_recovered)
-}
-
-
-recover_ucb <- function(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  #' 
-  #' @description generate choices according to soft max
-  #' and fit them with soft max, thompson, and ucb
-  
-  tbl_params_ucb <- create_participant_sample_ucb(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, 1)
-  
-  # simulate one fixed data set in case needed
-  tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
-    select(-trial_id)
-  
-  # simulate choices given soft max choice model
-  plan(multisession, workers = availableCores() - 2)
-  l_choices_simulated <- future_pmap(
-    tbl_params_ucb,
-    simulate_kalman, 
-    tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  # fit three candidate models on data generated with soft max choice model
-  l_softmax <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_softmax_no_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  l_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_thompson_one_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  l_ucb <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
-    map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ucb_no_variance_wrapper), 
-    condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
-  
-  # read out neg lls
-  neg2ll_softmax <- map_dbl(map(l_softmax, "result"), 2)
-  neg2ll_thompson <- map_dbl(map(l_thompson, "result"), 2)
-  neg2ll_ucb <- map_dbl(map(l_ucb, "result"), 3)
-  
-  tbl_lls <- tibble(
-    participant_id = 1:nr_participants,
-    bic_softmax = log(nr_participants) + neg2ll_softmax,
-    bic_thompson = log(nr_participants) + neg2ll_thompson,
-    bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
-    aic_softmax = 2 + neg2ll_softmax,
-    aic_thompson = 2 + neg2ll_thompson,
-    aic_ucb = 4 + neg2ll_ucb
-  )
-  
-  tbl_models <- tibble(model = c("bic_softmax", "bic_thompson", "bic_ucb"))
-  
-  tbl_recovered <- tbl_lls %>% 
-    pivot_longer(cols = starts_with("bic"), names_to = "model") %>%
-    group_by(participant_id) %>%
-    mutate(min_bic = min(value)) %>%
-    ungroup() %>%
-    filter(value == min_bic) %>%
-    count(model)
-  
-  tbl_recovered <- left_join(tbl_models, tbl_recovered, by = "model") %>%
-    replace_na(list(n = 0))
-  
-  return(tbl_recovered)
+  return(list(
+    tbl_lls = tbl_lls,
+    tbl_recovered = tbl_recovered
+  ))
 }
