@@ -41,14 +41,15 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
   labs(x = "Trial ID", y = "Reward")
 
 
-# Kalman & Softmax Main Experiment ----------------------------------------
+
+# Kalman & Softmax --------------------------------------------------------
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1, 2),
-  gamma_sd = c(.03, .1, .2, .3)
+  gamma_mn = c(.16, .5, 1, 2),#[1:2],
+  gamma_sd = c(.03, .1, .2, .3)#[1:2]
 )
-simulate_data <- c(TRUE, FALSE)
+simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
 nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
@@ -60,7 +61,10 @@ tbl_params_softmax <- crossing(
 
 fit_or_load <- "fit"
 if (fit_or_load == "fit")  {
-  l_results_softmax <- pmap(tbl_params_softmax, simulate_and_fit_softmax, lambda = lambda, nr_vars = 2)
+  l_results_softmax <- pmap(
+    tbl_params_softmax, simulate_and_fit_softmax, 
+    lambda = lambda, nr_vars = 2
+  )
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
 } else if (fit_or_load == "load")  {
   l_results_softmax <- readRDS("exploration-R/data/recovery-softmax-two-variances.RDS")
@@ -120,7 +124,8 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 
-# Kalman & Softmax: Fit Only Xi Variance Main Experiment -------------------
+
+# Kalman & Softmax: Fit Only Xi Variance ----------------------------------
 
 
 # take same combination of hyperparameters as before
@@ -165,7 +170,7 @@ tbl_cor_softmax_1var_long <- tbl_cor_softmax_1var %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`))
 
 pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_1var_long, pd, , "softmax")
+plot_cor_recovery(tbl_cor_softmax_1var_long, pd, "softmax")
 
 
 # cors between pars
@@ -188,7 +193,8 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 
-# Kalman & Softmax, but Fix Variances Main Experiment ---------------------
+
+# Kalman & Softmax, but Fix Variances -------------------------------------
 
 
 if (fit_or_load == "fit")  {
@@ -235,10 +241,11 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 
-# Kalman & Thompson Main Experiment ---------------------------------------
+
+# Kalman & Thompson: Two Variances ----------------------------------------
 
 
-simulate_data <- c(TRUE, FALSE)
+simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
 nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
@@ -306,11 +313,16 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 
 
-# Kalman & Thompson 1 Variance Main Experiment------------------------------
+
+# Kalman & Thompson Fit Xi Variance ---------------------------------------
+
 
 
 if (fit_or_load == "fit")  {
-  l_results_thompson_1var <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda, nr_vars = 1)
+  l_results_thompson_1var <- pmap(
+    tbl_params_thompson, simulate_and_fit_thompson, 
+    lambda = lambda, nr_vars = 1
+  )
   saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-one-variance.RDS")
 } else if (fit_or_load == "load")  {
   l_results_thompson_1var <- readRDS("exploration-R/data/recovery-thompson-one-variance.RDS")
@@ -350,14 +362,14 @@ plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1, 2),
-  gamma_sd = c(.03, .1, .2, .3)
+  gamma_mn = c(.16, .5, 1, 2),#[1:2],
+  gamma_sd = c(.03, .1, .2, .3)#[1:2]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, .5),
-  beta_sd = c(.05, .1)
+  beta_mn = c(.17, .5, 8),
+  beta_sd = c(.05, .1, .5)
 )
-simulate_data <- c(TRUE, FALSE)
+simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
 nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
@@ -369,7 +381,10 @@ tbl_params_ucb <- crossing(
 
 
 if (fit_or_load == "fit")  {
-  l_results_ucb_0var <- pmap(tbl_params_ucb, simulate_and_fit_ucb, lambda = lambda, nr_vars = 0)
+  l_results_ucb_0var <- pmap(
+    tbl_params_ucb, simulate_and_fit_ucb,
+    lambda = lambda, nr_vars = 0
+  )
   saveRDS(l_results_ucb_0var, "exploration-R/data/recovery-ucb-no-variance.RDS")
 } else if (fit_or_load == "load")  {
   l_results_ucb_0var <- readRDS("exploration-R/data/recovery-ucb-no-variance.RDS")
@@ -405,10 +420,8 @@ tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>%
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta
-    ) %>%
+  ) %>%
   pivot_longer(cols = c(Gamma, Beta))
 
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
-
-

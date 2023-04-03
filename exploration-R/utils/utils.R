@@ -1179,7 +1179,7 @@ simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials,
   
   tbl_params_thompson <- create_participant_sample_thompson(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nv_vars
+    nr_trials, lambda, nr_vars
   )
   
   # simulate data
@@ -1246,7 +1246,7 @@ simulate_and_fit_ucb <- function(
   
   tbl_params_ucb <- create_participant_sample_ucb(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nv_vars
+    nr_trials, lambda, nr_vars
   )
   
   # simulate fixed data set
