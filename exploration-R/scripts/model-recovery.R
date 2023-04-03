@@ -31,6 +31,12 @@ sigma_epsilon_sq <- 16
 lambda <- .9836
 
 
+fit_or_load <- "fit"
+
+
+# Soft Max ----------------------------------------------------------------
+
+
 tbl_gammas <- tibble(
   gamma_mn = c(.16),
   gamma_sd = c(.03)
@@ -40,31 +46,76 @@ nr_participants <- c(50)
 nr_trials <- c(50)
 cond_on_choices <- c(TRUE)
 
-
-# simulate according to soft max
-# fit with all three models
 tbl_params_softmax <- crossing(
   tbl_gammas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
+if (fit_or_load == "fit")  {
+  l_model_recovery_softmax <- pmap(
+    tbl_params_softmax, recover_softmax,
+    lambda = lambda, nr_vars = 0
+  )
+  saveRDS(l_model_recovery_softmax, "exploration-R/data/model-recovery-softmax.RDS")
+} else if (fit_or_load == "load")  {
+  l_model_recovery_softmax <- readRDS("exploration-R/data/model-recovery-softmax.RDS")
+}
 
-list2env(tbl_params_softmax[1, ], rlang::current_env())
 
-# simulate from softmax with inverse temperature only
-recover_softmax(
-  gamma_mn, gamma_sd, simulate_data, nr_participants,
-  nr_trials, cond_on_choices, lambda, nr_vars = 0
+
+
+# Thompson ----------------------------------------------------------------
+
+
+simulate_data <- c(TRUE, FALSE)#[1]
+nr_participants <- c(200)
+nr_trials <- c(300, 500)
+cond_on_choices <- c(TRUE)
+
+
+tbl_params_thompson <- crossing(
+  simulate_data, nr_participants, nr_trials, cond_on_choices
 )
-# simulate from thompson, estimate innovation variance
-recover_thompson(
-  gamma_mn, gamma_sd, simulate_data, nr_participants,
-  nr_trials, cond_on_choices, lambda, nr_vars = 1
+
+if (fit_or_load == "fit")  {
+  l_model_recovery_thompson <- pmap(
+    tbl_params_thompson, recover_thompson,
+    lambda = lambda, nr_vars = 0
+  )
+  saveRDS(l_model_recovery_thompson, "exploration-R/data/model-recovery-thompson.RDS")
+} else if (fit_or_load == "load")  {
+  l_model_recovery_thompson <- readRDS("exploration-R/data/model-recovery-thompson.RDS")
+}
+
+
+
+# UCB ---------------------------------------------------------------------
+
+
+tbl_gammas <- tibble(
+  gamma_mn = c(.16, .5, 1, 2),#[1:2],
+  gamma_sd = c(.03, .1, .2, .3)#[1:2]
 )
-# simulate from ucb with inverse temperature and exploration bonus
-recover_ucb(
-  gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
-  nr_trials, cond_on_choices, lambda, nr_vars = 0
+tbl_betas <- tibble(
+  beta_mn = c(.17, .5, 8),
+  beta_sd = c(.05, .1, .5)
 )
-# write functions
-# 1. fit three models
-# 2. summarize recovery results
+simulate_data <- c(TRUE, FALSE)#[1]
+nr_participants <- c(200)
+nr_trials <- c(300, 500)
+cond_on_choices <- c(TRUE)
+
+
+tbl_params_ucb <- crossing(
+  simulate_data, nr_participants, nr_trials, cond_on_choices
+)
+
+if (fit_or_load == "fit")  {
+  l_model_recovery_ucb <- pmap(
+    tbl_params_ucb, recover_ucb,
+    lambda = lambda, nr_vars = 0
+  )
+  saveRDS(l_model_recovery_ucb, "exploration-R/data/model-recovery-ucb.RDS")
+} else if (fit_or_load == "load")  {
+  l_model_recovery_ucb <- readRDS("exploration-R/data/model-recovery-ucb.RDS")
+}
+
