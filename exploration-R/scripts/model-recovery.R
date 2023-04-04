@@ -9,6 +9,7 @@ library(zoo)
 library(TTR)
 library(future)
 library(furrr)
+library(formattable)
 
 
 
@@ -51,6 +52,34 @@ if (fit_or_load == "fit")  {
   l_model_recovery_softmax <- readRDS("exploration-R/data/model-recovery-softmax.RDS")
 }
 
+tbl_results_softmax <- cbind(tbl_params_softmax, map(l_model_recovery_softmax, ~ cbind(
+  summarize_model_recovery(.x$tbl_lls, "aic") %>% pivot_wider(names_from = model, values_from = n),
+  summarize_model_recovery(.x$tbl_lls, "bic") %>% pivot_wider(names_from = model, values_from = n)
+)) %>% reduce(rbind))
+
+tbl_table_softmax <- tbl_results_softmax %>% 
+  mutate(
+    aic_total = aic_softmax + aic_thompson + aic_ucb,
+    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    prop_aic = aic_softmax / aic_total,
+    prop_bic = bic_softmax / bic_total
+  ) %>%
+  select(-c(starts_with("aic"), starts_with("bic"), cond_on_choices))
+names(tbl_table_softmax) <- c(
+  "Gamma Mean", "Gamma SD", "Sim. by Participant", "Nr. Participants", 
+  "Nr. Trials", "Prop. AIC", "Prop. BIC"
+)
+
+badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
+
+reactable(
+  tbl_table_softmax,
+  defaultColDef = colDef(
+    minWidth = 150,
+    align = "center",
+    cell = color_tiles(tbl_table_softmax, span = 6:7, colors = badtogood_cols),
+  )
+)
 
 
 
@@ -70,13 +99,41 @@ tbl_params_thompson <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_thompson <- pmap(
     tbl_params_thompson, recover_thompson,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 1
   )
   saveRDS(l_model_recovery_thompson, "exploration-R/data/model-recovery-thompson.RDS")
 } else if (fit_or_load == "load")  {
   l_model_recovery_thompson <- readRDS("exploration-R/data/model-recovery-thompson.RDS")
 }
 
+
+tbl_results_thompson <- cbind(tbl_params_thompson, map(l_model_recovery_thompson, ~ cbind(
+  summarize_model_recovery(.x$tbl_lls, "aic") %>% pivot_wider(names_from = model, values_from = n),
+  summarize_model_recovery(.x$tbl_lls, "bic") %>% pivot_wider(names_from = model, values_from = n)
+)) %>% reduce(rbind))
+
+tbl_table_thompson <- tbl_results_thompson %>% 
+  mutate(
+    aic_total = aic_softmax + aic_thompson + aic_ucb,
+    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    prop_aic = aic_thompson / aic_total,
+    prop_bic = bic_thompson / bic_total
+  ) %>%
+  select(-c(starts_with("aic"), starts_with("bic"), cond_on_choices))
+names(tbl_table_thompson) <- c(
+  "Sim. by Participant", "Nr. Participants", 
+  "Nr. Trials", "Prop. AIC", "Prop. BIC"
+)
+
+
+reactable(
+  tbl_table_thompson,
+  defaultColDef = colDef(
+    minWidth = 150,
+    align = "center",
+    cell = color_tiles(tbl_table_thompson, span = 4:5, colors = badtogood_cols),
+  )
+)
 
 
 # UCB ---------------------------------------------------------------------
@@ -95,8 +152,8 @@ nr_participants <- c(200)
 nr_trials <- c(300, 500)
 cond_on_choices <- c(TRUE)
 
-
 tbl_params_ucb <- crossing(
+  tbl_gammas, tbl_betas,
   simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
@@ -109,4 +166,33 @@ if (fit_or_load == "fit")  {
 } else if (fit_or_load == "load")  {
   l_model_recovery_ucb <- readRDS("exploration-R/data/model-recovery-ucb.RDS")
 }
+
+
+tbl_results_ucb <- cbind(tbl_params_thompson, map(l_model_recovery_ucb, ~ cbind(
+  summarize_model_recovery(.x$tbl_lls, "aic") %>% pivot_wider(names_from = model, values_from = n),
+  summarize_model_recovery(.x$tbl_lls, "bic") %>% pivot_wider(names_from = model, values_from = n)
+)) %>% reduce(rbind))
+
+tbl_table_ucb <- tbl_results_ucb %>% 
+  mutate(
+    aic_total = aic_softmax + aic_thompson + aic_ucb,
+    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    prop_aic = aic_ucb / aic_total,
+    prop_bic = bic_ucb / bic_total
+  ) %>%
+  select(-c(starts_with("aic"), starts_with("bic"), cond_on_choices))
+names(tbl_table_ucb) <- c(
+  "Sim. by Participant", "Nr. Participants", 
+  "Nr. Trials", "Prop. AIC", "Prop. BIC"
+)
+
+
+reactable(
+  tbl_table_ucb,
+  defaultColDef = colDef(
+    minWidth = 150,
+    align = "center",
+    cell = color_tiles(tbl_table_ucb, span = 4:5, colors = badtogood_cols),
+  )
+)
 
