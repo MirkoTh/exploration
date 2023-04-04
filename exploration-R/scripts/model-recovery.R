@@ -140,12 +140,12 @@ reactable(
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1, 2),#[1:2],
-  gamma_sd = c(.03, .1, .2, .3)#[1:2]
+  gamma_mn = c(.16, .5),#[1:2],
+  gamma_sd = c(.03, .1)#[1:2]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, .5, 8),
-  beta_sd = c(.05, .1, .5)
+  beta_mn = c(.17, 8),
+  beta_sd = c(.05, .5)
 )
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
@@ -168,7 +168,7 @@ if (fit_or_load == "fit")  {
 }
 
 
-tbl_results_ucb <- cbind(tbl_params_thompson, map(l_model_recovery_ucb, ~ cbind(
+tbl_results_ucb <- cbind(tbl_params_ucb, map(l_model_recovery_ucb, ~ cbind(
   summarize_model_recovery(.x$tbl_lls, "aic") %>% pivot_wider(names_from = model, values_from = n),
   summarize_model_recovery(.x$tbl_lls, "bic") %>% pivot_wider(names_from = model, values_from = n)
 )) %>% reduce(rbind))
@@ -182,6 +182,7 @@ tbl_table_ucb <- tbl_results_ucb %>%
   ) %>%
   select(-c(starts_with("aic"), starts_with("bic"), cond_on_choices))
 names(tbl_table_ucb) <- c(
+  "Gamma Mean", "Gamma SD", "Beta Mean", "Beta SD", 
   "Sim. by Participant", "Nr. Participants", 
   "Nr. Trials", "Prop. AIC", "Prop. BIC"
 )
@@ -189,10 +190,11 @@ names(tbl_table_ucb) <- c(
 
 reactable(
   tbl_table_ucb,
+  defaultPageSize = 24,
   defaultColDef = colDef(
     minWidth = 150,
     align = "center",
-    cell = color_tiles(tbl_table_ucb, span = 4:5, colors = badtogood_cols),
+    cell = color_tiles(tbl_table_ucb, span = 8:9, colors = badtogood_cols),
   )
 )
 
