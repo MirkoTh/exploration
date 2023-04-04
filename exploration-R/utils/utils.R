@@ -1574,6 +1574,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   
   # simulate choices given soft max choice model
   plan(multisession, workers = availableCores() - 2)
+  #plan(multisession, workers = 2)
   l_choices_simulated <- future_pmap(
     tbl_params_simulate,
     simulate_kalman, 
@@ -1638,21 +1639,32 @@ read_out_lls_and_ics <- function(l_models_fit) {
     aic_ucb = 4 + neg2ll_ucb
   )
   
-  tbl_models <- tibble(model = c("bic_softmax", "bic_thompson", "bic_ucb"))
+  tbl_recovered_bic <- summarize_model_recovery(tbl_lls, "bic")
+  tbl_recovered_aic <- summarize_model_recovery(tbl_lls, "aic")
+  
+  return(list(
+    tbl_lls = tbl_lls,
+    tbl_recovered_bic = tbl_recovered_bic,
+    tbl_recovered_aic = tbl_recovered_aic
+  ))
+}
+
+summarize_model_recovery <- function(tbl_lls, ic) {
+  #' 
+  #' @description summarize by-participant log likelihoods
+  #' 
+  tbl_models <- tibble(model = str_c(ic, c("_softmax", "_thompson", "_ucb")))
   
   tbl_recovered <- tbl_lls %>% 
-    pivot_longer(cols = starts_with("bic"), names_to = "model") %>%
+    pivot_longer(cols = starts_with(ic), names_to = "model") %>%
     group_by(participant_id) %>%
-    mutate(min_bic = min(value)) %>%
+    mutate(min_ic = min(value)) %>%
     ungroup() %>%
-    filter(value == min_bic) %>%
+    filter(value == min_ic) %>%
     count(model)
   
   tbl_recovered <- left_join(tbl_models, tbl_recovered, by = "model") %>%
     replace_na(list(n = 0))
   
-  return(list(
-    tbl_lls = tbl_lls,
-    tbl_recovered = tbl_recovered
-  ))
+  return(tbl_recovered)
 }
