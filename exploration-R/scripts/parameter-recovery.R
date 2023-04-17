@@ -439,7 +439,6 @@ plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 # Delta & Softmax ---------------------------------------------------------
 
 
-
 tbl_gammas <- tibble(
   gamma_mn = c(.16, .5, 1, 2)[1],
   gamma_sd = c(.03, .1, .2, .3)[1]
@@ -508,3 +507,86 @@ plot_cor_recovery(tbl_cor_delta_softmax_long, pd, "softmax")
 
 # Decay & Softmax ---------------------------------------------------------
 
+
+tbl_gammas <- tibble(
+  gamma_mn = c(.16, .5, 1, 2)[1],
+  gamma_sd = c(.03, .1, .2, .3)[1]
+)
+tbl_deltas <- tibble(
+  delta_mn = c(.55, .1, .9)[1],
+  delta_sd = c(.05, .03, .03)[1]
+)
+simulate_data <- c(TRUE, FALSE)[1]
+nr_participants <- c(12)
+nr_trials <- c(300, 500)[1]
+cond_on_choices <- c(TRUE)
+
+tbl_params_decay <- crossing(
+  tbl_gammas, tbl_deltas, simulate_data, nr_participants, nr_trials, cond_on_choices
+)
+
+
+
+simulate_and_fit_decay <- function(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda
+) {
+  
+  tbl_params_decay <- create_participant_sample_delta(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, lambda
+  )
+  
+  # simulate fixed data set
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_decay,
+    simulate_delta, 
+    tbl_rewards = tbl_rewards,
+    is_decay = TRUE,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_softmax <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_delta_softmax_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # replace empty results with NAs
+  l_results <- map(l_softmax, "result")
+  idx <- 1
+  for (p in l_results){
+    if (is.null(p)){
+      l_results[[idx]] <- rep(NA, (nr_vars + 2))
+    }
+    idx <- idx + 1
+  }
+  
+  tbl_results_delta <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
+  colnames(tbl_results_delta) <- c("delta_ml", "gamma_ml", "neg_ll")
+  
+  tbl_results_delta <- as_tibble(cbind(tbl_params_delta, tbl_results_delta)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_delta))
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
+    delta_mn = ", delta_mn, ", delta_sd = ", delta_sd, "
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_delta)
+  
+}
