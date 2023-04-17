@@ -641,7 +641,7 @@ simulate_kalman <- function(
 
 simulate_delta <- function(
     delta, lambda, nr_trials, params_decision, 
-    simulate_data, seed, tbl_rewards
+    simulate_data, seed, tbl_rewards, is_decay = FALSE
 ) {
   #' 
   #' @description simulate choices from a Kalman filter with some choice model
@@ -668,6 +668,22 @@ simulate_delta <- function(
   choices <- rep(0, nt + 1) # to hold the choices of the RL agent
   rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
   
+  if (!is_decay) {
+    f_update <- function() {
+      # set the learning rate only for the chosen option
+      lr[choices[t]] <- delta
+      choices_oh[choices[t]] <- 1
+      as_vector(m[t, ] + lr * (tbl_rewards[t, ] - m[t, ]))
+      }
+  } else if (is_decay) {
+    f_update <- function() {
+      # set the decay rate for all options
+      lr[rep(TRUE, length(lr))] <- delta
+      choices_oh[choices[t]] <- 1
+      as_vector(m[t, ] * lr + (choices_oh * tbl_rewards[t, ]))
+    }
+  }
+  
   for(t in 1:nt) {
     # variance components are just set to NA
     p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(NA, 1, ncol(m)), NA, params_decision)
@@ -675,11 +691,10 @@ simulate_delta <- function(
     choices[t] <- sample(1:4, size = 1, prob = p)
     # get the reward of the choice
     rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
-    lr <- rep(0, no)
-    # set the Kalman gain for the chosen option
-    lr[choices[t]] <- delta
+    choices_oh <- lr <- rep(0, no)
+    
     # compute the posterior means
-    m[t + 1, ] <- m[t, ] + lr * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
+    m[t + 1, ] <- f_update()
   }
   
   tbl_m <- as.data.frame(m)
