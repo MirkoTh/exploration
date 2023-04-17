@@ -441,7 +441,7 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq, m0 = NULL
     v[t+1,] <- (1-kt)*(v[t,] + sigma_xi_sq)
   }
   tbl_m <- as.data.frame(m)
-  # constrain v from becoming to small
+  # prevent v from becoming too small
   v <- t(apply(v, 1, function(x) pmax(x, .0001)))
   tbl_v <- as.data.frame(v)
   colnames(tbl_m) <- str_c("m_", 1:no)
@@ -505,6 +505,41 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
   
   return(list(tbl_learned = tbl_return, c_probs = c_probs))
 }
+
+
+delta_learning <- function(tbl_df, no, delta, m0 = NULL) {
+  #' delta learning without choice model given chosen options by participants
+  #' 
+  #' @description applies delta rule learning for a given bandit task with existing choices by participants
+  #' @param tbl_df with made choices and collected rewards as columns
+  #' @param no number of response options
+  #' @param delta learning rate
+  #' @return a tbl with by-trial estimated means for all bandits
+  
+  rewards <- tbl_df$rewards
+  choices <- tbl_df$choices
+  
+  nt <- length(rewards) # number of time points
+  if (is.null(m0)) {
+    m0 <- 0
+  }
+  m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
+  
+  for(t in 1:nt) {
+    lr <- rep(0, no)
+    # set the Kalman gain for the chosen option
+    lr[choices[t]] <- delta
+    # compute the posterior means
+    m[t+1,] <- m[t,] + lr*(rewards[t] - m[t,])
+  }
+  tbl_m <- as.data.frame(m)
+  # prevent v from becoming too small
+  colnames(tbl_m) <- str_c("m_", 1:no)
+  tbl_return <- tibble(tbl_m)
+  
+  return(tbl_return)
+}
+
 
 
 
@@ -602,6 +637,58 @@ simulate_kalman <- function(
   
   return(list(tbl_return = tbl_return, tbl_rewards = tbl_rewards))
 }
+
+
+simulate_delta <- function(
+    delta, lambda, nr_trials, params_decision, 
+    simulate_data, seed, tbl_rewards
+) {
+  #' 
+  #' @description simulate choices from a Kalman filter with some choice model
+  #' @param delta learning rate
+  #' @param lambda decay parameter of random walk
+  #' @param nr_trials number of choices to simulate
+  #' @param params_decision parameters of decision model
+  #' @param simulate_data should new data be generated for every participant
+  #' @param seed seed value of iteration
+  #' @param tbl_rewards if data are not simulated, take this tbl instead
+  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' 
+  if (params_decision$choicemodel %in% c("thompson", "ucb")) stop("only softmax implemented currently")
+  set.seed(seed)
+  if (simulate_data) {
+    tbl_rewards <- generate_restless_bandits(
+      sigma_xi_sq, sigma_epsilon_sq, c(-60, -20, 20, 60), lambda, nr_trials
+    ) %>% select(-trial_id)
+  }
+  
+  nt <- nrow(tbl_rewards) # number of time points
+  no <- ncol(tbl_rewards) # number of options
+  m <- matrix(0, ncol = no, nrow = nt + 1) # to hold the learned means
+  choices <- rep(0, nt + 1) # to hold the choices of the RL agent
+  rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
+  
+  for(t in 1:nt) {
+    # variance components are just set to NA
+    p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(NA, 1, ncol(m)), NA, params_decision)
+    # choose an option according to these probabilities
+    choices[t] <- sample(1:4, size = 1, prob = p)
+    # get the reward of the choice
+    rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
+    lr <- rep(0, no)
+    # set the Kalman gain for the chosen option
+    lr[choices[t]] <- delta
+    # compute the posterior means
+    m[t + 1, ] <- m[t, ] + lr * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
+  }
+  
+  tbl_m <- as.data.frame(m)
+  colnames(tbl_m) <- str_c("m_", 1:no)
+  tbl_return <- tibble(cbind(tbl_m, choices, rewards))
+  
+  return(list(tbl_return = tbl_return, tbl_rewards = tbl_rewards))
+}
+
 
 
 choice_prob <- function(m, v, sigma_xi_sq, pars) {
@@ -897,6 +984,28 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
 
 
 
+fit_delta_softmax <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description delta rule soft max fitting wrapper
+  #' conditioned on ground truth responses
+  #' 
+  delta <- upper_and_lower_bounds_revert(x[[1]], 0, 1)
+  gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
+  tbl_learned <- delta_learning(tbl_results, nr_options, delta)
+  p_choices <- softmax_choice_prob(
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    gamma
+  )
+  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-2*sllik)
+}
+
+
+
+
+
 fit_thompson_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(upper_and_lower_bounds(15, 0, 30), upper_and_lower_bounds(15, 0, 30))
@@ -1075,6 +1184,45 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
     r <- c(
       upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 3),
       upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3)
+    )
+  }
+  
+  return(r)
+}
+
+
+fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+  #' 
+  #' @description wrapper around delta rule soft max fitting wrapper
+  #' conditioned on ground truth responses
+  #' 
+  
+  tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
+  params_init <- c(
+    upper_and_lower_bounds(.5, 0, 1),
+    upper_and_lower_bounds(.2, 0, 3)
+  )
+  if (condition_on_observed_choices) {
+    result_optim <- optim(
+      params_init, fit_delta_softmax,
+      tbl_results = tbl_results, nr_options = 4
+    )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$par[1], 0, 1),
+      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
+      result_optim$value
+    )
+  } else if (!condition_on_observed_choices) {
+    result_optim <- DEoptim(
+      fit_delta_softmax_choose,
+      lower = c(-11.51292, -12.61153),
+      upper = c(11.51292, 12.61153),
+      tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
+    )
+    r <- c(
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 1),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3),
+      result_optim$optim$bestval
     )
   }
   
@@ -1314,6 +1462,70 @@ simulate_and_fit_ucb <- function(
 }
 
 
+simulate_and_fit_delta <- function(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda
+) {
+  
+  tbl_params_delta <- create_participant_sample_delta(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, lambda
+  )
+  
+  # simulate fixed data set
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_choices_simulated <- future_pmap(
+    tbl_params_delta,
+    simulate_delta, 
+    tbl_rewards = tbl_rewards,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  plan(multisession, workers = availableCores() - 2)
+  l_softmax <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_delta_softmax_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  # replace empty results with NAs
+  l_results <- map(l_softmax, "result")
+  idx <- 1
+  for (p in l_results){
+    if (is.null(p)){
+      l_results[[idx]] <- rep(NA, (nr_vars + 2))
+    }
+    idx <- idx + 1
+  }
+  
+  tbl_results_delta <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
+  colnames(tbl_results_delta) <- c("delta_ml", "gamma_ml", "neg_ll")
+  
+  tbl_results_delta <- as_tibble(cbind(tbl_params_delta, tbl_results_delta)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_delta))
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
+    delta_mn = ", delta_mn, ", delta_sd = ", delta_sd, "
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_delta)
+  
+}
+
+
 generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials) {
   #' 
   #' @description generate random walk data on bandits with independent means
@@ -1397,7 +1609,17 @@ create_participant_sample_thompson <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, lambda, nr_vars
 ) {
-  
+  #' 
+  #' @description create pool of participants deciding according to thompson sampling (MAP)
+  #' with individual parameters fixed or sampled from normal distribution
+  #' @param gamma_mn average inverse temperature
+  #' @param gamma_sd population standard deviation of inverse temperature
+  #' @param simulate_data should by-trial rewards be generated once or by participant?
+  #' @param nr_participants number of participants
+  #' @param nr_trials number of choices in the restless bandit task
+  #' @param lambda decay parameter of random walk
+  #' @param nr_vars how many variances of the kalman filter are varied and fit
+  #' @return a tbl with by-participant parameters  
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   sigma_xi_sq <- rep(16, nr_participants)
   sigma_epsilon_sq <- rep(16, nr_participants)
@@ -1481,6 +1703,59 @@ create_participant_sample_ucb <- function(
   
   return(tbl_params_ucb)
 }
+
+
+create_participant_sample_delta <- function(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, lambda
+) {
+  #' 
+  #' @description create pool of participants learning with delta rule and 
+  #' deciding according to soft max rule
+  #' with individual parameters fixed or sampled from normal distribution
+  #' @param gamma_mn average inverse temperature
+  #' @param gamma_sd population standard deviation of inverse temperature
+  #' @param delta_mn average learning rate
+  #' @param delta_sd sd of learning rate
+  #' @param simulate_data should by-trial rewards be generated once or by participant?
+  #' @param nr_participants number of participants
+  #' @param nr_trials number of choices in the restless bandit task
+  #' @param lambda decay parameter of random walk
+  #' @return a tbl with by-participant parameters
+  
+  s_delta <- -1
+  while(s_delta < 0){
+    delta <- rnorm(nr_participants, delta_mn, delta_sd)
+    s_delta <- min(delta)
+  }
+  s_gamma <- -1
+  while(s_gamma < 0){
+    gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
+    s_gamma <- min(gamma)
+  }
+  s_seeds <- -1
+  while(s_seeds < nr_participants) {
+    seed <- round(rnorm(nr_participants, 100000, 10000), 0)
+    s_seeds <- length(unique(seed))
+  }
+  
+  tbl_params_delta <- tibble(
+    delta = delta,
+    lambda = lambda,
+    nr_trials = nr_trials,
+    params_decision = map(
+      gamma,  
+      ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+    ),
+    simulate_data = simulate_data,
+    seed = seed
+  )
+  
+  return(tbl_params_delta)
+}
+
+
+
 
 
 recover_softmax <- function(

@@ -364,7 +364,8 @@ plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
 # possibly adopt plot_cor_recovery function, if error here
 
 
-# Kalman & UCB Main Experiment --------------------------------------------
+# Kalman & UCB ------------------------------------------------------------
+
 
 
 tbl_gammas <- tibble(
@@ -431,3 +432,79 @@ tbl_cor_ucb_0var_long <- tbl_cor_c_0var %>%
 
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
+
+
+
+
+# Delta & Softmax ---------------------------------------------------------
+
+
+
+tbl_gammas <- tibble(
+  gamma_mn = c(.16, .5, 1, 2)[1],
+  gamma_sd = c(.03, .1, .2, .3)[1]
+)
+tbl_deltas <- tibble(
+  delta_mn = c(.55, .1, .9)[1],
+  delta_sd = c(.05, .03, .03)[1]
+)
+simulate_data <- c(TRUE, FALSE)[1]
+nr_participants <- c(12)
+nr_trials <- c(300, 500)[1]
+cond_on_choices <- c(TRUE)
+
+tbl_params_delta <- crossing(
+  tbl_gammas, tbl_deltas, simulate_data, nr_participants, nr_trials, cond_on_choices
+)
+
+
+if (fit_or_load == "fit")  {
+  l_results_delta_softmax <- pmap(
+    tbl_params_delta, simulate_and_fit_delta,
+    lambda = lambda
+  )
+  saveRDS(l_results_delta_softmax, "exploration-R/data/recovery-delta-softmax.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_delta_softmax <- readRDS("exploration-R/data/recovery-delta-softmax.RDS")
+}
+
+
+counter <- 1
+l_results_c_delta_softmax <- list()
+for (tbl_r in l_results_delta_softmax) {
+  l_results_c_delta_softmax[[counter]] <- as_tibble(cbind(
+    tbl_r %>% 
+      unnest_wider(params_decision) %>%
+      select(-c(simulate_data, nr_trials)), tbl_params_delta[counter, ]
+  ))
+  counter <- counter + 1
+}
+
+tbl_cor_c_delta_softmax <- reduce(l_results_c_delta_softmax, rbind) %>%
+  group_by(delta_mn, gamma_mn, simulate_data, nr_trials) %>%
+  filter(
+    gamma_ml < 2.9 |
+      delta_ml < 0.99
+  ) %>%
+  summarize(
+    r_gamma = cor(gamma, gamma_ml),
+    r_delta = cor(delta, delta_ml)
+  ) %>% ungroup()
+
+tbl_cor_delta_softmax_long <- tbl_cor_c_delta_softmax %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% 
+  rename(
+    "Gamma" = r_gamma,
+    "Delta" = r_delta
+  ) %>%
+  pivot_longer(cols = c(Gamma, Delta))
+
+pd <- position_dodge(width = .9)
+plot_cor_recovery(tbl_cor_delta_softmax_long, pd, "softmax")
+
+
+# Decay & Softmax ---------------------------------------------------------
+
