@@ -507,7 +507,7 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
 }
 
 
-delta_learning <- function(tbl_df, no, delta, m0 = NULL) {
+delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
   #' delta learning without choice model given chosen options by participants
   #' 
   #' @description applies delta rule learning for a given bandit task with existing choices by participants
@@ -525,12 +525,29 @@ delta_learning <- function(tbl_df, no, delta, m0 = NULL) {
   }
   m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
   
+  if (!is_decay){
+    f_update <- function() {
+      lr <- rep(0, no)
+      # set the learning rate for the chosen option
+      lr[choices[t]] <- delta
+      # compute the estimated means
+      out <- m[t,] + lr*(rewards[t] - m[t,])
+      return(out)
+    }
+  } else if (is_decay) {
+    f_update <- function() {
+      lr <- rep(delta, no)
+      choices_oh <- rep(0, no)
+      # set the decay rate for all options
+      choices_oh[choices[t]] <- 1
+      # compute the estimated means
+      out <- m[t,] * lr + (rewards[t] * choices_oh)
+      return(out)
+    }
+  }
+  
   for(t in 1:nt) {
-    lr <- rep(0, no)
-    # set the Kalman gain for the chosen option
-    lr[choices[t]] <- delta
-    # compute the posterior means
-    m[t+1,] <- m[t,] + lr*(rewards[t] - m[t,])
+    m[t+1,] <- f_update()
   }
   tbl_m <- as.data.frame(m)
   # prevent v from becoming too small
@@ -674,7 +691,7 @@ simulate_delta <- function(
       lr[choices[t]] <- delta
       choices_oh[choices[t]] <- 1
       as_vector(m[t, ] + lr * (tbl_rewards[t, ] - m[t, ]))
-      }
+    }
   } else if (is_decay) {
     f_update <- function() {
       # set the decay rate for all options
@@ -999,14 +1016,16 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
 
 
 
-fit_delta_softmax <- function(x, tbl_results, nr_options) {
+fit_delta_softmax <- function(x, tbl_results, nr_options, is_decay = FALSE) {
   #' 
   #' @description delta rule soft max fitting wrapper
   #' conditioned on ground truth responses
+  #' can be used for delta rule or decay rule
+  #' @param is_decay flags what learning rule is used (i.e., delta or decay)
   #' 
   delta <- upper_and_lower_bounds_revert(x[[1]], 0, 1)
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
-  tbl_learned <- delta_learning(tbl_results, nr_options, delta)
+  tbl_learned <- delta_learning(tbl_results, nr_options, delta, is_decay = is_decay)
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
     gamma
@@ -1206,7 +1225,7 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
 }
 
 
-fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, is_decay, condition_on_observed_choices) {
   #' 
   #' @description wrapper around delta rule soft max fitting wrapper
   #' conditioned on ground truth responses
@@ -1220,7 +1239,8 @@ fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_obs
   if (condition_on_observed_choices) {
     result_optim <- optim(
       params_init, fit_delta_softmax,
-      tbl_results = tbl_results, nr_options = 4
+      tbl_results = tbl_results, nr_options = 4,
+      is_decay = is_decay
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1], 0, 1),
@@ -1228,17 +1248,7 @@ fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_obs
       result_optim$value
     )
   } else if (!condition_on_observed_choices) {
-    result_optim <- DEoptim(
-      fit_delta_softmax_choose,
-      lower = c(-11.51292, -12.61153),
-      upper = c(11.51292, 12.61153),
-      tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
-    )
-    r <- c(
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 1),
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3),
-      result_optim$optim$bestval
-    )
+    stop("not developed without conditioning on given responses")
   }
   
   return(r)
@@ -1479,12 +1489,12 @@ simulate_and_fit_ucb <- function(
 
 simulate_and_fit_delta <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda
+    nr_trials, cond_on_choices, is_decay, lambda
 ) {
   
   tbl_params_delta <- create_participant_sample_delta(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda
+    nr_trials, is_decay, lambda
   )
   
   # simulate fixed data set
@@ -1507,6 +1517,7 @@ simulate_and_fit_delta <- function(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
     safely(fit_delta_softmax_wrapper), 
+    is_decay = is_decay,
     condition_on_observed_choices = cond_on_choices,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
@@ -1529,10 +1540,10 @@ simulate_and_fit_delta <- function(
     mutate(participant_id = 1:nrow(tbl_results_delta))
   
   progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
+    "\nfinished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
     delta_mn = ", delta_mn, ", delta_sd = ", delta_sd, "
     simulate data = ", simulate_data, ", nr participants = ", nr_participants,
-    " nr trials = ", nr_trials, "\n"
+    " nr trials = ", nr_trials, " is decay = ", is_decay, "\n"
   )
   cat(progress_msg)
   
@@ -1722,7 +1733,7 @@ create_participant_sample_ucb <- function(
 
 create_participant_sample_delta <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda
+    nr_trials, is_decay, lambda
 ) {
   #' 
   #' @description create pool of participants learning with delta rule and 
@@ -1735,6 +1746,7 @@ create_participant_sample_delta <- function(
   #' @param simulate_data should by-trial rewards be generated once or by participant?
   #' @param nr_participants number of participants
   #' @param nr_trials number of choices in the restless bandit task
+  #' @param is_decay delta rule or decay rule learning (decay == TRUE)
   #' @param lambda decay parameter of random walk
   #' @return a tbl with by-participant parameters
   
@@ -1756,6 +1768,7 @@ create_participant_sample_delta <- function(
   
   tbl_params_delta <- tibble(
     delta = delta,
+    is_decay = is_decay,
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = map(
@@ -1793,7 +1806,7 @@ recover_softmax <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices
-    )
+  )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
   
@@ -1821,7 +1834,7 @@ recover_thompson <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices
-    )
+  )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
   
@@ -1849,7 +1862,7 @@ recover_ucb <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices
-    )
+  )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
   
