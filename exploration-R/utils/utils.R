@@ -703,8 +703,6 @@ simulate_delta <- function(
   
   for(t in 1:nt) {
     # variance components are just set to NA
-    m[t, ][m[t, ] > 709] <- 709
-    m[t, ][m[t, ] < -709] <- -709
     p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(NA, 1, ncol(m)), NA, params_decision)
     # choose an option according to these probabilities
     choices[t] <- sample(1:4, size = 1, prob = p)
@@ -745,7 +743,9 @@ softmax_choice_prob <- function(ms, gamma) {
   #' @param ms posterior means of the bandits
   #' @param gamma inverse temperature parameter
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
-  prob <- exp(gamma * ms)
+  # prevent exponent to become to large
+  max_vals <- matrix(rep(708, ncol(ms)), nrow = 1)
+  prob <- exp(pmin(max_vals, gamma * ms))
   prob <- prob / rowSums(prob)
   return(prob)
 }
@@ -1028,8 +1028,6 @@ fit_delta_softmax <- function(x, tbl_results, nr_options, is_decay = FALSE) {
   delta <- upper_and_lower_bounds_revert(x[[1]], 0, 1)
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
   tbl_learned <- delta_learning(tbl_results, nr_options, delta, is_decay = is_decay)
-  tbl_learned[tbl_learned > 709] <- 709
-  tbl_learned[tbl_learned < -709] <- -709
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
     gamma
