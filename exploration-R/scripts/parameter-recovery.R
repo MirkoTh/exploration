@@ -23,6 +23,7 @@ walk(home_grown, source)
 
 # Generate Random Walk Data -----------------------------------------------
 
+fit_or_load <- "fit"
 
 mu1 <- c(-60, -20, 20, 60)
 nr_trials <- 200
@@ -59,7 +60,6 @@ tbl_params_softmax <- crossing(
   tbl_gammas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
-fit_or_load <- "fit"
 if (fit_or_load == "fit")  {
   l_results_softmax <- pmap(
     tbl_params_softmax, simulate_and_fit_softmax, 
@@ -461,7 +461,7 @@ tbl_params_delta <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_delta_softmax <- pmap(
-    tbl_params_delta, simulate_and_fit_delta,
+    tbl_params_delta, safely(simulate_and_fit_delta),
     lambda = lambda
   )
   saveRDS(l_results_delta_softmax, "exploration-R/data/recovery-delta-softmax.RDS")
