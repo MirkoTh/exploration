@@ -550,7 +550,6 @@ delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
     m[t+1,] <- f_update()
   }
   tbl_m <- as.data.frame(m)
-  # prevent v from becoming too small
   colnames(tbl_m) <- str_c("m_", 1:no)
   tbl_return <- tibble(tbl_m)
   
@@ -1280,7 +1279,7 @@ kalman_softmax_experiment <- function(
     nr_trials, lambda, nr_vars
   )
   
-  tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_params_participants, nr_vars)
+  tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
     "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
@@ -1293,7 +1292,7 @@ kalman_softmax_experiment <- function(
 }
 
 simulate_and_fit_softmax <- function(
-    tbl_params_participants, nr_vars
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
 ) {
   
   # simulate data
@@ -1371,7 +1370,7 @@ kalman_thompson_experiment <- function(
     nr_trials, lambda, nr_vars
   )
   
-  tbl_results_kalman_thompson <- simulate_and_fit_thompson(tbl_params_participants, nr_vars)
+  tbl_results_kalman_thompson <- simulate_and_fit_thompson(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
     "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
@@ -1386,7 +1385,7 @@ kalman_thompson_experiment <- function(
 
 
 simulate_and_fit_thompson <- function(
-    tbl_params_participants, nr_vars
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
     ) {
   # create a tbl with simulation & model parameters
   
@@ -1460,7 +1459,7 @@ kalman_ucb_experiment <- function(
     nr_participants, nr_trials, lambda, nr_vars
   )
   
-  tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_params_participants, nr_vars)
+  tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
     "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
@@ -1474,7 +1473,7 @@ kalman_ucb_experiment <- function(
 }
 
 simulate_and_fit_ucb <- function(
-    tbl_params_participants, nr_vars
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
 ) {
   
   # simulate fixed data set
@@ -1546,7 +1545,7 @@ delta_experiment <- function(
     nr_trials, is_decay, lambda
   )
   
-  tbl_results_delta <- simulate_and_fit_delta(tbl_params_participants, nr_vars)
+  tbl_results_delta <- simulate_and_fit_delta(tbl_params_participants, is_decay, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
     "\nfinished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
@@ -1561,7 +1560,7 @@ delta_experiment <- function(
 
 
 simulate_and_fit_delta <- function(
-    tbl_params_participants, is_decay
+    tbl_params_participants, is_decay, cond_on_choices, nr_trials
 ) {
   
   # simulate fixed data set
