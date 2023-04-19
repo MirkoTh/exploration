@@ -1359,17 +1359,41 @@ simulate_and_fit_softmax <- function(
 
 
 
-simulate_and_fit_thompson <- function(simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars) {
-  # create a tbl with simulation & model parameters
+kalman_thompson_experiment <- function(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, lambda, nr_vars
+) {
   
-  tbl_params_thompson <- create_participant_sample_thompson(
+  # create a tbl with by-participant simulation & model parameters
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  tbl_params_participants <- create_participant_sample_thompson(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, lambda, nr_vars
   )
   
+  tbl_results_kalman_thompson <- simulate_and_fit_thompson(tbl_params_participants, nr_vars)
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_kalman_thompson)
+}
+
+
+
+simulate_and_fit_thompson <- function(
+    tbl_params_thompson, nr_vars
+    ) {
+  # create a tbl with simulation & model parameters
+  
+
   # simulate data
   tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   
