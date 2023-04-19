@@ -1448,15 +1448,34 @@ simulate_and_fit_thompson <- function(
 }
 
 
-simulate_and_fit_ucb <- function(
+kalman_ucb_experiment <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
 ) {
   
-  tbl_params_ucb <- create_participant_sample_ucb(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
+  # create a tbl with by-participant simulation & model parameters
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  tbl_params_participants <- create_participant_sample_ucb(
+    gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, lambda, nr_vars
   )
+  
+  tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_params_participants, nr_vars)
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
+    " beta_mn = ", beta_mn, ", beta sd = ", beta_sd,
+    ", simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_kalman_ucb)
+}
+
+simulate_and_fit_ucb <- function(
+    tbl_params_ucb, nr_vars
+) {
   
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
@@ -1509,14 +1528,6 @@ simulate_and_fit_ucb <- function(
   tbl_results_ucb <- as_tibble(cbind(tbl_params_ucb, tbl_results_ucb)) %>%
     mutate(participant_id = 1:nrow(tbl_results_ucb))
   
-  
-  progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
-    " beta_mn = ", beta_mn, ", beta sd = ", beta_sd,
-    ", simulate data = ", simulate_data, ", nr participants = ", nr_participants,
-    " nr trials = ", nr_trials, "\n"
-  )
-  cat(progress_msg)
   
   return(tbl_results_ucb)
   
