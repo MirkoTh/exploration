@@ -744,8 +744,8 @@ softmax_choice_prob <- function(ms, gamma) {
   #' @param gamma inverse temperature parameter
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
   # prevent exponent to become to large
-  max_vals <- matrix(rep(708, ncol(ms)), nrow = 1)
-  prob <- exp(pmin(max_vals, gamma * ms))
+  max_vals <- matrix(rep(708, ncol(ms) * nrow(ms)), nrow = nrow(ms))
+  prob <- exp(pmin(max_vals, as.matrix(gamma * ms)))
   prob <- prob / rowSums(prob)
   return(prob)
 }
@@ -855,7 +855,7 @@ fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options) {
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
     gamma
   )
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
   return(-2*sllik)
@@ -968,7 +968,7 @@ fit_kalman_thompson_xi_variance <- function(x, tbl_results, nr_options) {
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(), 
     nr_options
   ) %>% as.data.frame() %>% as_tibble()
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
@@ -1010,7 +1010,7 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
     gamma,
     beta
   )
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
   return(-2*sllik)
@@ -1032,7 +1032,7 @@ fit_delta_softmax <- function(x, tbl_results, nr_options, is_decay = FALSE) {
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
     gamma
   )
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
   return(-2*sllik)
@@ -1268,23 +1268,40 @@ upper_and_lower_bounds_revert <- function(par, lo, hi) {
 }
 
 
-simulate_and_fit_softmax <- function(
+kalman_softmax_experiment <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
 ) {
+  
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
-  
-  # simulate data
-  tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
-    select(-trial_id)
-  
-  tbl_params_softmax <- create_participant_sample_softmax(
+  tbl_params_participants <- create_participant_sample_softmax(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, lambda, nr_vars
   )
+  
+  tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_params_participants, nr_vars)
+  
+  progress_msg <- str_c(
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_kalman_softmax)
+}
+
+simulate_and_fit_softmax <- function(
+    tbl_params_participants, nr_vars
+) {
+  
+  # simulate data
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
   
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
@@ -1336,13 +1353,6 @@ simulate_and_fit_softmax <- function(
   
   tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
-  
-  progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
-    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
-    " nr trials = ", nr_trials, "\n"
-  )
-  cat(progress_msg)
   
   return(tbl_results_softmax)
 }
