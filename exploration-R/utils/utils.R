@@ -1534,15 +1534,35 @@ simulate_and_fit_ucb <- function(
 }
 
 
-simulate_and_fit_delta <- function(
+delta_experiment <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, is_decay, lambda
+    nr_trials, cond_on_choices, is_decay
 ) {
   
-  tbl_params_delta <- create_participant_sample_delta(
+  # create a tbl with by-participant simulation & model parameters
+  # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
+  tbl_params_participants <- create_participant_sample_delta(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
     nr_trials, is_decay, lambda
   )
+  
+  tbl_results_delta <- simulate_and_fit_delta(tbl_params_participants, nr_vars)
+  
+  progress_msg <- str_c(
+    "\nfinished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
+    delta_mn = ", delta_mn, ", delta_sd = ", delta_sd, "
+    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
+    " nr trials = ", nr_trials, " is decay = ", is_decay, "\n"
+  )
+  cat(progress_msg)
+  
+  return(tbl_results_kalman_ucb)
+}
+
+
+simulate_and_fit_delta <- function(
+    tbl_params_delta, is_decay
+) {
   
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
@@ -1586,13 +1606,7 @@ simulate_and_fit_delta <- function(
   tbl_results_delta <- as_tibble(cbind(tbl_params_delta, tbl_results_delta)) %>%
     mutate(participant_id = 1:nrow(tbl_results_delta))
   
-  progress_msg <- str_c(
-    "\nfinished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
-    delta_mn = ", delta_mn, ", delta_sd = ", delta_sd, "
-    simulate data = ", simulate_data, ", nr participants = ", nr_participants,
-    " nr trials = ", nr_trials, " is decay = ", is_decay, "\n"
-  )
-  cat(progress_msg)
+
   
   return(tbl_results_delta)
   
