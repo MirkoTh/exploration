@@ -47,12 +47,12 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1, 2),#[1:2],
-  gamma_sd = c(.03, .1, .2, .3)#[1:2]
+  gamma_mn = c(.16, .5, 1),#[1:2],
+  gamma_sd = c(.03, .1, .2)#[1:2]
 )
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300, 500)
+nr_trials <- c(200, 300)
 cond_on_choices <- c(TRUE)
 
 
@@ -249,122 +249,122 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 # Kalman & Thompson: Two Variances ----------------------------------------
 
 
-simulate_data <- c(TRUE, FALSE)#[1]
-nr_participants <- c(200)
-nr_trials <- c(300, 500)
-cond_on_choices <- c(TRUE)
-
-
-tbl_params_thompson <- crossing(
-  simulate_data, nr_participants, nr_trials, cond_on_choices
-)
-
-
-if (fit_or_load == "fit")  {
-  l_results_thompson <- pmap(
-    tbl_params_thompson, kalman_thompson_experiment, 
-    lambda = lambda, nr_vars = 2
-  )
-  saveRDS(l_results_thompson, "exploration-R/data/recovery-thompson-two-variances.RDS")
-} else if (fit_or_load == "load")  {
-  l_results_thompson <- readRDS("exploration-R/data/recovery-thompson-two-variances.RDS")
-}
-
-counter <- 1
-l_results_c <- list()
-for (tbl_r in l_results_thompson) {
-  l_results_c[[counter]] <- as_tibble(cbind(
-    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_thompson[counter, ]
-  ))
-  counter = counter + 1
-}
-
-tbl_cor_thompson <- reduce(l_results_c, rbind) %>%
-  unnest_wider(params_decision) %>%
-  filter(sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29) %>%
-  group_by(simulate_data, nr_participants, nr_trials) %>%
-  summarize(
-    r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
-    r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml)
-  ) %>% ungroup()
-
-tbl_cor_thompson_long <- tbl_cor_thompson %>% 
-  mutate(
-    simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
-  ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
-  pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
-
-pd <- position_dodge(width = 1)
-plot_cor_recovery(tbl_cor_thompson_long, pd, "thompson")
-#   facet_wrap(~ name) +
-# possibly adopt plot_cor_recovery function, if error here
-
-
-# cors between pars
-f_clean_cor <- function(x) {
-  x <- x[x$sigma_xi_sq_ml < 29 & x$sigma_xi_sq_ml < 29, ]
-  cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")])
-}
-l_cors_params <- map(l_results_c, f_clean_cor)
-
-counter <- 1
-for (tbl_r in l_cors_params) {
-  l_cors_params[[counter]] <- as_tibble(cbind(
-    tbl_r, tbl_params_thompson[counter, ]
-  ))
-  counter = counter + 1
-}
-
-
-l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_thompson)
-grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
-
+# simulate_data <- c(TRUE, FALSE)#[1]
+# nr_participants <- c(200)
+# nr_trials <- c(300, 500)
+# cond_on_choices <- c(TRUE)
+# 
+# 
+# tbl_params_thompson <- crossing(
+#   simulate_data, nr_participants, nr_trials, cond_on_choices
+# )
+# 
+# 
+# if (fit_or_load == "fit")  {
+#   l_results_thompson <- pmap(
+#     tbl_params_thompson, kalman_thompson_experiment, 
+#     lambda = lambda, nr_vars = 2
+#   )
+#   saveRDS(l_results_thompson, "exploration-R/data/recovery-thompson-two-variances.RDS")
+# } else if (fit_or_load == "load")  {
+#   l_results_thompson <- readRDS("exploration-R/data/recovery-thompson-two-variances.RDS")
+# }
+# 
+# counter <- 1
+# l_results_c <- list()
+# for (tbl_r in l_results_thompson) {
+#   l_results_c[[counter]] <- as_tibble(cbind(
+#     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_thompson[counter, ]
+#   ))
+#   counter = counter + 1
+# }
+# 
+# tbl_cor_thompson <- reduce(l_results_c, rbind) %>%
+#   unnest_wider(params_decision) %>%
+#   filter(sigma_xi_sq_ml < 29 & sigma_epsilon_sq_ml < 29) %>%
+#   group_by(simulate_data, nr_participants, nr_trials) %>%
+#   summarize(
+#     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
+#     r_sigma_epsilon = cor(sigma_epsilon_sq, sigma_epsilon_sq_ml)
+#   ) %>% ungroup()
+# 
+# tbl_cor_thompson_long <- tbl_cor_thompson %>% 
+#   mutate(
+#     simulate_data = factor(simulate_data),
+#     simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+#   ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon) %>%
+#   pivot_longer(cols = c(`Sigma Xi`, `Sigma Epsilon`))
+# 
+# pd <- position_dodge(width = 1)
+# plot_cor_recovery(tbl_cor_thompson_long, pd, "thompson")
+# #   facet_wrap(~ name) +
+# # possibly adopt plot_cor_recovery function, if error here
+# 
+# 
+# # cors between pars
+# f_clean_cor <- function(x) {
+#   x <- x[x$sigma_xi_sq_ml < 29 & x$sigma_xi_sq_ml < 29, ]
+#   cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml")])
+# }
+# l_cors_params <- map(l_results_c, f_clean_cor)
+# 
+# counter <- 1
+# for (tbl_r in l_cors_params) {
+#   l_cors_params[[counter]] <- as_tibble(cbind(
+#     tbl_r, tbl_params_thompson[counter, ]
+#   ))
+#   counter = counter + 1
+# }
+# 
+# 
+# l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_thompson)
+# grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
+# 
 
 
 
 # Kalman & Thompson Fit Xi Variance ---------------------------------------
 
-
-
-if (fit_or_load == "fit")  {
-  l_results_thompson_1var <- pmap(
-    tbl_params_thompson, kalman_thompson_experiment, 
-    lambda = lambda, nr_vars = 1
-  )
-  saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-one-variance.RDS")
-} else if (fit_or_load == "load")  {
-  l_results_thompson_1var <- readRDS("exploration-R/data/recovery-thompson-one-variance.RDS")
-}
-
-counter <- 1
-l_results_c <- list()
-for (tbl_r in l_results_thompson_1var) {
-  l_results_c[[counter]] <- as_tibble(cbind(
-    tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_thompson[counter, ]
-  ))
-  counter = counter + 1
-}
-
-tbl_cor_thompson_1var <- reduce(l_results_c, rbind) %>%
-  unnest_wider(params_decision) %>%
-  filter(sigma_xi_sq_ml < 29) %>%
-  group_by(simulate_data, nr_participants, nr_trials) %>%
-  summarize(
-    r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
-  ) %>% ungroup()
-
-tbl_cor_thompson_long_1var <- tbl_cor_thompson_1var %>% 
-  mutate(
-    simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
-  ) %>% rename("Sigma Xi" = r_sigma_xi) %>%
-  pivot_longer(cols = c(`Sigma Xi`))
-
-pd <- position_dodge(width = 1)
-plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
-#   facet_wrap(~ name) +
-# possibly adopt plot_cor_recovery function, if error here
+# 
+# 
+# if (fit_or_load == "fit")  {
+#   l_results_thompson_1var <- pmap(
+#     tbl_params_thompson, kalman_thompson_experiment, 
+#     lambda = lambda, nr_vars = 1
+#   )
+#   saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-one-variance.RDS")
+# } else if (fit_or_load == "load")  {
+#   l_results_thompson_1var <- readRDS("exploration-R/data/recovery-thompson-one-variance.RDS")
+# }
+# 
+# counter <- 1
+# l_results_c <- list()
+# for (tbl_r in l_results_thompson_1var) {
+#   l_results_c[[counter]] <- as_tibble(cbind(
+#     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_thompson[counter, ]
+#   ))
+#   counter = counter + 1
+# }
+# 
+# tbl_cor_thompson_1var <- reduce(l_results_c, rbind) %>%
+#   unnest_wider(params_decision) %>%
+#   filter(sigma_xi_sq_ml < 29) %>%
+#   group_by(simulate_data, nr_participants, nr_trials) %>%
+#   summarize(
+#     r_sigma_xi = cor(sigma_xi_sq, sigma_xi_sq_ml),
+#   ) %>% ungroup()
+# 
+# tbl_cor_thompson_long_1var <- tbl_cor_thompson_1var %>% 
+#   mutate(
+#     simulate_data = factor(simulate_data),
+#     simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+#   ) %>% rename("Sigma Xi" = r_sigma_xi) %>%
+#   pivot_longer(cols = c(`Sigma Xi`))
+# 
+# pd <- position_dodge(width = 1)
+# plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
+# #   facet_wrap(~ name) +
+# # possibly adopt plot_cor_recovery function, if error here
 
 
 # Kalman & UCB ------------------------------------------------------------
@@ -372,16 +372,16 @@ plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1, 2),#[1:2],
-  gamma_sd = c(.03, .1, .2, .3)#[1:2]
+  gamma_mn = c(.16, .5, 1),#[1:2],
+  gamma_sd = c(.03, .1, .2)#[1:2]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, .5, 8),
-  beta_sd = c(.05, .1, .5)
+  beta_mn = c(.17, 1.5),
+  beta_sd = c(.05, .25)
 )
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300, 500)
+nr_trials <- c(200, 300)
 cond_on_choices <- c(TRUE)
 
 
@@ -452,7 +452,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(300, 500)
+nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -464,7 +464,7 @@ tbl_params_delta <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_delta_softmax <- pmap(
-    tbl_params_delta, safely(delta_experiment),
+    tbl_params_delta, delta_experiment,
     lambda = lambda
   )
   saveRDS(l_results_delta_softmax, "exploration-R/data/recovery-delta-softmax.RDS")

@@ -1303,9 +1303,9 @@ simulate_and_fit_softmax <- function(
     select(-trial_id)
   
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
-    tbl_params_softmax,
+    tbl_params_participants,
     simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
@@ -1321,7 +1321,7 @@ simulate_and_fit_softmax <- function(
     my_current_wrapper <- fit_softmax_wrapper
   }
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_softmax <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -1351,7 +1351,7 @@ simulate_and_fit_softmax <- function(
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "neg_ll")
   }
   
-  tbl_results_softmax <- as_tibble(cbind(tbl_params_softmax, tbl_results_softmax)) %>%
+  tbl_results_softmax <- as_tibble(cbind(tbl_params_participants, tbl_results_softmax)) %>%
     mutate(participant_id = 1:nrow(tbl_results_softmax))
   
   return(tbl_results_softmax)
@@ -1386,7 +1386,7 @@ kalman_thompson_experiment <- function(
 
 
 simulate_and_fit_thompson <- function(
-    tbl_params_thompson, nr_vars
+    tbl_params_participants, nr_vars
     ) {
   # create a tbl with simulation & model parameters
   
@@ -1397,9 +1397,9 @@ simulate_and_fit_thompson <- function(
   ) %>% 
     select(-trial_id)
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
-    tbl_params_thompson,
+    tbl_params_participants,
     simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
@@ -1413,7 +1413,7 @@ simulate_and_fit_thompson <- function(
     my_current_wrapper <- fit_thompson_wrapper
   } 
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -1441,7 +1441,7 @@ simulate_and_fit_thompson <- function(
     colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "neg_ll")
   }
   
-  tbl_results_thompson <- as_tibble(cbind(tbl_params_thompson, tbl_results_thompson)) %>%
+  tbl_results_thompson <- as_tibble(cbind(tbl_params_participants, tbl_results_thompson)) %>%
     mutate(participant_id = 1:nrow(tbl_results_thompson))
   
   return(tbl_results_thompson)
@@ -1456,8 +1456,8 @@ kalman_ucb_experiment <- function(
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_ucb(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nr_vars
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, 
+    nr_participants, nr_trials, lambda, nr_vars
   )
   
   tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_params_participants, nr_vars)
@@ -1474,7 +1474,7 @@ kalman_ucb_experiment <- function(
 }
 
 simulate_and_fit_ucb <- function(
-    tbl_params_ucb, nr_vars
+    tbl_params_participants, nr_vars
 ) {
   
   # simulate fixed data set
@@ -1484,9 +1484,9 @@ simulate_and_fit_ucb <- function(
     select(-trial_id)
   
   # simulate
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
-    tbl_params_ucb,
+    tbl_params_participants,
     simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
@@ -1494,7 +1494,7 @@ simulate_and_fit_ucb <- function(
   )
   
   # fit
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_ucb <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -1525,7 +1525,7 @@ simulate_and_fit_ucb <- function(
   }
   
   
-  tbl_results_ucb <- as_tibble(cbind(tbl_params_ucb, tbl_results_ucb)) %>%
+  tbl_results_ucb <- as_tibble(cbind(tbl_params_participants, tbl_results_ucb)) %>%
     mutate(participant_id = 1:nrow(tbl_results_ucb))
   
   
@@ -1536,7 +1536,7 @@ simulate_and_fit_ucb <- function(
 
 delta_experiment <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, is_decay
+    nr_trials, cond_on_choices, is_decay, lambda
 ) {
   
   # create a tbl with by-participant simulation & model parameters
@@ -1556,12 +1556,12 @@ delta_experiment <- function(
   )
   cat(progress_msg)
   
-  return(tbl_results_kalman_ucb)
+  return(tbl_results_delta)
 }
 
 
 simulate_and_fit_delta <- function(
-    tbl_params_delta, is_decay
+    tbl_params_participants, is_decay
 ) {
   
   # simulate fixed data set
@@ -1570,16 +1570,16 @@ simulate_and_fit_delta <- function(
   ) %>% 
     select(-trial_id)
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
-    tbl_params_delta,
+    tbl_params_participants,
     simulate_delta, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
   
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   l_softmax <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -1603,9 +1603,8 @@ simulate_and_fit_delta <- function(
   tbl_results_delta <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   colnames(tbl_results_delta) <- c("delta_ml", "gamma_ml", "neg_ll")
   
-  tbl_results_delta <- as_tibble(cbind(tbl_params_delta, tbl_results_delta)) %>%
+  tbl_results_delta <- as_tibble(cbind(tbl_params_participants, tbl_results_delta)) %>%
     mutate(participant_id = 1:nrow(tbl_results_delta))
-  
 
   
   return(tbl_results_delta)
@@ -1634,7 +1633,7 @@ generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda
   )
   as_tibble(as.data.frame(mus + noise)) %>% 
     mutate(trial_id = 1:nr_trials) %>%
-    rename("Bandit 1" = V1, "Bandit 2" = V2, "Bandit 3" = V3, "Bandit 4" = V4)
+    rename("Arm 1" = V1, "Arm 2" = V2, "Arm 3" = V3, "Arm 4" = V4)
 }
 
 
@@ -1937,7 +1936,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   #' and fit all models afterwards
   
   # simulate choices given soft max choice model
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores() / 2)
   #plan(multisession, workers = 2)
   l_choices_simulated <- future_pmap(
     tbl_params_simulate,
