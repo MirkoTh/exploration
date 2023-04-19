@@ -62,7 +62,7 @@ tbl_params_softmax <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_softmax <- pmap(
-    tbl_params_softmax, simulate_and_fit_softmax, 
+    tbl_params_softmax, kalman_softmax_experiment, 
     lambda = lambda, nr_vars = 2
   )
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
@@ -133,7 +133,7 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 if (fit_or_load == "fit")  {
   l_results_softmax_1var <- pmap(
     tbl_params_softmax, 
-    simulate_and_fit_softmax, 
+    kalman_softmax_experiment, 
     lambda = lambda,
     nr_vars = 1
   )
@@ -204,7 +204,7 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 if (fit_or_load == "fit")  {
   l_results_softmax_0var <- pmap(
     tbl_params_softmax, 
-    simulate_and_fit_softmax, 
+    kalman_softmax_experiment, 
     lambda = lambda,
     nr_vars = 0
   )
@@ -261,7 +261,10 @@ tbl_params_thompson <- crossing(
 
 
 if (fit_or_load == "fit")  {
-  l_results_thompson <- pmap(tbl_params_thompson, simulate_and_fit_thompson, lambda = lambda, nr_vars = 2)
+  l_results_thompson <- pmap(
+    tbl_params_thompson, kalman_thompson_experiment, 
+    lambda = lambda, nr_vars = 2
+  )
   saveRDS(l_results_thompson, "exploration-R/data/recovery-thompson-two-variances.RDS")
 } else if (fit_or_load == "load")  {
   l_results_thompson <- readRDS("exploration-R/data/recovery-thompson-two-variances.RDS")
@@ -326,7 +329,7 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 2, ncol = 2))
 
 if (fit_or_load == "fit")  {
   l_results_thompson_1var <- pmap(
-    tbl_params_thompson, simulate_and_fit_thompson, 
+    tbl_params_thompson, kalman_thompson_experiment, 
     lambda = lambda, nr_vars = 1
   )
   saveRDS(l_results_thompson_1var, "exploration-R/data/recovery-thompson-one-variance.RDS")
@@ -389,7 +392,7 @@ tbl_params_ucb <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_ucb_0var <- pmap(
-    tbl_params_ucb, simulate_and_fit_ucb,
+    tbl_params_ucb, kalman_ucb_experiment,
     lambda = lambda, nr_vars = 0
   )
   saveRDS(l_results_ucb_0var, "exploration-R/data/recovery-ucb-no-variance.RDS")
@@ -461,7 +464,7 @@ tbl_params_delta <- crossing(
 
 if (fit_or_load == "fit")  {
   l_results_delta_softmax <- pmap(
-    tbl_params_delta, safely(simulate_and_fit_delta),
+    tbl_params_delta, safely(delta_experiment),
     lambda = lambda
   )
   saveRDS(l_results_delta_softmax, "exploration-R/data/recovery-delta-softmax.RDS")
