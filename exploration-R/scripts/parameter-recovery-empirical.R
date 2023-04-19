@@ -15,7 +15,8 @@ library(TTR)
 library(future)
 library(furrr)
 library(ggbeeswarm)
-
+library(reactable)
+library(reactablefmtr)
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
@@ -325,6 +326,25 @@ decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
 
 tbl_summary_pars <- rbind(km_sm, km_ucb, delta_sm, decay_sm)
 # visualize summary recovery of four models with reactable table
+badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
+
+colnames(tbl_summary_pars) <- c("Model", "simulate_data", "Gamma", "Beta", "Delta")
+tbl_summary_pars[, c("Gamma", "Beta", "Delta")] <- map(tbl_summary_pars[, c("Gamma", "Beta", "Delta")], ~ round(.x, digits = 2))
+tbl_summary_pars <- tbl_summary_pars %>% select(-simulate_data)
+reactable(
+  tbl_summary_pars,
+  defaultColDef = colDef(
+    minWidth = 150,
+    align = "center",
+    cell = color_tiles(tbl_summary_pars, span = 2:4, colors = badtogood_cols)
+  ),
+  columns = list(
+    Model = colDef(
+      style = cell_style(data,
+                         font_weight = "bold"))
+  )
+)
+
 
 
 tbl_gammas <- tbl_kalman_softmax_no_variance %>%
