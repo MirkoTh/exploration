@@ -14,6 +14,7 @@ library(zoo)
 library(TTR)
 library(future)
 library(furrr)
+library(ggbeeswarm)
 
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
@@ -72,7 +73,7 @@ my_participants_tbl_delta <- function(l_params_decision, delta) {
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = l_params_decision,
-    simulate_data = FALSE,
+    simulate_data = TRUE,
     seed = round(rnorm(nr_participants, 100000, 1000))
   )
 }
@@ -85,7 +86,7 @@ my_participants_tbl_delta <- function(l_params_decision, delta) {
 ## Softmax no variance ----------------------------------------------------
 
 
-
+plan(multisession, workers = 3)#availableCores() - 2)
 l_kalman_softmax_no_variance <- furrr::future_map(
   l_participants, fit_softmax_no_variance_wrapper, 
   tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -101,7 +102,9 @@ l_params_decision <- map(
 )
 
 tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision)
-tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_participants_kalman_softmax, nr_vars = 0)
+tbl_results_kalman_softmax <- simulate_and_fit_softmax(
+  tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE
+  )
 
 tbl_recovery_kalman_softmax <- tbl_results_kalman_softmax %>%
   unnest_wider(params_decision) %>%
@@ -127,7 +130,7 @@ tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>%
 
 
 
-plan(multisession, workers = availableCores() - 2)
+plan(multisession, workers = 3)#availableCores() - 2)
 l_kalman_ucb_no_variance <- furrr:::future_map(
   l_participants, fit_ucb_no_variance_wrapper,
   tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -142,7 +145,7 @@ l_params_decision <- map2(
 )
 
 tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision)
-tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0)
+tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE)
 
 tbl_recovery_kalman_ucb <- tbl_results_kalman_ucb %>%
   unnest_wider(params_decision) %>%
@@ -191,7 +194,7 @@ plot_cor_recovery(tbl_recovery_kalman_ucb_long, pd, "ucb")
 # )
 # 
 # tbl_participants_kalman_thompson <- my_participants_tbl_kalman(l_params_decision)
-# tbl_results_kalman_softmax <- simulate_and_fit_thompson(tbl_participants_kalman_thompson, nr_vars = 1)
+# tbl_results_kalman_softmax <- simulate_and_fit_thompson(tbl_participants_kalman_thompson, nr_vars = 1, cond_on_choices = TRUE)
 # 
 
 
@@ -199,7 +202,7 @@ plot_cor_recovery(tbl_recovery_kalman_ucb_long, pd, "ucb")
 
 
 
-plan(multisession, workers = availableCores() - 2)
+plan(multisession, workers = 3)#availableCores() - 2)
 l_delta_softmax <- furrr::future_map(
   l_participants, fit_delta_softmax_wrapper,
   tbl_rewards = tbl_rewards, is_decay = FALSE, condition_on_observed_choices = TRUE,
@@ -214,13 +217,13 @@ l_params_decision <- map(
 )
 
 tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta)
-tbl_results_delta_softmax <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE)
+tbl_results_delta_softmax <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE)
 
 tbl_recovery_delta_softmax <- tbl_results_delta_softmax %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
   filter(
-    gamma_ml < 2.9 |
+    gamma_ml < 2.9 &
       delta_ml < 0.99
   ) %>%
   summarize(
@@ -266,13 +269,13 @@ l_params_decision <- map(
 )
 
 tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta)
-tbl_results_decay_softmax <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE)
+tbl_results_decay_softmax <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE)
 
 tbl_recovery_decay_softmax <- tbl_results_decay_softmax %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
   filter(
-    gamma_ml < 2.9 |
+    gamma_ml < 2.9 &
       delta_ml < 0.99
   ) %>%
   summarize(
@@ -297,3 +300,110 @@ tbl_recovery_decay_softmax_long <- tbl_recovery_decay_softmax %>%
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_recovery_decay_softmax_long, pd, "softmax") +
   facet_grid(name ~ is_decay)
+
+
+
+
+# Summarize Results -------------------------------------------------------
+
+wrangle_recoveries <- function(my_tbl, modelname) {
+  tbl_summary <- tibble(pars = c("simulate_data", "r_gamma", "r_beta", "r_delta"))
+  out <- tbl_summary %>% left_join(
+    my_tbl %>% 
+      mutate(model = modelname) %>%
+      pivot_longer(cols = -model),
+    by = c("pars" = "name")
+  ) %>%
+    pivot_wider(names_from = pars, values_from = value)
+  out[!is.na(out$model), ]
+}
+
+km_sm <- wrangle_recoveries(tbl_recovery_kalman_softmax, "Kalman Softmax")
+km_ucb <- wrangle_recoveries(tbl_recovery_kalman_ucb, "Kalman UCB")
+delta_sm <- wrangle_recoveries(tbl_recovery_delta_softmax, "Delta Softmax")
+decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
+
+tbl_summary_pars <- rbind(km_sm, km_ucb, delta_sm, decay_sm)
+# visualize summary recovery of four models with reactable table
+
+
+tbl_gammas <- tbl_kalman_softmax_no_variance %>%
+  select(gamma) %>%
+  mutate(model = "Kalman Softmax") %>%
+  rbind(
+    tbl_kalman_ucb_no_variance %>%
+      select(gamma) %>%
+      mutate(model = "Kalman UCB") 
+  ) %>%
+  rbind(
+    tbl_delta_softmax %>%
+      select(gamma) %>%
+      mutate(model = "Delta Softmax") 
+  ) %>%
+  rbind(
+    tbl_decay_softmax %>%
+      select(gamma) %>%
+      mutate(model = "Decay Softmax") 
+  )
+
+tbl_gammas$model <- factor(tbl_gammas$model)
+tbl_gammas$model <- fct_inorder(tbl_gammas$model)
+pl_gammas <- ggplot(tbl_gammas, aes(model, gamma, group = model)) +
+  geom_violin(aes(fill = model), alpha = .25) +
+  geom_beeswarm(aes(color = model), cex = 1.5, alpha = .5) +
+  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(.003, .003)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Model", y = "Gamma")
+  
+
+
+tbl_deltas <- tbl_delta_softmax %>%
+  select(delta) %>%
+  mutate(model = "Delta Softmax") %>%
+  rbind(
+    tbl_decay_softmax %>%
+      select(delta) %>%
+      mutate(model = "Decay Softmax") 
+  )
+
+tbl_deltas$model <- factor(tbl_deltas$model)
+tbl_deltas$model <- fct_inorder(tbl_deltas$model)
+pl_deltas <- ggplot(tbl_deltas, aes(model, delta, group = model)) +
+  geom_violin(aes(fill = model), alpha = .25) +
+  geom_beeswarm(aes(color = model), cex = 1.5, alpha = .5) +
+  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(.003, .003)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Model", y = "Delta")
+
+tbl_beta <- tbl_kalman_ucb_no_variance %>%
+  select(beta) %>%
+  mutate(model = "Kalman UCB")
+
+tbl_beta$model <- factor(tbl_beta$model)
+tbl_beta$model <- fct_inorder(tbl_beta$model)
+pl_beta <- ggplot(tbl_beta, aes(model, beta, group = model)) +
+  geom_violin(aes(fill = model), alpha = .25) +
+  geom_beeswarm(aes(color = model), cex = 1.5, alpha = .5) +
+  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(.003, .003)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Model", y = "Beta")
+
+grid.draw(arrangeGrob(pl_gammas, pl_deltas, pl_beta, nrow = 1, widths = c(1, .5, .35)))
