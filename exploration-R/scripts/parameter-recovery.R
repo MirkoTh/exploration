@@ -227,9 +227,9 @@ for (tbl_r in l_results_softmax_0var) {
 tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
   unnest_wider(params_decision) %>%
   group_by(gamma_mn, simulate_data, nr_participants, nr_trials) %>%
-  filter(
-    gamma_ml < 2.9
-  ) %>%
+  # filter(
+  #   gamma_ml < 2.9
+  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
   ) %>% ungroup()
@@ -415,10 +415,10 @@ for (tbl_r in l_results_ucb_0var) {
 
 tbl_cor_ucb_0var <- reduce(l_results_c_0var, rbind) %>%
   group_by(gamma_mn, beta_mn, simulate_data, nr_trials) %>%
-  filter(
-    gamma_ml < 2.9 |
-      beta_ml < 2.9
-  ) %>%
+  # filter(
+  #   gamma_ml < 2.9 |
+  #     beta_ml < 2.9
+  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml)
@@ -445,8 +445,8 @@ plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1),#[1],
-  gamma_sd = c(.03, .1, .2)#[1]
+  gamma_mn = c(.05, .16, 1),#[1],
+  gamma_sd = c(.01, .03, .2)#[1]
 )
 tbl_deltas <- tibble(
   delta_mn = c(.55, .9),#[1],
@@ -454,7 +454,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- c(300, 600)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -488,10 +488,10 @@ for (tbl_r in l_results_delta_softmax) {
 
 tbl_cor_c_delta_softmax <- reduce(l_results_c_delta_softmax, rbind) %>%
   group_by(delta_mn, gamma_mn, simulate_data, nr_trials, is_decay) %>%
-  filter(
-    gamma_ml < 2.9 &
-      delta_ml < 0.99
-  ) %>%
+  # filter(
+  #   gamma_ml < 2.9 &
+  #     delta_ml < 0.99
+  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_delta = cor(delta, delta_ml)
@@ -501,7 +501,7 @@ tbl_cor_delta_softmax_long <- tbl_cor_c_delta_softmax %>%
   mutate(
     simulate_data = factor(simulate_data),
     is_decay = factor(is_decay),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE"),#, "Simulate Once" = "FALSE"),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
     is_decay = fct_recode(is_decay, "Decay Rule" = "TRUE", "Delta Rule" = "FALSE")
   ) %>% 
   rename(
@@ -512,7 +512,7 @@ tbl_cor_delta_softmax_long <- tbl_cor_c_delta_softmax %>%
 
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_cor_delta_softmax_long, pd, "softmax") +
-  facet_grid(interaction(delta_mn, name) ~ is_decay)
+  facet_grid(interaction(delta_mn, name) ~ interaction(simulate_data, is_decay))
 
 recovery_simulated_summary <- function(gamma_val) {
   tbl_sm0 <- tbl_cor_softmax_0var %>% 
@@ -523,15 +523,13 @@ recovery_simulated_summary <- function(gamma_val) {
     filter(gamma_mn == gamma_val & simulate_data & beta_mn == .17 & nr_trials == 300) %>%
     mutate(model = "Kalman UCB")
   tbl_delta_sm <- tbl_cor_c_delta_softmax %>% 
-    filter(gamma_mn == gamma_val & simulate_data & nr_trials == 400) %>%
+    filter(gamma_mn == gamma_val & simulate_data & nr_trials == 300) %>%
     filter(!is_decay & delta_mn == .9) %>%
     mutate(model = "Delta")
-  tbl_delta_sm$nr_trials[tbl_delta_sm$nr_trials == 400] <- 300
   tbl_decay_sm <- tbl_cor_c_delta_softmax %>% 
-    filter(gamma_mn == gamma_val & simulate_data & nr_trials == 400) %>%
+    filter(gamma_mn == gamma_val & simulate_data & nr_trials == 300) %>%
     filter(is_decay & delta_mn == .55) %>%
     mutate(model = "Decay")
-  tbl_decay_sm$nr_trials[tbl_decay_sm$nr_trials == 400] <- 300
   bind_rows(tbl_sm0, tbl_ucb0, tbl_delta_sm, tbl_decay_sm) %>%
     select(nr_trials, model, r_gamma, r_beta, r_delta)
 }

@@ -1565,7 +1565,7 @@ simulate_and_fit_delta <- function(
   
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   
