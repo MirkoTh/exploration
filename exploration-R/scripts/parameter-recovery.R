@@ -445,16 +445,16 @@ plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.05, .16, 1),#[1],
-  gamma_sd = c(.01, .03, .2)#[1]
+  gamma_mn = c(.08, .16),#[1],
+  gamma_sd = c(.05, .1)#[1]
 )
 tbl_deltas <- tibble(
-  delta_mn = c(.55, .9),#[1],
-  delta_sd = c(.05, .03)#[1]
+  delta_mn = c(.55, .85),#[1],
+  delta_sd = c(.20, .09)#[1]
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(300, 600)
+nr_trials <- c(200, 400, 600)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -462,7 +462,6 @@ tbl_params_delta <- crossing(
   tbl_gammas, tbl_deltas, simulate_data, nr_participants, 
   nr_trials, cond_on_choices, is_decay
 )
-
 
 if (fit_or_load == "fit")  {
   l_results_delta_softmax <- pmap(
@@ -473,6 +472,14 @@ if (fit_or_load == "fit")  {
 } else if (fit_or_load == "load")  {
   l_results_delta_softmax <- readRDS("exploration-R/data/recovery-delta-softmax.RDS")
 }
+
+m <- -1
+while(m < 0) {
+  vals <- rnorm(200, .16, .1)
+  m <- min(vals)
+}
+
+hist(vals)
 
 
 counter <- 1
@@ -509,6 +516,21 @@ tbl_cor_delta_softmax_long <- tbl_cor_c_delta_softmax %>%
     "Delta" = r_delta
   ) %>%
   pivot_longer(cols = c(Gamma, Delta))
+
+
+ggplot(
+  tbl_cor_delta_softmax_long %>% filter(gamma_mn %in% c(.08, .16) & simulate_data == "Simulate By Participant"), 
+  aes(gamma_mn, value, group = interaction(nr_trials, name))
+) +
+  geom_hline(yintercept = 1, linetype = "dotdash", color = "grey") +
+  geom_hline(yintercept = .5, linetype = "dotdash", color = "grey") +
+  geom_line(aes(group = interaction(nr_trials, name))) +
+  facet_grid(delta_mn ~ is_decay) +
+  geom_point(aes(color = nr_trials, shape = name)) +
+  theme_bw() +
+  scale_x_continuous(expand = c(.01, .01)) +
+  scale_y_continuous(expand = c(.01, 0)) +
+  labs(x = "", y = "")
 
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_cor_delta_softmax_long, pd, "softmax") +
@@ -559,7 +581,82 @@ my_nice_tbl <- function(my_tbl) {
 my_nice_tbl(tbl_1)
 my_nice_tbl(tbl_2)
 
+recovery_simulated_summary <- function(gamma_val) {
+  tbl_sm0 <- tbl_cor_softmax_0var %>% 
+    filter(gamma_mn == gamma_val & simulate_data & nr_trials == 300) %>% 
+    select(-nr_participants) %>%
+    mutate(model = "Kalman Softmax")
+  tbl_ucb0 <- tbl_cor_ucb_0var %>% 
+    filter(gamma_mn == gamma_val & simulate_data & beta_mn == .17 & nr_trials == 300) %>%
+    mutate(model = "Kalman UCB")
+  tbl_delta_sm <- tbl_cor_c_delta_softmax %>% 
+    filter(gamma_mn == .16 & simulate_data & nr_trials == 600) %>%
+    filter(!is_decay & delta_mn == .55) %>%
+    mutate(model = "Delta")
+  tbl_decay_sm <- tbl_cor_c_delta_softmax %>% 
+    filter(gamma_mn == .08 & simulate_data & nr_trials == 600) %>%
+    filter(is_decay & delta_mn == .55) %>%
+    mutate(model = "Decay")
+  bind_rows(tbl_sm0, tbl_ucb0, tbl_delta_sm, tbl_decay_sm) %>%
+    select(nr_trials, model, r_gamma, r_beta, r_delta)
+}
+
+tbl_1 <- recovery_simulated_summary(.16) %>% select(-nr_trials)
+tbl_1_long <- tbl_1 %>% pivot_longer(-model)
+tbl_1_long$name <- factor(tbl_1_long$name)
+levels(tbl_1_long$name) <- c("Beta", "Delta", "Gamma")
+tbl_1_long$name <- fct_relevel(tbl_1_long$name, "Beta", after = 2)
+pl_heatmap_cherry <- ggplot(tbl_1_long, aes(name, model)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2)), color = "black") +
+  theme_bw() +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_fill_gradient2(high = "aquamarine2", low = "tomato", mid = .5, guide = "none") +
+  labs(x = "", y = "")
 
 
+rule <- "Delta Rule"
+rule <- "Decay Rule"
+gamma_cherry <- .08
+gamma_cherry <- .16
+
+
+pl_landscape_delta <- plot_landscape_with_cherry("Delta Rule", .16)
+pl_landscape_decay <- plot_landscape_with_cherry("Decay Rule", .08)
+
+grid.draw(arrangeGrob(pl_heatmap_cherry, pl_landscape_delta, nrow = 1))
+grid.draw(arrangeGrob(pl_heatmap_cherry, pl_landscape_decay, nrow = 1))
+
+
+
+
+plot_landscape_with_cherry <- function(rule, gamma_cherry) {
+  tbl_plot <- tbl_cor_delta_softmax_long %>%
+    filter(simulate_data == "Simulate By Participant" & is_decay == rule) %>%
+    mutate(delta_mn = as.factor(delta_mn))
+  
+  tbl_cherry <- tbl_plot %>% filter(gamma_mn == gamma_cherry & nr_trials == 600 & delta_mn == .55)
+  
+  pl_landscape <- ggplot(tbl_plot, aes(gamma_mn, value, group = interaction(delta_mn, nr_trials))) +
+    geom_line(aes(color = nr_trials, linetype = delta_mn)) +
+    geom_point(color = "white", size = 3) +
+    geom_point(aes(color = nr_trials, shape = delta_mn))  +
+    geom_hline(yintercept = 1, linetype = "dotdash", color = "grey") +
+    geom_hline(yintercept = .5, linetype = "dotdash", color = "grey") +
+    facet_wrap(~ name) +
+    theme_bw() +
+    scale_x_continuous(expand = c(.01, .01)) +
+    scale_y_continuous(expand = c(.01, .01)) +
+    labs(x = "", y = "") +
+    scale_color_continuous(high = "slateblue", low = "lightblue", name = "Nr. Trials") +
+    scale_shape_discrete(name = "Mean Delta") +
+    scale_linetype_discrete(guide = "none") +
+    coord_cartesian(ylim = c(0, 1)) +
+    geom_point(data = tbl_cherry, shape = 0, size = 3)
+  
+  return(pl_landscape)
+  
+}
 
 
