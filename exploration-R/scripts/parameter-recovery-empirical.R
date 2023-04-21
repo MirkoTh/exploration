@@ -54,7 +54,7 @@ tbl_rewards <- generate_restless_bandits(
   select(-trial_id)
 
 
-my_participants_tbl_kalman <- function(l_params_decision) {
+my_participants_tbl_kalman <- function(l_params_decision, sim_d) {
   tibble(
     sigma_prior = 1000,
     mu_prior = 0,
@@ -63,18 +63,18 @@ my_participants_tbl_kalman <- function(l_params_decision) {
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = l_params_decision,
-    simulate_data = TRUE,
+    simulate_data = sim_d,
     seed = round(rnorm(nr_participants, 100000, 1000))
   )
 }
 
-my_participants_tbl_delta <- function(l_params_decision, delta) {
+my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
   tibble(
     delta = delta,
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = l_params_decision,
-    simulate_data = TRUE,
+    simulate_data = sim_d,
     seed = round(rnorm(nr_participants, 100000, 1000))
   )
 }
@@ -102,17 +102,22 @@ l_params_decision <- map(
   ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
 )
 
-tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision)
-tbl_results_kalman_softmax <- simulate_and_fit_softmax(
+tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
+tbl_results_kalman_softmax_sim <- simulate_and_fit_softmax(
   tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+  )
+tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, FALSE)
+tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
+  tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+)
+
+tbl_results_kalman_softmax <- rbind(
+  tbl_results_kalman_softmax_sim, tbl_results_kalman_softmax_fix
   )
 
 tbl_recovery_kalman_softmax <- tbl_results_kalman_softmax %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
-  # filter(
-  #   gamma_ml < 2.9
-  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
   ) %>% ungroup()
@@ -120,7 +125,7 @@ tbl_recovery_kalman_softmax <- tbl_results_kalman_softmax %>%
 tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>% 
   mutate(
     simulate_data = factor(simulate_data),
-    #simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
   ) %>% rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
 
@@ -145,27 +150,27 @@ l_params_decision <- map2(
   ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
 )
 
-tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision)
-tbl_results_kalman_ucb <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
+tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, FALSE)
+tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
 
+tbl_results_kalman_ucb <- rbind(tbl_results_kalman_ucb_fix, tbl_results_kalman_ucb_sim)
 tbl_recovery_kalman_ucb <- tbl_results_kalman_ucb %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
-  # filter(
-  #   gamma_ml < 2.9 &
-  #     beta_ml < 2.9
-  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml)
   ) %>% ungroup()
 
-tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb %>% 
+tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>% 
   mutate(
-    beta_mn = "empirical",
-    gamma_mn = "empirical",
     simulate_data = factor(simulate_data),
-  ) %>% 
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
+    beta_mn = "empirical",
+    gamma_mn = "empirical"
+  ) %>%
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta
@@ -214,16 +219,16 @@ l_params_decision <- map(
   ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
 )
 
-tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta)
-tbl_results_delta_softmax <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
+tbl_results_delta_softmax_sim <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
+tbl_results_delta_softmax_fix <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
+
+tbl_results_delta_softmax <- rbind(tbl_results_delta_softmax_sim, tbl_results_delta_softmax_fix)
 
 tbl_recovery_delta_softmax <- tbl_results_delta_softmax %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
-  # filter(
-  #   gamma_ml < 2.9 &
-  #     delta_ml < 0.99
-  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_delta = cor(delta, delta_ml)
@@ -234,9 +239,7 @@ tbl_recovery_delta_softmax_long <- tbl_recovery_delta_softmax %>%
     gamma_mn = "empirical",
     is_decay = FALSE,
     simulate_data = factor(simulate_data),
-    is_decay = factor(is_decay),
-    # simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    # is_decay = fct_recode(is_decay, "Decay Rule" = "TRUE", "Delta Rule" = "FALSE")
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
   ) %>% 
   rename(
     "Gamma" = r_gamma,
@@ -264,16 +267,16 @@ l_params_decision <- map(
   ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
 )
 
-tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta)
-tbl_results_decay_softmax <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
+tbl_results_decay_softmax_sim <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
+tbl_results_decay_softmax_fix <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
+
+tbl_results_decay_softmax <- rbind(tbl_results_decay_softmax_sim, tbl_results_decay_softmax_fix)
 
 tbl_recovery_decay_softmax <- tbl_results_decay_softmax %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
-  # filter(
-  #   gamma_ml < 2.9 &
-  #     delta_ml < 0.99
-  # ) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_delta = cor(delta, delta_ml)
@@ -282,11 +285,10 @@ tbl_recovery_decay_softmax <- tbl_results_decay_softmax %>%
 tbl_recovery_decay_softmax_long <- tbl_recovery_decay_softmax %>% 
   mutate(
     gamma_mn = "empirical",
-    is_decay = FALSE,
+    is_decay = TRUE,
     simulate_data = factor(simulate_data),
     is_decay = factor(is_decay),
-    # simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    # is_decay = fct_recode(is_decay, "Decay Rule" = "TRUE", "Delta Rule" = "FALSE")
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
   ) %>% 
   rename(
     "Gamma" = r_gamma,
@@ -304,11 +306,11 @@ plot_cor_recovery(tbl_recovery_decay_softmax_long, pd, "softmax") +
 # Summarize Results -------------------------------------------------------
 
 wrangle_recoveries <- function(my_tbl, modelname) {
-  tbl_summary <- tibble(pars = c("simulate_data", "r_gamma", "r_beta", "r_delta"))
+  tbl_summary <- tibble(pars = c("r_gamma", "r_beta", "r_delta"))
   out <- tbl_summary %>% left_join(
     my_tbl %>% 
       mutate(model = modelname) %>%
-      pivot_longer(cols = -model),
+      pivot_longer(cols = -c(model, simulate_data)),
     by = c("pars" = "name")
   ) %>%
     pivot_wider(names_from = pars, values_from = value)
@@ -340,6 +342,24 @@ reactable(
                          font_weight = "bold"))
   )
 )
+
+tbl_summary_pars_long <- tbl_summary_pars %>% pivot_longer(-c(model, simulate_data))
+tbl_summary_pars_long$name <- factor(tbl_summary_pars_long$name)
+levels(tbl_summary_pars_long$name) <- c("Beta", "Delta", "Gamma")
+tbl_summary_pars_long$name <- fct_relevel(tbl_summary_pars_long$name, "Beta", after = 2)
+tbl_summary_pars_long$simulate_data <- factor(tbl_summary_pars_long$simulate_data, labels = c("One Stimulus Set", "Individual Stimulus Set"))
+ggplot(tbl_summary_pars_long, aes(name, model)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2)), color = "black") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "white")) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_fill_gradient2(high = "aquamarine2", low = "tomato", mid = .5, guide = "none") +
+  labs(x = "", y = "") +
+  facet_wrap(~ simulate_data)
+
+
 
 
 tbl_gammas <- tbl_results_kalman_softmax %>%
