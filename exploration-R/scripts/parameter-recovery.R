@@ -45,7 +45,8 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 
-# Kalman & Softmax --------------------------------------------------------
+
+# Kalman & Softmax: fit Xi and Epsilon Variances --------------------------
 
 
 tbl_gammas <- tibble(
@@ -127,7 +128,7 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 
-# Kalman & Softmax: Fit Only Xi Variance ----------------------------------
+# Kalman & Softmax: Fit Xi Variance ----------------------------------------
 
 
 # take same combination of hyperparameters as before
@@ -200,7 +201,7 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 
-# Kalman & Softmax, but Fix Variances -------------------------------------
+# Kalman & Softmax: Fix Variances ------------------------------------------
 
 
 if (fit_or_load == "fit")  {
@@ -248,7 +249,7 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 
-# Kalman & Thompson: Two Variances ----------------------------------------
+# Kalman & Thompson: fit Xi and Epsilon Variances --------------------------
 
 
 # simulate_data <- c(TRUE, FALSE)#[1]
@@ -325,7 +326,7 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 
-# Kalman & Thompson Fit Xi Variance ---------------------------------------
+# Kalman & Thompson: Fit Xi Variance --------------------------------------
 
 # 
 # 
@@ -369,7 +370,8 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 # # possibly adopt plot_cor_recovery function, if error here
 
 
-# Kalman & UCB ------------------------------------------------------------
+
+# Kalman & UCB: Fix Variances ---------------------------------------------
 
 
 
@@ -438,6 +440,77 @@ tbl_cor_ucb_0var_long <- tbl_cor_ucb_0var %>%
 pd <- position_dodge(width = .9)
 plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
+
+
+# Kalman & (RU & Thompson): Fix Variances ----------------------------------
+
+
+tbl_gammas <- tibble(
+  gamma_mn = c(.16, .5, 1),#[1],
+  gamma_sd = c(.03, .1, .2)#[1]
+)
+tbl_betas <- tibble(
+  beta_mn = c(.17, 1.5),#[1],
+  beta_sd = c(.05, .25)#[1]
+)
+tbl_w_mix <- tibble(
+  w_mix_mn = c(.5, .75),
+  w_mix_sd = c(.2, .15)
+)
+  
+simulate_data <- c(TRUE, FALSE)#[1]
+nr_participants <- c(200)
+nr_trials <- c(200, 300)
+cond_on_choices <- c(TRUE)
+
+
+tbl_params_ru_thompson <- crossing(
+  tbl_gammas, tbl_betas, tbl_w_mix,
+  simulate_data, nr_participants, nr_trials, cond_on_choices
+)
+
+
+if (fit_or_load == "fit")  {
+  l_results_ru_thompson_0var <- pmap(
+    tbl_params_ru_thompson, kalman_ru_thompson_experiment,
+    lambda = lambda, nr_vars = 0
+  )
+  saveRDS(l_results_ru_thompson_0var, "exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+} else if (fit_or_load == "load")  {
+  l_results_ru_thompson_0var <- readRDS("exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+}
+
+counter <- 1
+l_results_mix_0var <- list()
+for (tbl_r in l_results_ru_thompson_0var) {
+  l_results_mix_0var[[counter]] <- as_tibble(cbind(
+    tbl_r %>% 
+      unnest_wider(params_decision) %>%
+      select(-c(simulate_data, nr_trials)), tbl_params_ru_thompson[counter, ]
+  ))
+  counter <- counter + 1
+}
+
+tbl_cor_ru_thompson_0var <- reduce(l_results_mix_0var, rbind) %>%
+  group_by(gamma_mn, beta_mn, simulate_data, nr_trials) %>%
+  summarize(
+    r_gamma = cor(gamma, gamma_ml),
+    r_beta = cor(beta, beta_ml)
+  ) %>% ungroup()
+
+tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+  ) %>% 
+  rename(
+    "Gamma" = r_gamma,
+    "Beta" = r_beta
+  ) %>%
+  pivot_longer(cols = c(Gamma, Beta))
+
+pd <- position_dodge(width = .9)
+plot_cor_recovery(tbl_cor_ru_thompson_0var_long, pd, "ucb")
 
 
 
