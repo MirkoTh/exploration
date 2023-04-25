@@ -21,6 +21,11 @@ library(reactablefmtr)
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
+
+fit_or_load <- "load"
+
+
+
 tbl_rb <- read_csv(
   "https://github.com/speekenbrink-lab/data/raw/master/Speekenbrink_Konstantinidis_2015.csv"
 )
@@ -86,34 +91,43 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 
 ## Softmax no variance ----------------------------------------------------
 
+if (fit_or_load == "fit") {
+  plan(multisession, workers = 2)#availableCores() - 2)
+  l_kalman_softmax_no_variance <- furrr::future_map(
+    l_participants, fit_softmax_no_variance_wrapper, 
+    tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+    .progress = TRUE
+  )
+  saveRDS(l_kalman_softmax_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-softmax-fit.rds")
+  
+  tbl_kalman_softmax_no_variance <- reduce(l_kalman_softmax_no_variance, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(gamma = V1, ll = V2)
+  
+  l_params_decision <- map(
+    tbl_kalman_softmax_no_variance$gamma, 
+    ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+  )
+  
+  tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
+  tbl_results_kalman_softmax_sim <- simulate_and_fit_softmax(
+    tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+  )
+  tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, FALSE)
+  tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
+    tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+  )
+  
+  tbl_results_kalman_softmax <- rbind(
+    tbl_results_kalman_softmax_sim, tbl_results_kalman_softmax_fix
+  )
+  saveRDS(tbl_results_kalman_softmax, file = "exploration-R/data/empirical-parameter-recovery-kalman-softmax-recovery.rds")
+} else if (fit_or_load == "load") {
+  l_kalman_softmax_no_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-softmax-fit.rds")
+  tbl_results_kalman_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-softmax-recovery.rds")
+}
 
-plan(multisession, workers = 2)#availableCores() - 2)
-l_kalman_softmax_no_variance <- furrr::future_map(
-  l_participants, fit_softmax_no_variance_wrapper, 
-  tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-  .progress = TRUE
-)
 
-tbl_kalman_softmax_no_variance <- reduce(l_kalman_softmax_no_variance, rbind) %>%
-  as.data.frame() %>% as_tibble() %>% rename(gamma = V1, ll = V2)
 
-l_params_decision <- map(
-  tbl_kalman_softmax_no_variance$gamma, 
-  ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
-)
-
-tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
-tbl_results_kalman_softmax_sim <- simulate_and_fit_softmax(
-  tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
-)
-tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, FALSE)
-tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
-  tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
-)
-
-tbl_results_kalman_softmax <- rbind(
-  tbl_results_kalman_softmax_sim, tbl_results_kalman_softmax_fix
-)
 
 tbl_recovery_kalman_softmax <- tbl_results_kalman_softmax %>%
   unnest_wider(params_decision) %>%
@@ -135,27 +149,38 @@ tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>%
 ## UCB with Softmax -------------------------------------------------------
 
 
+if (fit_or_load == "fit") {
+  plan(multisession, workers = 2)#availableCores() - 2)
+  l_kalman_ucb_no_variance <- furrr:::future_map(
+    l_participants, fit_ucb_no_variance_wrapper,
+    tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+    .progress = TRUE
+  )
+  saveRDS(l_kalman_ucb_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-fit.rds")
+  
+  tbl_kalman_ucb_no_variance <- reduce(l_kalman_ucb_no_variance, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, ll = V3)
+  
+  l_params_decision <- map2(
+    tbl_kalman_ucb_no_variance$gamma, tbl_kalman_ucb_no_variance$beta,
+    ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
+  )
+  
+  tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
+  tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, FALSE)
+  tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  
+  tbl_results_kalman_ucb <- rbind(tbl_results_kalman_ucb_fix, tbl_results_kalman_ucb_sim)
+  saveRDS(tbl_results_kalman_ucb, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-recovery.rds")
+} else if (fit_or_load == "load") {
+  l_kalman_ucb_no_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-fit.rds")
+  tbl_results_kalman_ucb <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-recovery.rds")
+}
 
-plan(multisession, workers = 2)#availableCores() - 2)
-l_kalman_ucb_no_variance <- furrr:::future_map(
-  l_participants, fit_ucb_no_variance_wrapper,
-  tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-  .progress = TRUE
-)
-tbl_kalman_ucb_no_variance <- reduce(l_kalman_ucb_no_variance, rbind) %>%
-  as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, ll = V3)
 
-l_params_decision <- map2(
-  tbl_kalman_ucb_no_variance$gamma, tbl_kalman_ucb_no_variance$beta,
-  ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
-)
 
-tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
-tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
-tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, FALSE)
-tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
 
-tbl_results_kalman_ucb <- rbind(tbl_results_kalman_ucb_fix, tbl_results_kalman_ucb_sim)
 tbl_recovery_kalman_ucb <- tbl_results_kalman_ucb %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
@@ -182,31 +207,42 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
 
 ## RU Thompson -------------------------------------------------------------
 
+if (fit_or_load == "fit") {
+  plan(multisession, workers = 2)#availableCores() - 2)
+  l_kalman_ru_thompson_no_variance <- furrr:::future_map(
+    l_participants, fit_ru_thompson_no_variance_wrapper,
+    tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+    .progress = TRUE
+  )
+  saveRDS(l_kalman_ru_thompson_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-fit.rds")
+  
+  tbl_kalman_ru_thompson_no_variance <- reduce(l_kalman_ru_thompson_no_variance, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, w_mix = V3, ll = V4)
+  
+  l_params_decision <- pmap(
+    list(
+      tbl_kalman_ru_thompson_no_variance$gamma, 
+      tbl_kalman_ru_thompson_no_variance$beta,
+      tbl_kalman_ru_thompson_no_variance$w_mix
+    ),
+    ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ru_thompson", no = 4)
+  )
+  
+  tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
+  tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
+  tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  
+  tbl_results_kalman_ru_thompson <- rbind(tbl_results_kalman_ru_thompson_fix, tbl_results_kalman_ru_thompson_sim)
+  saveRDS(tbl_results_kalman_ru_thompson, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-recovery.rds")
+} else if (fit_or_load == "load") {
+  l_kalman_ru_thompson_no_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-fit.rds")
+  tbl_results_kalman_ru_thompson <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-recovery.rds")
+}
 
-plan(multisession, workers = 2)#availableCores() - 2)
-l_kalman_ru_thompson_no_variance <- furrr:::future_map(
-  l_participants, fit_ru_thompson_no_variance_wrapper,
-  tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-  .progress = TRUE
-)
-tbl_kalman_ru_thompson_no_variance <- reduce(l_kalman_ru_thompson_no_variance, rbind) %>%
-  as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, w_mix = V3, ll = V4)
 
-l_params_decision <- pmap(
-  list(
-    tbl_kalman_ru_thompson_no_variance$gamma, 
-    tbl_kalman_ru_thompson_no_variance$beta,
-    tbl_kalman_ru_thompson_no_variance$w_mix
-  ),
-  ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ru_thompson", no = 4)
-)
 
-tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
-tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
-tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
-tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
 
-tbl_results_kalman_ru_thompson <- rbind(tbl_results_kalman_ru_thompson_fix, tbl_results_kalman_ru_thompson_sim)
 tbl_recovery_kalman_ru_thompson <- tbl_results_kalman_ru_thompson %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
@@ -236,49 +272,72 @@ tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>%
 
 
 # 
-# plan(multisession, workers = availableCores() - 2)
-# l_kalman_thompson_one_variance <- furrr::future_map(
-#   l_participants, fit_thompson_one_variance_wrapper,
-#   tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-#   .progress = TRUE
-# )
-# tbl_kalman_thompson_one_variance <- reduce(l_kalman_thompson_one_variance, rbind) %>%
-#   as.data.frame() %>% as_tibble() %>% rename(xi_innovation = V1, ll = V3)
+# if (fit_or_load == "fit") {
+#   plan(multisession, workers = availableCores() - 2)
+#   l_kalman_thompson_one_variance <- furrr::future_map(
+#     l_participants, fit_thompson_one_variance_wrapper,
+#     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+#     .progress = TRUE
+#   )
+#   saveRDS(l_kalman_thompson_one_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-fit.rds")
+#   
+#   tbl_kalman_thompson_one_variance <- reduce(l_kalman_thompson_one_variance, rbind) %>%
+#     as.data.frame() %>% as_tibble() %>% rename(xi_innovation = V1, ll = V3)
+#   
+#   l_params_decision <- map2(
+#     tbl_kalman_thompson_one_variance$xi_innovation,
+#     ~ list(xi_eta_sq = ..1, choicemodel = "thompson", no = 4)
+#   )
+#   
+#   tbl_participants_kalman_thompson_fix <- my_participants_tbl_kalman(l_params_decision, FALSE)
+#   tbl_results_kalman_softmax_fix <- simulate_and_fit_thompson(tbl_participants_kalman_thompson_fix, nr_vars = 1, cond_on_choices = TRUE)
+#   tbl_participants_kalman_thompson_sim <- my_participants_tbl_kalman(l_params_decision, TRUE)
+#   tbl_results_kalman_softmax_sim <- simulate_and_fit_thompson(tbl_participants_kalman_thompson_sim, nr_vars = 1, cond_on_choices = TRUE)
+#   tbl_results_kalman_softmax <- rbind(tbl_results_kalman_softmax_fix, tbl_results_kalman_softmax_sim)
+#   saveRDS(tbl_results_kalman_softmax, file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-recovery.rds")
+#   
+# } else if (fit_or_load == "load") {
+#   l_kalman_thompson_one_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-fit.rds")
+#   tbl_results_kalman_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-recovery.rds")
+# }
 # 
-# l_params_decision <- map2(
-#   tbl_kalman_thompson_one_variance$xi_innovation,
-#   ~ list(xi_eta_sq = ..1, choicemodel = "thompson", no = 4)
-# )
-# 
-# tbl_participants_kalman_thompson <- my_participants_tbl_kalman(l_params_decision)
-# tbl_results_kalman_softmax <- simulate_and_fit_thompson(tbl_participants_kalman_thompson, nr_vars = 1, cond_on_choices = TRUE)
 # 
 
 
 ## Delta Rule -------------------------------------------------------------
 
 
+if (fit_or_load == "fit") {
+  plan(multisession, workers = availableCores() - 2)
+  l_delta_softmax <- furrr::future_map(
+    l_participants, fit_delta_softmax_wrapper,
+    tbl_rewards = tbl_rewards, is_decay = FALSE, condition_on_observed_choices = TRUE,
+    .progress = TRUE
+  )
+  saveRDS(l_delta_softmax, file = "exploration-R/data/empirical-parameter-recovery-delta-softmax-fit.rds")
+  
+  tbl_delta_softmax <- reduce(l_delta_softmax, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(delta = V1, gamma = V2, ll = V3)
+  
+  l_params_decision <- map(
+    tbl_delta_softmax$gamma,
+    ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+  )
+  
+  tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
+  tbl_results_delta_softmax_sim <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
+  tbl_results_delta_softmax_fix <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
+  
+  tbl_results_delta_softmax <- rbind(tbl_results_delta_softmax_sim, tbl_results_delta_softmax_fix)
+  saveRDS(tbl_results_delta_softmax, file = "exploration-R/data/empirical-parameter-recovery-delta-softmax-recovery.rds")
+  
+} else if (fit_or_load == "load") {
+  l_delta_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-delta-softmax-fit.rds")
+  tbl_results_delta_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-delta-softmax-recovery.rds")
+}
 
-plan(multisession, workers = availableCores() - 2)
-l_delta_softmax <- furrr::future_map(
-  l_participants, fit_delta_softmax_wrapper,
-  tbl_rewards = tbl_rewards, is_decay = FALSE, condition_on_observed_choices = TRUE,
-  .progress = TRUE
-)
-tbl_delta_softmax <- reduce(l_delta_softmax, rbind) %>%
-  as.data.frame() %>% as_tibble() %>% rename(delta = V1, gamma = V2, ll = V3)
 
-l_params_decision <- map(
-  tbl_delta_softmax$gamma,
-  ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
-)
-
-tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
-tbl_results_delta_softmax_sim <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
-tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
-tbl_results_delta_softmax_fix <- simulate_and_fit_delta(tbl_participants_delta, is_decay = FALSE, cond_on_choices = TRUE, nr_trials = nr_trials)
-
-tbl_results_delta_softmax <- rbind(tbl_results_delta_softmax_sim, tbl_results_delta_softmax_fix)
 
 tbl_recovery_delta_softmax <- tbl_results_delta_softmax %>%
   unnest_wider(params_decision) %>%
@@ -306,27 +365,35 @@ tbl_recovery_delta_softmax_long <- tbl_recovery_delta_softmax %>%
 ## Decay Rule -------------------------------------------------------------
 
 
+if (fit_or_load == "fit") {
+  plan(multisession, workers = availableCores() - 2)
+  l_decay_softmax <- furrr::future_map(
+    l_participants, fit_delta_softmax_wrapper,
+    tbl_rewards = tbl_rewards, is_decay = TRUE, condition_on_observed_choices = TRUE,
+    .progress = TRUE
+  )
+  saveRDS(l_decay_softmax, file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-fit.rds")
+  
+  tbl_decay_softmax <- reduce(l_decay_softmax, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(delta = V1, gamma = V2, ll = V3)
+  
+  l_params_decision <- map(
+    tbl_decay_softmax$gamma,
+    ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
+  )
+  
+  tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
+  tbl_results_decay_softmax_sim <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
+  tbl_results_decay_softmax_fix <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
+  
+  tbl_results_decay_softmax <- rbind(tbl_results_decay_softmax_sim, tbl_results_decay_softmax_fix)
+  saveRDS(tbl_results_decay_softmax, file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-recovery.rds")
+} else if (fit_or_load == "load") {
+  l_decay_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-decay-softmax.rds")
+  tbl_results_decay_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-recovery.rds")
+}
 
-plan(multisession, workers = availableCores() - 2)
-l_decay_softmax <- furrr::future_map(
-  l_participants, fit_delta_softmax_wrapper,
-  tbl_rewards = tbl_rewards, is_decay = TRUE, condition_on_observed_choices = TRUE,
-  .progress = TRUE
-)
-tbl_decay_softmax <- reduce(l_decay_softmax, rbind) %>%
-  as.data.frame() %>% as_tibble() %>% rename(delta = V1, gamma = V2, ll = V3)
-
-l_params_decision <- map(
-  tbl_decay_softmax$gamma,
-  ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
-)
-
-tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, TRUE)
-tbl_results_decay_softmax_sim <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
-tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_delta_softmax$delta, FALSE)
-tbl_results_decay_softmax_fix <- simulate_and_fit_delta(tbl_participants_decay, is_decay = TRUE, cond_on_choices = TRUE, nr_trials = nr_trials)
-
-tbl_results_decay_softmax <- rbind(tbl_results_decay_softmax_sim, tbl_results_decay_softmax_fix)
 
 tbl_recovery_decay_softmax <- tbl_results_decay_softmax %>%
   unnest_wider(params_decision) %>%
@@ -363,7 +430,7 @@ wrangle_recoveries <- function(my_tbl, modelname) {
   tbl_summary <- crossing(
     pars = c("r_gamma", "r_beta", "r_delta", "r_w_mix"),
     simulate_data = c(TRUE, FALSE)
-    )
+  )
   out <- tbl_summary %>% left_join(
     my_tbl %>% 
       mutate(model = modelname) %>%
@@ -377,7 +444,6 @@ wrangle_recoveries <- function(my_tbl, modelname) {
 km_sm <- wrangle_recoveries(tbl_recovery_kalman_softmax, "Kalman Softmax")
 km_ucb <- wrangle_recoveries(tbl_recovery_kalman_ucb, "Kalman UCB")
 km_ru_thompson <- wrangle_recoveries(tbl_recovery_kalman_ru_thompson, "Kalman RU & Thompson")
-
 delta_sm <- wrangle_recoveries(tbl_recovery_delta_softmax, "Delta Softmax")
 decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
 
