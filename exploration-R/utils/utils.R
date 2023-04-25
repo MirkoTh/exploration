@@ -1042,8 +1042,8 @@ fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
   w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ru_and_thompson_choice_prob(
-    as.matrix(tbl_learned %>% select(starts_with("m_"))), 
-    as.matrix(tbl_learned %>% select(starts_with("v_"))),
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))), 
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_"))),
     sigma_xi_sq, gamma, beta, w_mix, nr_options
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices_mix, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
