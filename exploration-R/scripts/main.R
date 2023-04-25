@@ -291,7 +291,7 @@ l_rb <- map(l_rb, function(x) {
 })
 
 l_results_rb <- map(l_rb, kalman_learning, no = no_rb, sigma_xi_sq = sigma_xi_sq_rb, sigma_epsilon_sq = sigma_epsilon_sq_rb)
-l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2, m0 = 0, v0 = 100)
+l_results_exp2 <- map(l_exp2, kalman_learning, no = no_exp2, sigma_xi_sq = sigma_xi_sq_exp2, sigma_epsilon_sq = sigma_epsilon_sq_exp2, m0 = 0, v0 = 1000)
 
 
 
@@ -397,7 +397,74 @@ tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
     by = c("subject", "block", "trial")
   )
 
-cor(tbl_exp2_features_learned[, c("val_diff", "ru", "thompson", "p_diff")])
+
+l_trials <- split(tbl_exp2_features_learned, tbl_exp2_features_learned$trial)
+l_cors_trials <- map(l_trials, ~ cor(.x[, c("val_diff", "ru", "thompson", "p_diff")]))
+cor_v_vtu <- map_dbl(l_cors_trials, ~ .x[3, 1])[2:10]
+cor_v_ru <- map_dbl(l_cors_trials, ~ .x[1, 2])[2:10]
+
+tbl_cors <- tibble(v_vtu = cor_v_vtu, v_ru = cor_v_ru) %>%
+  mutate(trial_id = 2:10) %>%
+  pivot_longer(-trial_id) %>%
+  mutate(name = fct_inorder(factor(name)), name = fct_relabel(name, ~ c("V vs. V/TU", "V vs. RU")))
+
+ggplot(tbl_cors, aes(trial_id, value, group = name)) +
+  geom_hline(yintercept = 1, linetype = "dotdash", color = "black") +
+  geom_hline(yintercept = 0, linetype = "dotdash", color = "grey") +
+  geom_hline(yintercept = -1, linetype = "dotdash", color = "black") +
+  geom_line(aes(color = name)) +
+  geom_point(size = 3, color = "white") +
+  geom_point(aes(color = name)) +
+  geom_label(aes(y = value - .1, x = trial_id + .1, label = round(value, 2), color = name)) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0.01, 0.2)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  labs(x = "Trial", y = "r") +
+  theme(strip.background = element_rect(fill = "white")) +
+  scale_color_brewer(palette = "Set1", name = "Variables")
+
+tbl_exp2_features_learned$val_diff_z <- scale(tbl_exp2_features_learned$val_diff)
+tbl_exp2_features_learned$ru_z <- scale(tbl_exp2_features_learned$ru)
+tbl_exp2_features_learned$thompson_z <- scale(tbl_exp2_features_learned$thompson)
+
+
+m_hybrid <- glm(-1*choice + 2 ~ val_diff_z + ru_z + thompson_z, data = tbl_exp2_features_learned, family = "binomial")
+m_ucb <- glm(-1*choice + 2  ~ val_diff_z + ru_z, data = tbl_exp2_features_learned, family = "binomial")
+m_thompson_ru <- glm(-1*choice + 2  ~ thompson_z + ru_z, data = tbl_exp2_features_learned, family = "binomial")
+# glm(-1*choice + 2  ~ val_diff_z, data = tbl_exp2_features_learned, family = "binomial")
+# glm(-1*choice + 2  ~ thompson_z, data = tbl_exp2_features_learned, family = "binomial")
+library(car)
+vif(m_hybrid)
+vif(m_ucb)
+vif(m_thompson_ru)
+
+
+l_exp2_fl <- split(tbl_exp2_features_learned, tbl_exp2_features_learned$subject)
+l_m_hybrid <- map(l_exp2_fl, ~ glm(-1*choice + 2 ~ val_diff_z + ru_z + thompson_z, data = .x, family = "binomial"))
+tbl_vifs <- tibble(
+  map(l_m_hybrid, vif) %>% reduce(rbind) %>%
+    as.data.frame()
+) %>% arrange(desc(val_diff_z)) %>%
+  mutate(
+  subject_id_random = 1:44
+)
+
+colnames(tbl_vifs) <- c("V", "RU", "V/TU", "Participant")
+tbl_vifs %>% pivot_longer(-Participant) %>%
+  ggplot(aes(Participant, name)) +
+  geom_tile(aes(fill = value >= 5), color = "white") +
+  geom_label(aes(label = round(value, 0))) +
+  scale_fill_viridis_d(name = "VIF >= 5") + 
+  scale_color_viridis_d(direction = -1) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(x = "Participant", y = "Variable", title = "VIF") +
+  theme(strip.background = element_rect(fill = "white"))
+  
+
+
+
 
 
 tbl_exp2_features_learned <- tbl_exp2_features_learned[complete.cases(tbl_exp2_features_learned), ]
@@ -440,8 +507,8 @@ tbl_cor <- cor(
 tbl_cor$x <- colnames(tbl_cor)
 tbl_cor$x <- fct_inorder(tbl_cor$x)
 levels(tbl_cor$x) <- c(
-    "PMU1", "PMU2", "PMU3", "PMU4", "M1", "M2", "M3", "M4", 
-    "V1", "V2", "V3", "V4", "Run Length (Lagged)", "Nr. Previous Switches (Lagged)"
+  "PMU1", "PMU2", "PMU3", "PMU4", "M1", "M2", "M3", "M4", 
+  "V1", "V2", "V3", "V4", "Run Length (Lagged)", "Nr. Previous Switches (Lagged)"
 )
 colnames(tbl_cor) <- c(levels(tbl_cor$x), "x")
 tbl_cor <- tbl_cor %>% pivot_longer(cols = -x) 
@@ -455,7 +522,7 @@ tbl_cor %>%
     axis.text.x = element_text(angle = 90), 
     axis.title.y = element_blank(),
     axis.title.x = element_blank()
-    ) +
+  ) +
   scale_y_discrete(limits = rev) +
   scale_fill_viridis_c(name = "Correlation")
 
@@ -467,7 +534,7 @@ tbl_cor %>%
 tbl_exp2_features_learned$m_prev <- pmap_dbl(
   tbl_exp2_features_learned[, c("m_1", "m_2", "previous_choice")], 
   ~ c(..1, ..2)[..3] - c(..1, ..2)[abs(..3 - 3)]
-  )
+)
 tbl_exp2_features_learned$v_prev <- pmap_dbl(
   tbl_exp2_features_learned[, c("v_1", "v_2", "previous_choice")], 
   ~ c(..1, ..2)[..3] - c(..1, ..2)[abs(..3 - 3)]
