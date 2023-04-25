@@ -22,7 +22,7 @@ home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
 
 
 
@@ -92,7 +92,7 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 ## Softmax no variance ----------------------------------------------------
 
 if (fit_or_load == "fit") {
-  plan(multisession, workers = 2)#availableCores() - 2)
+  plan(multisession, workers = availableCores() - 2)
   l_kalman_softmax_no_variance <- furrr::future_map(
     l_participants, fit_softmax_no_variance_wrapper, 
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -150,7 +150,7 @@ tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>%
 
 
 if (fit_or_load == "fit") {
-  plan(multisession, workers = 2)#availableCores() - 2)
+  plan(multisession, workers = availableCores() - 2)
   l_kalman_ucb_no_variance <- furrr:::future_map(
     l_participants, fit_ucb_no_variance_wrapper,
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -208,7 +208,7 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
 ## RU Thompson -------------------------------------------------------------
 
 if (fit_or_load == "fit") {
-  plan(multisession, workers = 2)#availableCores() - 2)
+  plan(multisession, workers = availableCores() - 2)
   l_kalman_ru_thompson_no_variance <- furrr:::future_map(
     l_participants, fit_ru_thompson_no_variance_wrapper,
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -447,19 +447,23 @@ km_ru_thompson <- wrangle_recoveries(tbl_recovery_kalman_ru_thompson, "Kalman RU
 delta_sm <- wrangle_recoveries(tbl_recovery_delta_softmax, "Delta Softmax")
 decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
 
-tbl_summary_pars <- rbind(km_sm, km_ucb, delta_sm, decay_sm)
+tbl_summary_pars <- rbind(km_sm, km_ucb, km_ru_thompson, delta_sm, decay_sm)
 # visualize summary recovery of four models with reactable table
 badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
 
-colnames(tbl_summary_pars) <- c("Model", "simulate_data", "Gamma", "Beta", "Delta")
-tbl_summary_pars[, c("Gamma", "Beta", "Delta")] <- map(tbl_summary_pars[, c("Gamma", "Beta", "Delta")], ~ round(.x, digits = 2))
-tbl_summary_pars <- tbl_summary_pars %>% select(-simulate_data)
+colnames(tbl_summary_pars) <- c("simulate_data", "Model", "Beta", "Delta", "Gamma", "w_mix")
+tbl_summary_pars <- tbl_summary_pars %>% relocate(Gamma, .before = Beta)
+tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")] <- map(tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")], ~ round(.x, digits = 2))
+# tbl_summary_pars <- tbl_summary_pars %>% select(-simulate_data)
+tbl_summary_pars$simulate_data <- factor(tbl_summary_pars$simulate_data)
+levels(tbl_summary_pars$simulate_data) <- c("One Fixed Set", "By Participant")
+tbl_summary_pars <- tbl_summary_pars %>% rename("Random Walk" = simulate_data)
 reactable(
   tbl_summary_pars,
   defaultColDef = colDef(
     minWidth = 150,
     align = "center",
-    cell = color_tiles(tbl_summary_pars, span = 2:4, colors = badtogood_cols)
+    cell = color_tiles(tbl_summary_pars, span = 3:6, colors = badtogood_cols)
   ),
   columns = list(
     Model = colDef(
@@ -468,12 +472,11 @@ reactable(
   )
 )
 
-tbl_summary_pars_long <- tbl_summary_pars %>% pivot_longer(-c(model, simulate_data))
+tbl_summary_pars_long <- tbl_summary_pars %>% pivot_longer(-c(Model, "Random Walk"))
 tbl_summary_pars_long$name <- factor(tbl_summary_pars_long$name)
-levels(tbl_summary_pars_long$name) <- c("Beta", "Delta", "Gamma")
+levels(tbl_summary_pars_long$name) <- c("Beta", "Delta", "Gamma", "w_mix")
 tbl_summary_pars_long$name <- fct_relevel(tbl_summary_pars_long$name, "Beta", after = 2)
-tbl_summary_pars_long$simulate_data <- factor(tbl_summary_pars_long$simulate_data, labels = c("One Stimulus Set", "Individual Stimulus Set"))
-ggplot(tbl_summary_pars_long, aes(name, model)) +
+ggplot(tbl_summary_pars_long, aes(name, Model)) +
   geom_tile(aes(fill = value)) +
   geom_text(aes(label = round(value, 2)), color = "black") +
   theme_bw() +
@@ -482,42 +485,47 @@ ggplot(tbl_summary_pars_long, aes(name, model)) +
   scale_y_discrete(expand = c(0, 0)) +
   scale_fill_gradient2(high = "aquamarine2", low = "tomato", mid = .5, guide = "none") +
   labs(x = "", y = "") +
-  facet_wrap(~ simulate_data)
+  facet_wrap(~ `Random Walk`)
 
 
 
 
 tbl_gammas <- tbl_results_kalman_softmax %>%
   select(gamma_ml) %>%
-  mutate(model = "Kalman Softmax") %>%
+  mutate(Model = "Kalman Softmax") %>%
   rbind(
     tbl_results_kalman_ucb %>%
       select(gamma_ml) %>%
-      mutate(model = "Kalman UCB") 
+      mutate(Model = "Kalman UCB") 
+  )  %>%
+  rbind(
+    tbl_results_kalman_ru_thompson %>%
+      select(gamma_ml) %>%
+      mutate(Model = "Kalman RU & Thompson") 
   ) %>%
   rbind(
     tbl_results_delta_softmax %>%
       select(gamma_ml) %>%
-      mutate(model = "Delta Softmax") 
+      mutate(Model = "Delta Softmax") 
   ) %>%
   rbind(
     tbl_results_decay_softmax %>%
       select(gamma_ml) %>%
-      mutate(model = "Decay Softmax") 
+      mutate(Model = "Decay Softmax") 
   ) %>% rename(gamma = gamma_ml)
 
-tbl_gammas$model <- factor(tbl_gammas$model)
-tbl_gammas$model <- fct_inorder(tbl_gammas$model)
-pl_gammas <- ggplot(tbl_gammas, aes(model, gamma, group = model)) +
-  geom_violin(aes(fill = model), alpha = .25) +
-  geom_quasirandom(aes(color = model), cex = 1.75, alpha = .5, method = "quasirandom") +
-  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+tbl_gammas$Model <- factor(tbl_gammas$Model)
+tbl_gammas$Model <- fct_inorder(tbl_gammas$Model)
+pl_gammas <- ggplot(tbl_gammas, aes(Model, gamma, group = Model)) +
+  geom_violin(aes(fill = Model), alpha = .25) +
+  geom_quasirandom(aes(color = Model), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = Model), alpha = .7) +
   stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_continuous(expand = c(.003, .003)) +
   scale_fill_viridis_d() +
   scale_color_viridis_d() +
-  coord_cartesian(ylim = c(0, .4)) +
+  coord_cartesian(ylim = c(0, 3)) +
   theme_bw() +
   theme(legend.position = "none") +
   labs(x = "Model", y = "Gamma")
@@ -526,19 +534,19 @@ pl_gammas <- ggplot(tbl_gammas, aes(model, gamma, group = model)) +
 
 tbl_deltas <- tbl_results_delta_softmax %>%
   select(delta_ml) %>%
-  mutate(model = "Delta Softmax") %>%
+  mutate(Model = "Delta Softmax") %>%
   rbind(
     tbl_results_decay_softmax %>%
       select(delta_ml) %>%
-      mutate(model = "Decay Softmax") 
+      mutate(Model = "Decay Softmax") 
   ) %>% rename(delta = delta_ml)
 
-tbl_deltas$model <- factor(tbl_deltas$model)
-tbl_deltas$model <- fct_inorder(tbl_deltas$model)
-pl_deltas <- ggplot(tbl_deltas, aes(model, delta, group = model)) +
-  geom_violin(aes(fill = model), alpha = .25) +
-  geom_quasirandom(aes(color = model), cex = 1.75, alpha = .5, method = "quasirandom") +
-  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+tbl_deltas$Model <- factor(tbl_deltas$Model)
+tbl_deltas$Model <- fct_inorder(tbl_deltas$Model)
+pl_deltas <- ggplot(tbl_deltas, aes(Model, delta, group = Model)) +
+  geom_violin(aes(fill = Model), alpha = .25) +
+  geom_quasirandom(aes(color = Model), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = Model), alpha = .7) +
   stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_continuous(expand = c(.003, .003)) +
@@ -550,15 +558,21 @@ pl_deltas <- ggplot(tbl_deltas, aes(model, delta, group = model)) +
 
 tbl_beta <- tbl_results_kalman_ucb %>%
   select(beta_ml) %>%
-  mutate(model = "Kalman UCB") %>%
-  rename(beta = beta_ml)
+  mutate(Model = "Kalman UCB") %>%
+  rename(beta = beta_ml)  %>%
+  rbind(
+    tbl_results_kalman_ru_thompson %>%
+      select(beta_ml) %>%
+      mutate(Model = "Kalman RU & Thompson") %>%
+      rename(beta = beta_ml)
+  ) 
 
-tbl_beta$model <- factor(tbl_beta$model)
-tbl_beta$model <- fct_inorder(tbl_beta$model)
-pl_beta <- ggplot(tbl_beta, aes(model, beta, group = model)) +
-  geom_violin(aes(fill = model), alpha = .25) +
-  geom_quasirandom(aes(color = model), cex = 1.75, alpha = .5, method = "quasirandom") +
-  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+tbl_beta$Model <- factor(tbl_beta$Model)
+tbl_beta$Model <- fct_inorder(tbl_beta$Model)
+pl_beta <- ggplot(tbl_beta, aes(Model, beta, group = Model)) +
+  geom_violin(aes(fill = Model), alpha = .25) +
+  geom_quasirandom(aes(color = Model), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = Model), alpha = .7) +
   stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_continuous(expand = c(.003, .003)) +
@@ -572,15 +586,15 @@ pl_beta <- ggplot(tbl_beta, aes(model, beta, group = model)) +
 
 tbl_w_mix <- tbl_results_kalman_ru_thompson %>%
   select(w_mix_ml) %>%
-  mutate(model = "Kalman RU & Thompson") %>%
+  mutate(Model = "Kalman RU & Thompson") %>%
   rename(w_mix = w_mix_ml)
 
-tbl_w_mix$model <- factor(tbl_w_mix$model)
-tbl_w_mix$model <- fct_inorder(tbl_w_mix$model)
-pl_w_mix <- ggplot(tbl_w_mix, aes(model, w_mix, group = model)) +
-  geom_violin(aes(fill = model), alpha = .25) +
-  geom_quasirandom(aes(color = model), cex = 1.75, alpha = .5, method = "quasirandom") +
-  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+tbl_w_mix$Model <- factor(tbl_w_mix$Model)
+tbl_w_mix$Model <- fct_inorder(tbl_w_mix$Model)
+pl_w_mix <- ggplot(tbl_w_mix, aes(Model, w_mix, group = Model)) +
+  geom_violin(aes(fill = Model), alpha = .25) +
+  geom_quasirandom(aes(color = Model), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = Model), alpha = .7) +
   stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_continuous(expand = c(.003, .003)) +
@@ -591,8 +605,8 @@ pl_w_mix <- ggplot(tbl_w_mix, aes(model, w_mix, group = model)) +
   labs(x = "Model", y = "w Thompson (vs. RU)")
 
 
-pl_params_empirical <- arrangeGrob(pl_gammas, pl_deltas, pl_beta, pl_w_mix, nrow = 1, widths = c(1, .5, .35, .35))
-save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical-same-stimuli.pdf", 12, 4)
+pl_params_empirical <- arrangeGrob(pl_gammas, pl_w_mix, pl_deltas, pl_beta, nrow = 1, widths = c(1, .25, .5, .5))
+save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical.pdf", 16.5, 5.5)
 #save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical-individual-stimuli.pdf", 12, 4)
 
 
