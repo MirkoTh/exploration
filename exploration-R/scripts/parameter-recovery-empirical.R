@@ -87,7 +87,7 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 ## Softmax no variance ----------------------------------------------------
 
 
-plan(multisession, workers = availableCores() - 2)
+plan(multisession, workers = 2)#availableCores() - 2)
 l_kalman_softmax_no_variance <- furrr::future_map(
   l_participants, fit_softmax_no_variance_wrapper, 
   tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -105,7 +105,7 @@ l_params_decision <- map(
 tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
 tbl_results_kalman_softmax_sim <- simulate_and_fit_softmax(
   tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
-  )
+)
 tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, FALSE)
 tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
   tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
@@ -113,7 +113,7 @@ tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
 
 tbl_results_kalman_softmax <- rbind(
   tbl_results_kalman_softmax_sim, tbl_results_kalman_softmax_fix
-  )
+)
 
 tbl_recovery_kalman_softmax <- tbl_results_kalman_softmax %>%
   unnest_wider(params_decision) %>%
@@ -136,7 +136,7 @@ tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>%
 
 
 
-plan(multisession, workers = availableCores() - 2)
+plan(multisession, workers = 2)#availableCores() - 2)
 l_kalman_ucb_no_variance <- furrr:::future_map(
   l_participants, fit_ucb_no_variance_wrapper,
   tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
@@ -176,6 +176,60 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
     "Beta" = r_beta
   ) %>%
   pivot_longer(cols = c(Gamma, Beta))
+
+
+
+
+## RU Thompson -------------------------------------------------------------
+
+
+plan(multisession, workers = 2)#availableCores() - 2)
+l_kalman_ru_thompson_no_variance <- furrr:::future_map(
+  l_participants, fit_ru_thompson_no_variance_wrapper,
+  tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+  .progress = TRUE
+)
+tbl_kalman_ru_thompson_no_variance <- reduce(l_kalman_ru_thompson_no_variance, rbind) %>%
+  as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, w_mix = V3, ll = V4)
+
+l_params_decision <- pmap(
+  list(
+    tbl_kalman_ru_thompson_no_variance$gamma, 
+    tbl_kalman_ru_thompson_no_variance$beta,
+    tbl_kalman_ru_thompson_no_variance$w_mix
+  ),
+  ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ru_thompson", no = 4)
+)
+
+tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
+tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
+tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+
+tbl_results_kalman_ru_thompson <- rbind(tbl_results_kalman_ru_thompson_fix, tbl_results_kalman_ru_thompson_sim)
+tbl_recovery_kalman_ru_thompson <- tbl_results_kalman_ru_thompson %>%
+  unnest_wider(params_decision) %>%
+  group_by(simulate_data) %>%
+  summarize(
+    r_gamma = cor(gamma, gamma_ml),
+    r_beta = cor(beta, beta_ml),
+    r_w_mix = cor(w_mix, w_mix_ml)
+  ) %>% ungroup()
+
+tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
+    beta_mn = "empirical",
+    gamma_mn = "empirical"
+  ) %>%
+  rename(
+    "Gamma" = r_gamma,
+    "Beta" = r_beta,
+    "w_mix" = r_w_mix
+  ) %>%
+  pivot_longer(cols = c(Gamma, Beta, w_mix))
+
 
 
 ## Thompson Sampling (Xi Variance) ----------------------------------------
@@ -306,12 +360,15 @@ plot_cor_recovery(tbl_recovery_decay_softmax_long, pd, "softmax") +
 # Summarize Results -------------------------------------------------------
 
 wrangle_recoveries <- function(my_tbl, modelname) {
-  tbl_summary <- tibble(pars = c("r_gamma", "r_beta", "r_delta"))
+  tbl_summary <- crossing(
+    pars = c("r_gamma", "r_beta", "r_delta", "r_w_mix"),
+    simulate_data = c(TRUE, FALSE)
+    )
   out <- tbl_summary %>% left_join(
     my_tbl %>% 
       mutate(model = modelname) %>%
       pivot_longer(cols = -c(model, simulate_data)),
-    by = c("pars" = "name")
+    by = c("pars" = "name", "simulate_data" = "simulate_data")
   ) %>%
     pivot_wider(names_from = pars, values_from = value)
   out[!is.na(out$model), ]
@@ -319,6 +376,8 @@ wrangle_recoveries <- function(my_tbl, modelname) {
 
 km_sm <- wrangle_recoveries(tbl_recovery_kalman_softmax, "Kalman Softmax")
 km_ucb <- wrangle_recoveries(tbl_recovery_kalman_ucb, "Kalman UCB")
+km_ru_thompson <- wrangle_recoveries(tbl_recovery_kalman_ru_thompson, "Kalman RU & Thompson")
+
 delta_sm <- wrangle_recoveries(tbl_recovery_delta_softmax, "Delta Softmax")
 decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
 
@@ -396,7 +455,7 @@ pl_gammas <- ggplot(tbl_gammas, aes(model, gamma, group = model)) +
   theme_bw() +
   theme(legend.position = "none") +
   labs(x = "Model", y = "Gamma")
-  
+
 
 
 tbl_deltas <- tbl_results_delta_softmax %>%
@@ -443,7 +502,30 @@ pl_beta <- ggplot(tbl_beta, aes(model, beta, group = model)) +
   theme(legend.position = "none") +
   labs(x = "Model", y = "Beta")
 
-pl_params_empirical <- arrangeGrob(pl_gammas, pl_deltas, pl_beta, nrow = 1, widths = c(1, .5, .35))
+
+
+tbl_w_mix <- tbl_results_kalman_ru_thompson %>%
+  select(w_mix_ml) %>%
+  mutate(model = "Kalman RU & Thompson") %>%
+  rename(w_mix = w_mix_ml)
+
+tbl_w_mix$model <- factor(tbl_w_mix$model)
+tbl_w_mix$model <- fct_inorder(tbl_w_mix$model)
+pl_w_mix <- ggplot(tbl_w_mix, aes(model, w_mix, group = model)) +
+  geom_violin(aes(fill = model), alpha = .25) +
+  geom_quasirandom(aes(color = model), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = model), alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(.003, .003)) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Model", y = "w Thompson (vs. RU)")
+
+
+pl_params_empirical <- arrangeGrob(pl_gammas, pl_deltas, pl_beta, pl_w_mix, nrow = 1, widths = c(1, .5, .35, .35))
 save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical-same-stimuli.pdf", 12, 4)
 #save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical-individual-stimuli.pdf", 12, 4)
 
