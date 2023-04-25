@@ -446,8 +446,8 @@ plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1),#[1],
-  gamma_sd = c(.03, .1, .2)#[1]
+  gamma_mn = c(.16, 1),#[1],
+  gamma_sd = c(.03, .2)#[1]
 )
 tbl_betas <- tibble(
   beta_mn = c(.17, 1.5),#[1],
@@ -492,10 +492,11 @@ for (tbl_r in l_results_ru_thompson_0var) {
 }
 
 tbl_cor_ru_thompson_0var <- reduce(l_results_mix_0var, rbind) %>%
-  group_by(gamma_mn, beta_mn, simulate_data, nr_trials) %>%
+  group_by(gamma_mn, beta_mn, w_mix_mn, simulate_data, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
-    r_beta = cor(beta, beta_ml)
+    r_beta = cor(beta, beta_ml),
+    r_w_mix = cor(w_mix, w_mix_ml)
   ) %>% ungroup()
 
 tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>% 

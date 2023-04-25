@@ -1636,11 +1636,11 @@ simulate_and_fit_ru_thompson <- function(
   tbl_results_ru_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   
   if (nr_vars == 0) {
-    colnames(tbl_results_ru_thompson) <- c("gamma_ml", "beta_ml", "w_mix", "neg_ll")
+    colnames(tbl_results_ru_thompson) <- c("gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   } else if (nr_vars == 1) {
-    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "w_mix", "neg_ll")
+    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   }  else if (nr_vars == 2) {
-    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "w_mix", "neg_ll")
+    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   }
   
   
