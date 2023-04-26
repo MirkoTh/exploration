@@ -1995,6 +1995,7 @@ create_participant_sample_ru_thompson <- function(
   return(tbl_params_ru_thompson)
 }
 
+
 create_participant_sample_delta <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
     nr_trials, is_decay, lambda
@@ -2047,7 +2048,6 @@ create_participant_sample_delta <- function(
 }
 
 
-
 recover_softmax <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
@@ -2074,7 +2074,6 @@ recover_softmax <- function(
   
   return(l_goodness)
 }
-
 
 
 recover_thompson <- function(
