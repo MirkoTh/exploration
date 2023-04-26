@@ -7,5 +7,10 @@ documents/
 *Rproj*
 *lock*
 exploration-R/renv/
+exploration-R/data/
+exploration-R/figures/
+figures/
+literature/
+renv/
 *.ipynb_checkpoints*
 open-data/
