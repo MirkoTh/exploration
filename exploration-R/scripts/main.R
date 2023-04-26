@@ -428,6 +428,11 @@ tbl_exp2_features_learned$ru_z <- scale(tbl_exp2_features_learned$ru)
 tbl_exp2_features_learned$thompson_z <- scale(tbl_exp2_features_learned$thompson)
 
 
+
+
+# Sam's Model -------------------------------------------------------------
+
+
 m_hybrid <- glm(-1*choice + 2 ~ val_diff_z + ru_z + thompson_z, data = tbl_exp2_features_learned, family = "binomial")
 m_ucb <- glm(-1*choice + 2  ~ val_diff_z + ru_z, data = tbl_exp2_features_learned, family = "binomial")
 m_thompson_ru <- glm(-1*choice + 2  ~ thompson_z + ru_z, data = tbl_exp2_features_learned, family = "binomial")
@@ -485,9 +490,18 @@ tbl_coefs_probit %>%
   scale_y_continuous(expand = c(0, 0)) +
   labs(x = "Parameter", y = "Coefficient") +
   theme(strip.background = element_rect(fill = "white"))
-  
 
 
+tbl_cors_params <- tbl_coefs_probit %>%
+  summarize(
+    r_RU_V = round(cor(RU, V), 2),
+    r_RU_VTU = round(cor(RU, `V/TU`), 2),
+    r_V_VTU = round(cor(V, `V/TU`), 2)
+  )
+colnames(tbl_cors_params) <- c("RU vs. V", "RU vs. V/TU", "V vs. V/TU")
+formattable::formattable(
+  tbl_cors_params
+)
 
 tbl_exp2_features_learned <- tbl_exp2_features_learned[complete.cases(tbl_exp2_features_learned), ]
 tbl_rb_features_learned <- tbl_rb_features_learned[complete.cases(tbl_rb_features_learned), ]
