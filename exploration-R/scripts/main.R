@@ -440,7 +440,7 @@ vif(m_thompson_ru)
 
 
 l_exp2_fl <- split(tbl_exp2_features_learned, tbl_exp2_features_learned$subject)
-l_m_hybrid <- map(l_exp2_fl, ~ glm(-1*choice + 2 ~ val_diff_z + ru_z + thompson_z, data = .x, family = "binomial"))
+l_m_hybrid <- map(l_exp2_fl, ~ glm(-1*choice + 2 ~ val_diff_z + ru_z + thompson_z, data = .x, family = binomial(link = "probit"))) #"binomial"
 tbl_vifs <- tibble(
   map(l_m_hybrid, vif) %>% reduce(rbind) %>%
     as.data.frame()
@@ -464,6 +464,28 @@ tbl_vifs %>% pivot_longer(-Participant) %>%
   
 
 
+library(ggbeeswarm)
+tbl_coefs_probit <- as_tibble(as.data.frame(reduce(map(l_m_hybrid, "coefficients"), rbind)))
+colnames(tbl_coefs_probit) <- c("Intercept", "V", "RU", "V/TU", "subj_id_random")
+tbl_coefs_probit %>% 
+  mutate(subj_id_random = 1:nrow(tbl_coefs_probit)) %>%
+  select(-Intercept) %>%
+  pivot_longer(-subj_id_random) %>%
+  ggplot(aes(name, value, group = name)) +
+  geom_violin(alpha = .25, aes(color = name)) +
+  geom_quasirandom(aes(color = name), width = .2, cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_line(aes(group = subj_id_random), color = "grey", alpha = .3) +
+  geom_boxplot(aes(fill = name), width = .15, alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "white", fill = "black", size = 3, shape = 23) + 
+  coord_cartesian(ylim = c(-5.5, 13)) +
+  scale_fill_viridis_d(guide = "none") +
+  scale_color_viridis_d(guide = "none") +
+  theme_bw() +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Parameter", y = "Coefficient") +
+  theme(strip.background = element_rect(fill = "white"))
+  
 
 
 
