@@ -1603,7 +1603,7 @@ simulate_and_fit_ru_thompson <- function(
     select(-trial_id)
   
   # simulate
-  plan(multisession, workers = availableCores() / 2)
+  plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
     simulate_kalman, 
@@ -1613,7 +1613,7 @@ simulate_and_fit_ru_thompson <- function(
   )
   
   # fit
-  plan(multisession, workers = availableCores() / 2)
+  plan(multisession, workers = availableCores() - 2)
   l_ru_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -1953,10 +1953,12 @@ create_participant_sample_ru_thompson <- function(
     sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
   }
   
-  s_w_mix <- 1.1
-  while(s_w_mix > 1) {
+  max_w_mix <- 1.1
+  min_w_mix <- -1
+  while(max_w_mix > 1 | min_w_mix < 0) {
     w_mix <- rnorm(nr_participants, w_mix_mn, w_mix_sd)
-    s_w_mix <- max(w_mix)
+    max_w_mix <- max(w_mix)
+    min_w_mix <- min(w_mix)
   }
   s_beta <- -1
   while(s_beta < 0) {
