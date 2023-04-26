@@ -280,28 +280,28 @@ tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>%
 #     .progress = TRUE
 #   )
 #   saveRDS(l_kalman_thompson_one_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-fit.rds")
-#   
+# 
 #   tbl_kalman_thompson_one_variance <- reduce(l_kalman_thompson_one_variance, rbind) %>%
 #     as.data.frame() %>% as_tibble() %>% rename(xi_innovation = V1, ll = V3)
-#   
+# 
 #   l_params_decision <- map2(
 #     tbl_kalman_thompson_one_variance$xi_innovation,
 #     ~ list(xi_eta_sq = ..1, choicemodel = "thompson", no = 4)
 #   )
-#   
+# 
 #   tbl_participants_kalman_thompson_fix <- my_participants_tbl_kalman(l_params_decision, FALSE)
 #   tbl_results_kalman_softmax_fix <- simulate_and_fit_thompson(tbl_participants_kalman_thompson_fix, nr_vars = 1, cond_on_choices = TRUE)
 #   tbl_participants_kalman_thompson_sim <- my_participants_tbl_kalman(l_params_decision, TRUE)
 #   tbl_results_kalman_softmax_sim <- simulate_and_fit_thompson(tbl_participants_kalman_thompson_sim, nr_vars = 1, cond_on_choices = TRUE)
 #   tbl_results_kalman_softmax <- rbind(tbl_results_kalman_softmax_fix, tbl_results_kalman_softmax_sim)
 #   saveRDS(tbl_results_kalman_softmax, file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-recovery.rds")
-#   
+# 
 # } else if (fit_or_load == "load") {
 #   l_kalman_thompson_one_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-fit.rds")
 #   tbl_results_kalman_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-recovery.rds")
 # }
 # 
-# 
+
 
 
 ## Delta Rule -------------------------------------------------------------
@@ -390,7 +390,7 @@ if (fit_or_load == "fit") {
   tbl_results_decay_softmax <- rbind(tbl_results_decay_softmax_sim, tbl_results_decay_softmax_fix)
   saveRDS(tbl_results_decay_softmax, file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-recovery.rds")
 } else if (fit_or_load == "load") {
-  l_decay_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-decay-softmax.rds")
+  l_decay_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-fit.rds")
   tbl_results_decay_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-decay-softmax-recovery.rds")
 }
 

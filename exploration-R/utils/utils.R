@@ -2067,7 +2067,7 @@ recover_softmax <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -2095,7 +2095,7 @@ recover_thompson <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -2123,7 +2123,7 @@ recover_ucb <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -2152,7 +2152,7 @@ recover_ru_thompson <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -2181,7 +2181,7 @@ recover_delta <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "delta"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit)
@@ -2190,7 +2190,7 @@ recover_delta <- function(
 }
 
 
-simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_choices) {
+simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_choices, family, is_decay = NULL) {
   #' 
   #' @description simulate choices with specifications from tbl_params_simulate
   #' and fit all models afterwards
@@ -2198,15 +2198,28 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   # simulate choices given soft max choice model
   plan(multisession, workers = availableCores() / 2)
   #plan(multisession, workers = 2)
-  l_choices_simulated <- future_pmap(
+  cat("\nsimulating data")
+  if (family == "kalman") {
+    l_choices_simulated <- future_pmap(
     tbl_params_simulate,
     simulate_kalman, 
     tbl_rewards = tbl_rewards,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
+  } else if (family == "delta") {
+    l_choices_simulated <- future_pmap(
+      tbl_params_simulate,
+      simulate_delta, 
+      tbl_rewards = tbl_rewards,
+      is_decay = is_decay,
+      .progress = TRUE, 
+      .options = furrr_options(seed = NULL)
+    )
+  }
   
-  # fit three candidate models on data generated with soft max choice model
+  cat("\nfitting kalman softmax")
+  # fit candidate models on generated data
   l_softmax <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2216,6 +2229,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting kalman thompson")
   l_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2225,6 +2239,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting kalman ucb")
   l_ucb <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2234,6 +2249,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting kalman ru & thompson")
   l_ru_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2243,6 +2259,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting delta")
   l_delta <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2253,6 +2270,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting decay")
   l_decay <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
@@ -2274,7 +2292,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
 }
 
 
-read_out_lls_and_ics <- function(l_models_fit) {
+read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
   #' 
   #' @description read out by-participant log likelihoods for each model
   #' and summarize these results
@@ -2283,15 +2301,24 @@ read_out_lls_and_ics <- function(l_models_fit) {
   neg2ll_softmax <- map_dbl(map(l_models_fit[["softmax"]], "result"), 2)
   neg2ll_thompson <- map_dbl(map(l_models_fit[["thompson"]], "result"), 2)
   neg2ll_ucb <- map_dbl(map(l_models_fit[["ucb"]], "result"), 3)
+  neg2ll_ru_thompson <- map_dbl(map(l_models_fit[["ru_thompson"]], "result"), 4)
+  neg2ll_delta <- map_dbl(map(l_models_fit[["delta"]], "result"), 3)
+  neg2ll_decay <- map_dbl(map(l_models_fit[["decay"]], "result"), 3)
   
   tbl_lls <- tibble(
     participant_id = 1:nr_participants,
     bic_softmax = log(nr_participants) + neg2ll_softmax,
     bic_thompson = log(nr_participants) + neg2ll_thompson,
     bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
+    bic_ru_thompson = 3*log(nr_participants) + neg2ll_ru_thompson,
+    bic_delta = 2*log(nr_participants) + neg2ll_delta,
+    bic_decay = 2*log(nr_participants) + neg2ll_decay,
     aic_softmax = 2 + neg2ll_softmax,
     aic_thompson = 2 + neg2ll_thompson,
-    aic_ucb = 4 + neg2ll_ucb
+    aic_ucb = 4 + neg2ll_ucb,
+    aic_ru_thompson = 6 + neg2ll_ru_thompson,
+    aic_delta = 4 + neg2ll_delta,
+    aic_decay = 4 + neg2ll_decay
   )
   
   tbl_recovered_bic <- summarize_model_recovery(tbl_lls, "bic")
@@ -2308,7 +2335,10 @@ summarize_model_recovery <- function(tbl_lls, ic) {
   #' 
   #' @description summarize by-participant log likelihoods
   #' 
-  tbl_models <- tibble(model = str_c(ic, c("_softmax", "_thompson", "_ucb")))
+  tbl_models <- tibble(
+    model = str_c(
+      ic, c("_softmax", "_thompson", "_ucb", "_ru_thompson", "_delta", "_decay")
+      ))
   
   tbl_recovered <- tbl_lls %>% 
     pivot_longer(cols = starts_with(ic), names_to = "model") %>%
