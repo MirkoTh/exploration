@@ -2142,13 +2142,42 @@ recover_ru_thompson <- function(
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_ru_thompson(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, lambda, nr_vars
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data, 
+    nr_participants, nr_trials, lambda, nr_vars
     )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
-    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  l_models_fit <- simulate_and_fit_models(
+    tbl_params_participants, tbl_rewards, cond_on_choices
+  )
+  
+  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  
+  return(l_goodness)
+}
+
+
+recover_delta <- function(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, cond_on_choices, is_decay, lambda
+) {
+  #' 
+  #' @description generate choices according to soft max
+  #' and fit them with soft max, thompson, and ucb
+  
+  tbl_params_participants <- create_participant_sample_delta(
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    nr_trials, is_decay, lambda
+  )
+  
+  # simulate one fixed data set in case needed
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
   ) %>% 
     select(-trial_id)
   
