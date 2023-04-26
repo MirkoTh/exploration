@@ -2048,8 +2048,6 @@ create_participant_sample_delta <- function(
 
 
 
-
-
 recover_softmax <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants, 
     nr_trials, cond_on_choices, lambda, nr_vars
@@ -2076,6 +2074,7 @@ recover_softmax <- function(
   
   return(l_goodness)
 }
+
 
 
 recover_thompson <- function(
@@ -2117,6 +2116,35 @@ recover_ucb <- function(
   tbl_params_participants <- create_participant_sample_ucb(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
     nr_trials, lambda, 1)
+  
+  # simulate one fixed data set in case needed
+  tbl_rewards <- generate_restless_bandits(
+    sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
+  ) %>% 
+    select(-trial_id)
+  
+  l_models_fit <- simulate_and_fit_models(
+    tbl_params_participants, tbl_rewards, cond_on_choices
+  )
+  
+  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  
+  return(l_goodness)
+}
+
+
+recover_ru_thompson <- function(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
+    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars
+) {
+  #' 
+  #' @description generate choices according to soft max
+  #' and fit them with soft max, thompson, and ucb
+  
+  tbl_params_participants <- create_participant_sample_ru_thompson(
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
+    simulate_data, nr_participants, nr_trials, lambda, nr_vars
+    )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
@@ -2178,10 +2206,42 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  l_ru_thompson <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_ru_thompson_no_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  l_delta <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_delta_softmax_wrapper), 
+    is_decay = FALSE,
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
+  l_decay <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_delta_softmax_wrapper), 
+    is_decay = TRUE,
+    condition_on_observed_choices = cond_on_choices,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
   return(list(
     softmax = l_softmax,
     thompson = l_thompson,
-    ucb = l_ucb
+    ucb = l_ucb,
+    ru_thompson = l_ru_thompson,
+    delta = l_delta,
+    decay = l_decay
   ))
 }
 
