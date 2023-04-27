@@ -22,7 +22,6 @@ sigma_xi_sq <- 16
 sigma_epsilon_sq <- 16
 lambda <- .9836
 cond_on_choices <- TRUE
-nr_participants <- length(l_params_decision)
 
 tbl_rewards <- generate_restless_bandits(
   sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
@@ -70,6 +69,7 @@ l_params_decision <- map(
   tbl_kalman_softmax_no_variance$gamma, 
   ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
 )
+nr_participants <- length(l_params_decision)
 
 tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
 l_models_fit_softmax_kalman <- simulate_and_fit_models(
@@ -208,13 +208,34 @@ my_ic_comparison <- function(ic){
   tbl_ic <- l_goodness_softmax_kalman[[nm]] %>%
     mutate(model_in = "Kalman & Softmax") %>%
     rbind(
+      l_goodness_kalman_thompson[[nm]] %>%
+        mutate(model_in = "Kalman &\nThompson")
+    ) %>%
+    rbind(
+      l_goodness_kalman_ucb[[nm]] %>%
+        mutate(model_in = "Kalman &\nUCB")
+    ) %>%
+    rbind(
+      l_goodness_kalman_ru_thompson[[nm]] %>%
+        mutate(model_in = "Kalman & RU\nand Thompson")
+    ) %>%
+    rbind(
       l_goodness_delta[[nm]] %>%
-        mutate(model_in = "Delta & Softmax")
+        mutate(model_in = "Delta &\nSoftmax")
+    ) %>%
+    rbind(
+      l_goodness_decay[[nm]] %>%
+        mutate(model_in = "Decay &\nSoftmax")
     )
   tbl_ic$model <- factor(tbl_ic$model)
   levels(tbl_ic$model) <- c(
-    "Decay Softmax", "Delta Softmax", "Kalman, RU & Thompson",
-    "Kalman & Softmax", "Kalman & Thompson", "Kalman & UCB"
+    "Decay &\nSoftmax", "Delta &\nSoftmax", "Kalman & RU\nand Thompson",
+    "Kalman &\nSoftmax", "Kalman &\nThompson", "Kalman &\nUCB"
+  )
+  tbl_ic$model_in <- factor(tbl_ic$model_in)
+  levels(tbl_ic$model_in) <- c(
+    "Decay &\nSoftmax", "Delta &\nSoftmax", "Kalman & RU\nand Thompson",
+    "Kalman &\nSoftmax", "Kalman &\nThompson", "Kalman &\nUCB"
   )
   tbl_ic %>% rename(model_out = model)
 }
@@ -226,7 +247,7 @@ plot_my_ic <- function(my_tbl) {
   theme_bw() +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_discrete(expand = c(0, 0)) +
-  labs(x = "", y = "") +
+  labs(x = "Model In", y = "Model Out") +
   theme(strip.background = element_rect(fill = "white")) +
   scale_fill_viridis_c(guide = "none")
 }
@@ -235,6 +256,11 @@ plot_my_ic <- function(my_tbl) {
 tbl_bic <- my_ic_comparison("bic")
 tbl_aic <- my_ic_comparison("aic")
 
-plot_my_ic(tbl_bic) + ggtitle("BIC")
-plot_my_ic(tbl_aic) + ggtitle("AIC")
+pl_bic <- plot_my_ic(tbl_bic) + ggtitle("BIC")
+pl_aic <- plot_my_ic(tbl_aic) + ggtitle("AIC")
+
+pl_bic_aic <- arrangeGrob(pl_bic, pl_aic, nrow = 1)
+save_my_pdf_and_tiff(pl_bic_aic, "figures/model-recovery-empirical", 12, 5)
+
+
 
