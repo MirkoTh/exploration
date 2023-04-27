@@ -22,7 +22,7 @@ home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
 
-fit_or_load <- "fit"
+fit_or_load <- "load"
 
 
 
@@ -301,8 +301,8 @@ tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>%
 #   tbl_results_kalman_softmax <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-thompson-one-variance-recovery.rds")
 # }
 # 
-
-
+# 
+# 
 
 ## Delta Rule -------------------------------------------------------------
 
@@ -417,11 +417,6 @@ tbl_recovery_decay_softmax_long <- tbl_recovery_decay_softmax %>%
   ) %>%
   pivot_longer(cols = c(Gamma, Delta))
 
-pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_recovery_decay_softmax_long, pd, "softmax") +
-  facet_grid(name ~ is_decay)
-
-
 
 
 # Summarize Results -------------------------------------------------------
@@ -454,24 +449,9 @@ badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
 colnames(tbl_summary_pars) <- c("simulate_data", "Model", "Beta", "Delta", "Gamma", "w_mix")
 tbl_summary_pars <- tbl_summary_pars %>% relocate(Gamma, .before = Beta)
 tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")] <- map(tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")], ~ round(.x, digits = 2))
-# tbl_summary_pars <- tbl_summary_pars %>% select(-simulate_data)
 tbl_summary_pars$simulate_data <- factor(tbl_summary_pars$simulate_data)
 levels(tbl_summary_pars$simulate_data) <- c("One Fixed Set", "By Participant")
 tbl_summary_pars <- tbl_summary_pars %>% rename("Random Walk" = simulate_data)
-reactable(
-  tbl_summary_pars,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_summary_pars, span = 3:6, colors = badtogood_cols)
-  ),
-  columns = list(
-    Model = colDef(
-      style = cell_style(data,
-                         font_weight = "bold"))
-  )
-)
-
 tbl_summary_pars_long <- tbl_summary_pars %>% pivot_longer(-c(Model, "Random Walk"))
 tbl_summary_pars_long$name <- factor(tbl_summary_pars_long$name)
 levels(tbl_summary_pars_long$name) <- c("Beta", "Delta", "Gamma", "w_mix")
@@ -486,8 +466,6 @@ ggplot(tbl_summary_pars_long, aes(name, Model)) +
   scale_fill_gradient2(high = "aquamarine2", low = "tomato", mid = .5, guide = "none") +
   labs(x = "", y = "") +
   facet_wrap(~ `Random Walk`)
-
-
 
 
 tbl_gammas <- tbl_results_kalman_softmax %>%
