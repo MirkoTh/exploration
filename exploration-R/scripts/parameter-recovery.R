@@ -25,13 +25,14 @@ walk(home_grown, source)
 
 # Generate Random Walk Data -----------------------------------------------
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
 
 mu1 <- c(-60, -20, 20, 60)
 nr_trials <- 200
 sigma_xi_sq <- 16
 sigma_epsilon_sq <- 16
 lambda <- .9836
+n_reps <- 10
 
 tbl_bandits <- generate_restless_bandits(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials)
 
@@ -50,12 +51,12 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1),
-  gamma_sd = c(.03, .1, .2)
+  gamma_mn = c(.08, .16, 1),#[1],
+  gamma_sd = c(.05, .1, .2)#[1]
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
 
 
@@ -69,6 +70,7 @@ if (fit_or_load == "fit")  {
     lambda = lambda, nr_vars = 2
   )
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
+  
 } else if (fit_or_load == "load")  {
   l_results_softmax <- readRDS("exploration-R/data/recovery-softmax-two-variances.RDS")
 }
@@ -101,31 +103,31 @@ tbl_cor_softmax_long <- tbl_cor_softmax %>%
     simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
   ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon, "Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`, `Sigma Epsilon`))
+# 
+# pd <- position_dodge(width = .9)
+# plot_cor_recovery(tbl_cor_softmax_long, pd, "softmax")
 
-pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_long, pd, "softmax")
-
-
-# cors between pars
-f_clean_cor <- function(x) {
-  x <- x[x$gamma_ml < 2.9 & x$sigma_xi_sq_ml < 29 & x$sigma_epsilon_sq_ml < 29, ]
-  cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
-}
-l_cors_params <- map(
-  l_results_c, f_clean_cor
-)
-
-counter <- 1
-for (tbl_r in l_cors_params) {
-  l_cors_params[[counter]] <- as_tibble(cbind(
-    tbl_r, tbl_params_softmax[counter, ]
-  ))
-  counter = counter + 1
-}
-
-l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
-grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
-
+# 
+# # cors between pars
+# f_clean_cor <- function(x) {
+#   x <- x[x$gamma_ml < 2.9 & x$sigma_xi_sq_ml < 29 & x$sigma_epsilon_sq_ml < 29, ]
+#   cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+# }
+# l_cors_params <- map(
+#   l_results_c, f_clean_cor
+# )
+# 
+# counter <- 1
+# for (tbl_r in l_cors_params) {
+#   l_cors_params[[counter]] <- as_tibble(cbind(
+#     tbl_r, tbl_params_softmax[counter, ]
+#   ))
+#   counter = counter + 1
+# }
+# 
+# l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
+# grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
+# 
 
 
 
@@ -207,13 +209,17 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 if (fit_or_load == "fit")  {
-  l_results_softmax_0var <- pmap(
-    tbl_params_softmax, 
-    kalman_softmax_experiment, 
-    lambda = lambda,
-    nr_vars = 0
-  )
-  saveRDS(l_results_softmax_0var, "exploration-R/data/recovery-softmax-no-variance.RDS")
+  l_results_softmax_0var_all <- list()
+  for (i in 1:n_reps) {
+    l_results_softmax_0var <- pmap(
+      tbl_params_softmax, 
+      kalman_softmax_experiment, 
+      lambda = lambda,
+      nr_vars = 0
+    )
+    l_results_softmax_0var_all[[i]] <- l_results_softmax_0var
+    saveRDS(l_results_softmax_0var_all, "exploration-R/data/recovery-softmax-no-variance.RDS")
+  }
 } else if (fit_or_load == "load")  {
   l_results_softmax_0var <- readRDS("exploration-R/data/recovery-softmax-no-variance.RDS")
 }
@@ -245,8 +251,8 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   ) %>% rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
 
-pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
+# pd <- position_dodge(width = .9)
+# plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 
@@ -379,8 +385,8 @@ plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, .5, 1),#[1],
-  gamma_sd = c(.03, .1, .2)#[1]
+  gamma_mn = c(.08, .16, 1),#[1],
+  gamma_sd = c(.05, .1, .2)#[1]
 )
 tbl_betas <- tibble(
   beta_mn = c(.17, 1.5),#[1],
@@ -388,7 +394,7 @@ tbl_betas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
 
 
@@ -398,11 +404,15 @@ tbl_params_ucb <- crossing(
 
 
 if (fit_or_load == "fit")  {
-  l_results_ucb_0var <- pmap(
-    tbl_params_ucb, kalman_ucb_experiment,
-    lambda = lambda, nr_vars = 0
-  )
-  saveRDS(l_results_ucb_0var, "exploration-R/data/recovery-ucb-no-variance.RDS")
+  l_results_ucb_0var_all <- list()
+  for (i in 1:n_reps) {
+    l_results_ucb_0var <- pmap(
+      tbl_params_ucb, kalman_ucb_experiment,
+      lambda = lambda, nr_vars = 0
+    )
+    l_results_ucb_0var_all[[i]] <- l_results_ucb_0var
+    saveRDS(l_results_ucb_0var_all, "exploration-R/data/recovery-ucb-no-variance.RDS")
+  }
 } else if (fit_or_load == "load")  {
   l_results_ucb_0var <- readRDS("exploration-R/data/recovery-ucb-no-variance.RDS")
 }
@@ -440,8 +450,8 @@ tbl_cor_ucb_0var_long <- tbl_cor_ucb_0var %>%
   ) %>%
   pivot_longer(cols = c(Gamma, Beta))
 
-pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
+# pd <- position_dodge(width = .9)
+# plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
 
@@ -449,8 +459,8 @@ plot_cor_recovery(tbl_cor_ucb_0var_long, pd, "ucb")
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.16, 1),
-  gamma_sd = c(.03, .2)
+  gamma_mn = c(.08, .16),
+  gamma_sd = c(.05, .1)
 )
 tbl_betas <- tibble(
   beta_mn = c(.17, 1.5),
@@ -460,10 +470,10 @@ tbl_w_mix <- tibble(
   w_mix_mn = c(.5, .75),
   w_mix_sd = c(.2, .15)
 )
-  
+
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
 
 
@@ -474,11 +484,15 @@ tbl_params_ru_thompson <- crossing(
 
 
 if (fit_or_load == "fit")  {
-  l_results_ru_thompson_0var <- pmap(
-    tbl_params_ru_thompson, kalman_ru_thompson_experiment,
-    lambda = lambda, nr_vars = 0
-  )
-  saveRDS(l_results_ru_thompson_0var, "exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+  l_results_ru_thompson_0var_all <- list()
+  for (i in 1:n_reps) {
+    l_results_ru_thompson_0var <- pmap(
+      tbl_params_ru_thompson, kalman_ru_thompson_experiment,
+      lambda = lambda, nr_vars = 0
+    )
+    l_results_ru_thompson_0var_all[[i]] <- l_results_ru_thompson_0var
+    saveRDS(l_results_ru_thompson_0var_all, "exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+  }
 } else if (fit_or_load == "load")  {
   l_results_ru_thompson_0var <- readRDS("exploration-R/data/recovery-ru-thompson-no-variance.RDS")
 }
@@ -499,7 +513,10 @@ tbl_cor_ru_thompson_0var <- reduce(l_results_mix_0var, rbind) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml),
-    r_w_mix = cor(w_mix, w_mix_ml)
+    r_w_mix = cor(w_mix, w_mix_ml),
+    r_gamma_beta = cor(gamma_ml, beta_ml),
+    r_gamma_w_mix = cor(gamma_ml, w_mix_ml),
+    r_beta_w_mix = cor(beta_ml, w_mix_ml)
   ) %>% ungroup()
 
 tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>% 
@@ -513,10 +530,10 @@ tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>%
     "w_mix" = r_w_mix
   ) %>%
   pivot_longer(cols = c(Gamma, Beta, w_mix))
-
-pd <- position_dodge(width = .9)
-plot_cor_recovery(tbl_cor_ru_thompson_0var_long, pd, "ucb") +
-  facet_grid(interaction(simulate_data, name) ~ interaction(beta_mn, w_mix_mn))
+# 
+# pd <- position_dodge(width = .9)
+# plot_cor_recovery(tbl_cor_ru_thompson_0var_long, pd, "ucb") +
+#   facet_grid(interaction(simulate_data, name) ~ interaction(beta_mn, w_mix_mn))
 
 
 
@@ -533,7 +550,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -543,11 +560,15 @@ tbl_params_delta <- crossing(
 )
 
 if (fit_or_load == "fit")  {
-  l_results_delta_softmax <- pmap(
-    tbl_params_delta, delta_experiment,
-    lambda = lambda
-  )
-  saveRDS(l_results_delta_softmax, "exploration-R/data/recovery-delta-softmax.RDS")
+  l_results_delta_softmax_all <- list()
+  for (i in 1:n_reps) {
+    l_results_delta_softmax <- pmap(
+      tbl_params_delta, delta_experiment,
+      lambda = lambda
+    )
+    l_results_delta_softmax_all[[i]] <- l_results_delta_softmax
+    saveRDS(l_results_delta_softmax_all, "exploration-R/data/recovery-delta-softmax.RDS")
+  }
 } else if (fit_or_load == "load")  {
   l_results_delta_softmax <- readRDS("exploration-R/data/recovery-delta-softmax.RDS")
 }
@@ -679,6 +700,6 @@ grid.draw(arrangeGrob(
   pl_heatmap_cherry + ggtitle("Parameter Recovery (Cherries)"), 
   pl_landscape_delta + theme(legend.position = "none") + ggtitle("Delta Model"), 
   pl_landscape_decay + ggtitle("Decay Model")
- , nrow = 1, widths = c(1, 1, 1.15))
+  , nrow = 1, widths = c(1, 1, 1.15))
 )
 
