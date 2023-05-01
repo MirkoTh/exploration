@@ -2015,10 +2015,12 @@ create_participant_sample_delta <- function(
   #' @param lambda decay parameter of random walk
   #' @return a tbl with by-participant parameters
   
-  s_delta <- -1
-  while(s_delta < 0){
+  min_delta <- -1
+  max_delta <- 1.1
+  while(min_delta < 0 |max_delta > 1){
     delta <- rnorm(nr_participants, delta_mn, delta_sd)
-    s_delta <- min(delta)
+    min_delta <- min(delta)
+    max_delta <- max(delta)
   }
   s_gamma <- -1
   while(s_gamma < 0){
