@@ -107,27 +107,27 @@ tbl_cor_softmax_long <- tbl_cor_softmax %>%
 # pd <- position_dodge(width = .9)
 # plot_cor_recovery(tbl_cor_softmax_long, pd, "softmax")
 
-# 
-# # cors between pars
-# f_clean_cor <- function(x) {
-#   x <- x[x$gamma_ml < 2.9 & x$sigma_xi_sq_ml < 29 & x$sigma_epsilon_sq_ml < 29, ]
-#   cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
-# }
-# l_cors_params <- map(
-#   l_results_c, f_clean_cor
-# )
-# 
-# counter <- 1
-# for (tbl_r in l_cors_params) {
-#   l_cors_params[[counter]] <- as_tibble(cbind(
-#     tbl_r, tbl_params_softmax[counter, ]
-#   ))
-#   counter = counter + 1
-# }
-# 
-# l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
-# grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
-# 
+
+# cors between pars
+f_clean_cor <- function(x) {
+  x <- x[x$gamma_ml < 2.9 & x$sigma_xi_sq_ml < 29 & x$sigma_epsilon_sq_ml < 29, ]
+  cor(x[, c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml")])
+}
+l_cors_params <- map(
+  l_results_c, f_clean_cor
+)
+
+counter <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_softmax[counter, ]
+  ))
+  counter = counter + 1
+}
+
+l_heatmaps_par_cor <- map(l_cors_params, plot_my_heatmap_softmax)
+grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
+
 
 
 
