@@ -743,7 +743,7 @@ softmax_choice_prob <- function(ms, gamma) {
   #' @description soft max choice rule
   #' @param ms posterior means of the bandits
   #' @param gamma inverse temperature parameter
-  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' @return a tbl with by-trial choice probabilities
   # prevent exponent to become to large
   max_vals <- matrix(rep(708, ncol(ms) * nrow(ms)), nrow = nrow(ms))
   prob <- exp(pmin(max_vals, as.matrix(gamma * ms)))
@@ -762,7 +762,7 @@ thompson_choice_prob_map <- function(m, v, no) {
   #' @param v matrix with prior predictive variance for each bandit in a columns
   #' and every time point in a row
   #' @param no number of response options
-  #' @return a tbl with by-trial posterior means and variances for all bandits
+  #' @return a tbl with by-trial choice probabilities
   
   # construct the transformation matrix for the difference scores for the first option  
   A <- list()
@@ -797,7 +797,7 @@ ucb_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta) {
   #' @param vs posterior variances of the bandits
   #' @param gamma inverse temperature parameter
   #' @param beta ucb parameter
-  #' @return a tbl with by-trial posterior means and variances for the chosen bandits
+  #' @return a tbl with by-trial choice probabilities
   prob <- exp(gamma * ms + beta * sqrt(vs + sigma_xi_sq))
   prob <- prob / rowSums(prob)
   return(prob)
@@ -805,12 +805,40 @@ ucb_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta) {
 
 
 ru_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix, nr_options) {
+  #' 
+  #' @description mixture between relative uncertainty and Thompson sampling
+  #' @param ms posterior means of the bandits
+  #' @param vs posterior variances of the bandits
+  #' @param gamma inverse temperature parameter
+  #' @param beta ucb parameter
+  #' @param w_mix mixture parameter
+  #' @param nr_options number of arms/response options
+  #' @return a tbl with by-trial choice probabilities
   tbl_zeromeans <- as_tibble(as.data.frame(matrix(
     reduce(map(1:nr_options, ~ rep(0, nrow(ms))), c),
     ncol = nr_options
   )))
   colnames(tbl_zeromeans) <- str_c("m_", 1:nr_options)
   p_choices_ucb <- ucb_choice_prob(tbl_zeromeans, vs, sigma_xi_sq, gamma, beta)
+  p_choices_thompson <- thompson_choice_prob_map(ms, vs, nr_options)
+  p_choices_mix <- w_mix * p_choices_thompson + (1 - w_mix) * p_choices_ucb
+  return(p_choices_mix)
+}
+
+
+ucb_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix, nr_options) {
+  #' 
+  #' @description mixture between ucb and Thompson sampling
+  #' @param ms posterior means of the bandits
+  #' @param vs posterior variances of the bandits
+  #' @param gamma inverse temperature parameter
+  #' @param beta ucb parameter
+  #' @param w_mix mixture parameter
+  #' @param nr_options number of arms/response options
+  #' @return a tbl with by-trial choice probabilities
+  tbl_means <- as_tibble(as.data.frame(ms))
+  colnames(tbl_means) <- str_c("m_", 1:nr_options)
+  p_choices_ucb <- ucb_choice_prob(tbl_means, vs, sigma_xi_sq, gamma, beta)
   p_choices_thompson <- thompson_choice_prob_map(ms, vs, nr_options)
   p_choices_mix <- w_mix * p_choices_thompson + (1 - w_mix) * p_choices_ucb
   return(p_choices_mix)
