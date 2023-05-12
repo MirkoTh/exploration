@@ -6,11 +6,96 @@ library(gridExtra)
 
 # difference scores are always option 1 - option 2
 tbl_e1_prep <- read_csv("exploration-R/data/fan-exp1_bandit_task_scale.csv")
-tbl_e1 <- tbl_e1_prep %>% select(sub, block, trial, C, V, RU, TU, V_old, RU_old, TU_old)
+tbl_e1 <- tbl_e1_prep %>% 
+  select(
+    sub, block, trial, C, V, RU, TU, V_old, RU_old, TU_old, 
+    Factor1_Somatic_Anxiety, Factor2_Cognitive_Anxiety, 
+    Factor3_Negative_Affect, Factor4_Low_Self_esteem
+    )
 tbl_e1$VTU_old <- tbl_e1$V_old / tbl_e1$TU_old
 tbl_e1$VTU <- scale(tbl_e1$VTU_old)[, 1]
 
-cor(tbl_e1 %>% select(V, RU, VTU))
+tbl_cor <- tbl_subset %>% group_by(sub) %>% summarize(r_v = cor(V, C), r_vtu = cor(VTU, C), r_v_vtu = cor(V, VTU))
+l_tbl_subset <- split(tbl_subset, tbl_subset$sub)
+sub_ids <- map_dbl(l_tbl_subset, ~ as_vector(.x[1, "sub"]))
+l_models <- map(l_tbl_subset, ~ glm(C ~ V + VTU + RU, data = .x))
+l_vifs <- map(l_models, car::vif)
+tbl_vifs <- reduce(l_vifs, rbind) %>%
+  as.data.frame() %>% as_tibble() %>%
+  mutate(sub = sub_ids) %>%
+  relocate(sub, .before = V)
+sub_excl <- tbl_vifs$sub[(tbl_vifs$V > 3.5 | tbl_vifs$VTU > 3.5)]
+
+tbl_subset <- tbl_e1 %>% filter(!(sub %in% sub_excl))
+tbl_subset$V_cut <- cut(tbl_subset$V, c(-10, -.1, .1, 10), labels = FALSE)
+tbl_subset$VTU_cut <- cut(tbl_subset$VTU, c(-10, -.1, .1, 10), labels = FALSE)
+tbl_subset$RU_cut <- cut(tbl_subset$RU, c(-10, -.1, .1, 10), labels = FALSE)
+
+tbl_subset %>% 
+  filter(V_cut == 2 & VTU_cut == 2 & RU_cut == 2) %>%
+  group_by(sub, V_cut, VTU_cut, RU_cut) %>%
+  summarize(c_mn = mean(C)) %>%
+  ggplot(aes(c_mn)) + geom_histogram()
+
+tbl_choices_agg <- tbl_e1 %>% group_by(sub) %>% summarize(n = n(), C1 = sum(C))
+cor(tbl_subset[, c("V", "VTU", "RU", "C")])
+
+
+m_ri <- glmer(
+  C ~ 1 + (1 | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+summary(m_ri)
+
+m_no_i <- glmer(
+  C ~ -1 + VTU + V + RU + (-1 + VTU + V + RU | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+summary(m_no_i)
+
+
+# predict keeping vtu constant, but see whether you can "recover" it
+m_subset_v <- glmer(
+  C ~ V + V:Factor1_Somatic_Anxiety + (1 + V | sub), 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+
+tbl_subset$preds_prob_v <- predict(m_subset_v, type = "response")
+tbl_subset$preds_v <- as.numeric(rbernoulli(nrow(tbl_subset), tbl_subset$preds_prob_v))
+
+
+m_subset_check_v <- glmer(
+  preds_v ~ VTU + VTU:Factor1_Somatic_Anxiety + V + V:Factor1_Somatic_Anxiety + (1 + VTU | sub), 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+
+summary(m_subset_check_v)
+
+
+# predict keeping v constant, but see whether you can "recover" it
+m_subset_vtu <- glmer(
+  C ~ -1 + VTU + (-1+ VTU | sub), # VTU:Factor1_Somatic_Anxiety + 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+summary(m_subset_vtu)
+
+tbl_subset$preds_prob_vtu <- predict(m_subset_vtu, type = "response")
+tbl_subset$preds_vtu <- as.numeric(rbernoulli(nrow(tbl_subset), tbl_subset$preds_prob_vtu))
+
+
+m_subset_check_vtu <- glmer(
+  preds_vtu ~ VTU + VTU:Factor1_Somatic_Anxiety + V + V:Factor1_Somatic_Anxiety + (1 + VTU | sub), 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+
+summary(m_subset_check_vtu)
+
 
 m_100 <- glmer(
   C ~ V + RU*trial + VTU + (1 + V + RU*trial + VTU | sub), 
