@@ -251,7 +251,7 @@ tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
   group_by(replication_id, gamma_mn, simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
-  ) %>% ungroup()
+  ) %>% ungroup()http://127.0.0.1:45233/graphttp://127.0.0.1:45233/graphics/plot_zoom_png?width=1850&height=946hics/plot_zoom_png?width=1850&height=946
 
 tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>% 
   filter(!is.na(gamma_mn)) %>%
@@ -263,7 +263,7 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
 
-# pd <- position_dodge(width = .9)
+# pd <- position_dodge(width = .9)http://127.0.0.1:45233/graphics/plot_zoom_png?width=1060&height=647
 # plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
   geom_violin(alpha = .25) +
@@ -273,6 +273,7 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
   theme_bw() +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
+  scale_color_viridis_d(name = "Nr. Trials") +
   labs(x = "Gamma Mean Gen.", y = "Correlation In - Out", title = "Gamma (inv. Temp.)") + 
   theme(strip.background = element_rect(fill = "white"))
 
@@ -488,7 +489,7 @@ plot_ucb_param_recovery <- function(param, ttl) {
     geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
     geom_violin(alpha = .25) +
     geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
-    facet_grid(beta_mn ~ interaction(simulate_data, nr_trials, sep = " & ")) +
+    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ beta_mn) +
     coord_cartesian(ylim = c(0, 1)) +
     theme_bw() +
     scale_x_discrete(expand = c(0, 0)) +
@@ -501,8 +502,12 @@ plot_ucb_param_recovery <- function(param, ttl) {
 plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
 plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
 
-# Kalman & (RU & Thompson): Fix Variances ----------------------------------
 
+
+
+
+# Kalman & Mixture: Fix Variances ------------------------------------------
+# mixture can be ucb & thompson or only ru & thompson (with means = 0)
 
 tbl_gammas <- tibble(
   gamma_mn = c(.08, .16),
@@ -513,58 +518,59 @@ tbl_betas <- tibble(
   beta_sd = c(.05, .25)
 )
 tbl_w_mix <- tibble(
-  w_mix_mn = c(.5, .75),
-  w_mix_sd = c(.2, .15)
+  w_mix_mn = c(.4, .6),
+  w_mix_sd = c(.2, .2)
 )
 
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
 nr_trials <- c(200, 400)
 cond_on_choices <- c(TRUE)
+mixturetype <- c("ucb_thompson") #"ru_thompson"
 
 
-tbl_params_ru_thompson <- crossing(
+tbl_params_mixture <- crossing(
   tbl_gammas, tbl_betas, tbl_w_mix,
-  simulate_data, nr_participants, nr_trials, cond_on_choices
+  simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype
 )
 
 
 if (fit_or_load == "fit")  {
-  l_results_ru_thompson_0var_all <- list()
+  l_results_mixture_0var_all <- list()
   for (i in 1:n_reps) {
-    l_results_ru_thompson_0var <- pmap(
-      tbl_params_ru_thompson, kalman_ru_thompson_experiment,
+    l_results_mixture_0var <- pmap(
+      tbl_params_mixture, kalman_mixture_experiment,
       lambda = lambda, nr_vars = 0
     )
-    l_results_ru_thompson_0var_all[[i]] <- l_results_ru_thompson_0var
-    saveRDS(l_results_ru_thompson_0var_all, "exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+    l_results_mixture_0var_all[[i]] <- l_results_mixture_0var
+    saveRDS(l_results_mixture_0var_all, "exploration-R/data/recovery-mixture-no-variance.RDS")
   }
 } else if (fit_or_load == "load")  {
-  l_results_ru_thompson_0var <- readRDS("exploration-R/data/recovery-ru-thompson-no-variance.RDS")
+  l_results_mixture_0var <- readRDS("exploration-R/data/recovery-mixture-no-variance.RDS")
 }
 
 
-l_results_ru_thompson_0var <- map2(
-  l_results_ru_thompson_0var, 1:length(l_results_ru_thompson_0var), 
+l_results_mixture_0var <- map2(
+  l_results_mixture_0var, 1:length(l_results_mixture_0var), 
   ~ map2(.x, rep(.y, length(.x)), add_repl_id)
 )
-l_results_ru_thompson_0var <- reduce(l_results_ru_thompson_0var, c)
+l_results_mixture_0var <- reduce(l_results_mixture_0var, c)
 
 counter <- 1
 counter_design <- 1
 l_results_mix_0var <- list()
-for (tbl_r in l_results_ru_thompson_0var) {
+for (tbl_r in l_results_mixture_0var) {
   l_results_mix_0var[[counter]] <- as_tibble(cbind(
     tbl_r %>% 
       unnest_wider(params_decision) %>%
-      select(-c(simulate_data, nr_trials)), tbl_params_ru_thompson[counter_design, ]
+      select(-c(simulate_data, nr_trials)), tbl_params_mixture[counter_design, ]
   ))
   counter <- counter + 1
-  counter_design <- counter %% nrow(tbl_params_ru_thompson)
-  counter_design[counter_design == 0] <- nrow(tbl_params_ru_thompson)
+  counter_design <- counter %% nrow(tbl_params_mixture)
+  counter_design[counter_design == 0] <- nrow(tbl_params_mixture)
 }
 
-tbl_cor_ru_thompson_0var <- reduce(l_results_mix_0var, rbind) %>%
+tbl_cor_mixture_0var <- reduce(l_results_mix_0var, rbind) %>%
   group_by(replication_id, gamma_mn, beta_mn, w_mix_mn, simulate_data, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
@@ -575,7 +581,7 @@ tbl_cor_ru_thompson_0var <- reduce(l_results_mix_0var, rbind) %>%
     r_beta_w_mix = cor(beta_ml, w_mix_ml)
   ) %>% ungroup()
 
-tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>% 
+tbl_cor_mixture_0var_long <- tbl_cor_mixture_0var %>% 
   mutate(
     simulate_data = factor(simulate_data),
     simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
@@ -591,11 +597,11 @@ tbl_cor_ru_thompson_0var_long <- tbl_cor_ru_thompson_0var %>%
   pivot_longer(cols = c(Gamma, Beta, w_mix))
 # 
 # pd <- position_dodge(width = .9)
-# plot_cor_recovery(tbl_cor_ru_thompson_0var_long, pd, "ucb") +
+# plot_cor_recovery(tbl_cor_mixture_0var_long, pd, "ucb") +
 #   facet_grid(interaction(simulate_data, name) ~ interaction(beta_mn, w_mix_mn))
 
 plot_ru_thompson_param_recovery <- function(param, ttl) {
-  ggplot(tbl_cor_ru_thompson_0var_long %>% filter(name == param), aes(as.factor(gamma_mn), value)) +
+  ggplot(tbl_cor_mixture_0var_long %>% filter(name == param), aes(as.factor(gamma_mn), value)) +
     geom_hline(yintercept = .5, color = "grey", linetype = "dotdash") +
     geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
     geom_violin(alpha = .25) +
@@ -727,7 +733,7 @@ plot_delta_param_recovery <- function(dc, param, ttl) {
     geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
     geom_violin(alpha = .25) +
     geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
-    facet_grid(delta_mn ~ interaction(simulate_data, nr_trials, sep = " & ")) +
+    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ delta_mn) +
     coord_cartesian(ylim = c(-1, 1)) +
     theme_bw() +
     scale_x_discrete(expand = c(.02, .02)) +
