@@ -251,7 +251,8 @@ tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
   group_by(replication_id, gamma_mn, simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
-  ) %>% ungroup()http://127.0.0.1:45233/graphttp://127.0.0.1:45233/graphics/plot_zoom_png?width=1850&height=946hics/plot_zoom_png?width=1850&height=946
+  ) %>% ungroup()
+
 
 tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>% 
   filter(!is.na(gamma_mn)) %>%
@@ -263,7 +264,7 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
 
-# pd <- position_dodge(width = .9)http://127.0.0.1:45233/graphics/plot_zoom_png?width=1060&height=647
+# pd <- position_dodge(width = .9)
 # plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
 ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
   geom_violin(alpha = .25) +
@@ -522,9 +523,9 @@ tbl_w_mix <- tibble(
   w_mix_sd = c(.2, .2)
 )
 
-simulate_data <- c(TRUE, FALSE)
+simulate_data <- c(FALSE) # TRUE, 
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- c(400) # 200, 
 cond_on_choices <- c(TRUE)
 mixturetype <- c("ucb_thompson") #"ru_thompson"
 
@@ -551,7 +552,7 @@ if (fit_or_load == "fit")  {
 
 
 l_results_mixture_0var <- map2(
-  l_results_mixture_0var, 1:length(l_results_mixture_0var), 
+  l_results_mixture_0var_all, 1:length(l_results_mixture_0var_all), 
   ~ map2(.x, rep(.y, length(.x)), add_repl_id)
 )
 l_results_mixture_0var <- reduce(l_results_mixture_0var, c)
