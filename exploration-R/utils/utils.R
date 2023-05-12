@@ -733,6 +733,9 @@ choice_prob <- function(m, v, sigma_xi_sq, pars) {
          ru_thompson = ru_and_thompson_choice_prob(
            m, v, sigma_xi_sq, pars$gamma, pars$beta, pars$w_mix, ncol(m)
          ),
+         ucb_thompson = ucb_and_thompson_choice_prob(
+           m, v, sigma_xi_sq, pars$gamma, pars$beta, pars$w_mix, ncol(m)
+         ),
          stop("Invalid choicemodel")
   )
 }
@@ -1060,7 +1063,7 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
 
 fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
   #' 
-  #' @description Kalman soft max with ucb fitting wrapper,
+  #' @description Kalman ru and thompson mixture fitting wrapper,
   #' fix Kalman variances to the true value
   #' 
   sigma_xi_sq <- 16
@@ -1070,6 +1073,29 @@ fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
   w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ru_and_thompson_choice_prob(
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))), 
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_"))),
+    sigma_xi_sq, gamma, beta, w_mix, nr_options
+  )
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices_mix, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  llik <- log(lik)
+  sllik <- sum(llik)
+  return(-2*sllik)
+}
+
+
+fit_kalman_ucb_thompson_no_variance <- function(x, tbl_results, nr_options) {
+  #' 
+  #' @description Kalman ucb and thompson mixture fitting wrapper,
+  #' fix Kalman variances to the true value
+  #' 
+  sigma_xi_sq <- 16
+  sigma_epsilon_sq <- 16
+  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
+  beta <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
+  w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
+  tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
+  p_choices_mix <- ucb_and_thompson_choice_prob(
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))), 
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_"))),
     sigma_xi_sq, gamma, beta, w_mix, nr_options
@@ -1283,7 +1309,7 @@ fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_o
 }
 
 
-fit_ru_thompson_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_mixture_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, f_fit) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(
     upper_and_lower_bounds(1.5, 0, 3),
@@ -1292,7 +1318,7 @@ fit_ru_thompson_no_variance_wrapper <- function(tbl_results, tbl_rewards, condit
   )
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_ru_thompson_no_variance,
+      params_init, f_fit,
       tbl_results = tbl_results, nr_options = 4
     )
     r <- c(
@@ -1620,7 +1646,7 @@ simulate_and_fit_ucb <- function(
 }
 
 
-simulate_and_fit_ru_thompson <- function(
+simulate_and_fit_mixture <- function(
     tbl_params_participants, nr_vars, cond_on_choices, nr_trials
 ) {
   
@@ -1641,18 +1667,22 @@ simulate_and_fit_ru_thompson <- function(
   )
   
   # fit
+  mixturetype <- tbl_params_participants$params_decision[[1]][["choicemodel"]]
+  if(mixturetype == "ucb_thompson") f_fit <- fit_kalman_ucb_thompson_no_variance
+  if(mixturetype == "ru_thompson") f_fit <- fit_kalman_ru_thompson_no_variance
   plan(multisession, workers = availableCores() - 2)
-  l_ru_thompson <- future_map2(
+  l_mixture <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ru_thompson_no_variance_wrapper), 
+    safely(fit_mixture_no_variance_wrapper), 
     condition_on_observed_choices = cond_on_choices,
+    f_fit = f_fit,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
-  l_results <- map(l_ru_thompson, "result")
+  l_results <- map(l_mixture, "result")
   idx <- 1
   for (p in l_results){
     if (is.null(p)){
@@ -1661,39 +1691,39 @@ simulate_and_fit_ru_thompson <- function(
     idx <- idx + 1
   }
   
-  tbl_results_ru_thompson <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
+  tbl_results_mixture <- as.data.frame(reduce(l_results, rbind)) %>% as_tibble()
   
   if (nr_vars == 0) {
-    colnames(tbl_results_ru_thompson) <- c("gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
+    colnames(tbl_results_mixture) <- c("gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   } else if (nr_vars == 1) {
-    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
+    colnames(tbl_results_mixture) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   }  else if (nr_vars == 2) {
-    colnames(tbl_results_ru_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
+    colnames(tbl_results_mixture) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   }
   
   
-  tbl_results_ru_thompson <- as_tibble(cbind(tbl_params_participants, tbl_results_ru_thompson)) %>%
-    mutate(participant_id = 1:nrow(tbl_results_ru_thompson))
+  tbl_results_mixture <- as_tibble(cbind(tbl_params_participants, tbl_results_mixture)) %>%
+    mutate(participant_id = 1:nrow(tbl_results_mixture))
   
   
-  return(tbl_results_ru_thompson)
+  return(tbl_results_mixture)
   
 }
 
 
-kalman_ru_thompson_experiment <- function(
+kalman_mixture_experiment <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars
+    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars, mixturetype
 ) {
   
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
-  tbl_params_participants <- create_participant_sample_ru_thompson(
+  tbl_params_participants <- create_participant_sample_mixture(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data, 
-    nr_participants, nr_trials, lambda, nr_vars
+    nr_participants, nr_trials, lambda, nr_vars, mixturetype
   )
   
-  tbl_results_kalman_ru_thompson <- simulate_and_fit_ru_thompson(
+  tbl_results_kalman_mixture <- simulate_and_fit_mixture(
     tbl_params_participants, nr_vars, cond_on_choices, nr_trials
   )
   
@@ -1705,7 +1735,7 @@ kalman_ru_thompson_experiment <- function(
   )
   cat(progress_msg)
   
-  return(tbl_results_kalman_ru_thompson)
+  return(tbl_results_kalman_mixture)
 }
 
 
@@ -1966,9 +1996,10 @@ create_participant_sample_ucb <- function(
 }
 
 
-create_participant_sample_ru_thompson <- function(
+create_participant_sample_mixture <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, 
-    simulate_data, nr_participants, nr_trials, lambda, nr_vars
+    simulate_data, nr_participants, nr_trials, lambda, nr_vars,
+    mixturetype
 ) {
   # create a tbl with simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
@@ -2005,7 +2036,7 @@ create_participant_sample_ru_thompson <- function(
     s_seeds <- length(unique(seed))
   }
   
-  tbl_params_ru_thompson <- tibble(
+  tbl_params_mixture <- tibble(
     sigma_prior = rep(1000, nr_participants),
     mu_prior = rep(0, nr_participants),
     sigma_xi_sq,
@@ -2014,13 +2045,13 @@ create_participant_sample_ru_thompson <- function(
     nr_trials = nr_trials,
     params_decision = pmap(
       list(gamma, beta, w_mix), 
-      ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ru_thompson", no = 4)
+      ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = mixturetype, no = 4)
     ),
     simulate_data = simulate_data,
     seed = seed
   )
   
-  return(tbl_params_ru_thompson)
+  return(tbl_params_mixture)
 }
 
 
