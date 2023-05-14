@@ -216,7 +216,7 @@ generated quantities {
       b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2] + 
       b[subj_predict[n], 3] * x_predict[n, 3]
       );
-    posterior_prediction[n] = Phi(theta_predict[n]);
+    posterior_prediction[n] = bernoulli(theta_predict[n]);
   }
 }
 

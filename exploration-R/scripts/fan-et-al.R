@@ -276,6 +276,8 @@ fit_choice_reduced <- mod_choice_reduced$sample(
   init = 0
 )
 
+fit_choice_reduced@stanmodel@dso <- new("cxxdso")
+saveRDS(fit_choice_reduced, file = "exploration-R/data/fit_choice_reduced.rds")
 # 50 subjects: 500s
 # 200 subjects: 650s
 # 200 subjects with predictions: 770s
@@ -285,6 +287,8 @@ fit_choice_reduced <- mod_choice_reduced$sample(
 pars_interest <- c("mu_tf")
 tbl_draws <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
 tbl_summary <- fit_choice_reduced$summary(variables = pars_interest)
+
+saveRDS(tbl_draws, "")
 
 tbl_posterior <- tbl_draws %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
