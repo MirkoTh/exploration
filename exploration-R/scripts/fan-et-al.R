@@ -1,3 +1,8 @@
+
+# Set Up Script -----------------------------------------------------------
+
+
+
 library(tidyverse)
 library(lme4)
 library(rutils)
@@ -11,6 +16,11 @@ home_grown <- c(
   "exploration-R/utils/stan-models.R"
   )
 walk(home_grown, source)
+
+
+
+
+# Prepare Data ------------------------------------------------------------
 
 
 # difference scores are always option 1 - option 2
@@ -34,7 +44,7 @@ tbl_vifs <- reduce(l_vifs, rbind) %>%
   as.data.frame() %>% as_tibble() %>%
   mutate(sub = sub_ids) %>%
   relocate(sub, .before = V)
-sub_incl <- tbl_vifs$sub[(tbl_vifs$V <= 2.5 | tbl_vifs$VTU <= 2.5)]
+sub_incl <- tbl_vifs$sub#[(tbl_vifs$V <= 3 | tbl_vifs$VTU <= 3)]
 
 tbl_subset <- tbl_e1 %>% filter(sub %in% sub_incl)
 tbl_subset$V_cut <- cut(tbl_subset$V, c(-10, -.1, .1, 10), labels = FALSE)
@@ -262,7 +272,8 @@ l_data <- list(
 )
 
 fit_choice_reduced <- mod_choice_reduced$sample(
-  data = l_data, iter_sampling = 500, iter_warmup = 500, chains = 1
+  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
+  init = 0
 )
 
 # 50 subjects: 500s
@@ -308,7 +319,7 @@ table(tbl_predict[, c("C", "backcast")])
 # Recover on 3-Parameter Model --------------------------------------------
 
 
-choice_model <- stan_choice()
+choice_model <- stan_choice_lkj()
 mod_choice <- cmdstan_model(choice_model)
 
 mm_choice <- model.matrix(
@@ -341,7 +352,7 @@ l_data <- list(
 )
 
 fit_choice <- mod_choice$sample(
-  data = l_data, iter_sampling = 3000, iter_warmup = 1000, chains = 1
+  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1
 )
 
 # 50 subjects: 500s
@@ -349,7 +360,7 @@ fit_choice <- mod_choice$sample(
 
 
 # analyze group-level posterior parameters estimates
-pars_interest <- c("mu_tf")
+pars_interest <- c("mu", "Sigma")
 tbl_draws <- fit_choice$draws(variables = pars_interest, format = "df")
 tbl_summary <- fit_choice$summary(variables = pars_interest)
 
@@ -368,12 +379,33 @@ tbl_thx <- l[[2]]
 map(as.list(params_bf), plot_posterior, tbl_posterior, tbl_thx, bfs)
 
 
+# inspect the parameter correlations
+tbl_cor_posterior <- tbl_draws %>% 
+  dplyr::select(c(`Sigma[2,3]`, `Sigma[2,4]`, `Sigma[3,4]`, .chain)) %>%
+  rename(chain = .chain) %>%
+  pivot_longer(starts_with(c("Sigma")), names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, labels = c("r(V, RU)", "r(V, VTU)", "r(RU, VTU)")))
+
+library(ggbeeswarm)
+ggplot(tbl_cor_posterior, aes(parameter, value, group = parameter)) +
+  geom_violin(aes(fill = parameter), alpha = .25) +
+  geom_quasirandom(aes(color = parameter), cex = 1.75, alpha = .5, method = "quasirandom") +
+  geom_boxplot(width = .25, aes(color = parameter), alpha = .7) +
+  stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "", y = "Correlation") + 
+  theme(strip.background = element_rect(fill = "white"))
+
+
+
 tbl_preds <- fit_choice$draws(variables = "posterior_prediction", format = "df") %>%
   select(starts_with("posterior_prediction"))
 
 # do backcasts align with data?
 pred_prob <- apply(tbl_preds, 2, mean) %>% unname()
-plot(pred_prob, tbl_predict$C)
+cor(pred_prob, tbl_predict$C)
 
 
 sample_ids <- sample(1:nrow(tbl_preds), replace = TRUE, size = ncol(tbl_preds))

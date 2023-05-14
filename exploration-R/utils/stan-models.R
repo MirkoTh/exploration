@@ -216,6 +216,79 @@ generated quantities {
       b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2] + 
       b[subj_predict[n], 3] * x_predict[n, 3]
       );
+    posterior_prediction[n] = Phi(theta_predict[n]);
+  }
+}
+
+")
+  return(stan_logistic)
+}
+
+
+stan_choice_lkj <- function() {
+  
+  stan_logistic <- write_stan_file("
+data {
+  int n_data;
+  int n_subj;
+  array[n_data] int choice;
+  array[n_data] int subj;
+  matrix[n_data, 4] x; // ic, v, ru, vtu
+  int n_data_predict;
+  array[n_data_predict] int subj_predict;
+  matrix[n_data_predict, 4] x_predict; // ic, v, ru, vtu
+}
+
+transformed data {
+  real scale_cont = sqrt(2) / 4;
+}
+
+parameters {
+  matrix[n_subj, 4] b;
+  vector[4] mu;
+  vector <lower=0>[4] sigma_subject;
+  cholesky_factor_corr[4] L;
+
+}
+
+transformed parameters {
+
+  array[n_data] real <lower=0,upper=1> theta;
+  
+  for (n in 1:n_data) {
+    theta[n] = Phi(
+    b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2] + 
+    b[subj[n], 3] * x[n, 3] + b[subj[n], 4] * x[n, 4]);
+  }
+}
+
+
+model {
+  for (n in 1:n_data) {
+    choice[n] ~ bernoulli(theta[n]);
+  }
+  L ~ lkj_corr_cholesky(1);
+
+  for (s in 1:n_subj) {
+    b[s] ~ multi_normal_cholesky(mu, diag_pre_multiply(sigma_subject, L));
+  }
+
+  sigma_subject ~ uniform(0.001, 10);
+  mu ~ normal(0, 1);
+}
+
+generated quantities {
+  vector[n_data_predict] posterior_prediction;
+  vector[n_data_predict] theta_predict;
+  corr_matrix[4] Sigma;
+  
+  Sigma = multiply_lower_tri_self_transpose(L);
+
+  for (n in 1:n_data_predict) {
+    theta_predict[n] = Phi(
+      b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2] + 
+      b[subj_predict[n], 3] * x_predict[n, 3] + b[subj_predict[n], 4] * x_predict[n, 4]
+      );
     posterior_prediction[n] = bernoulli_rng(theta_predict[n]);
   }
 }
@@ -223,6 +296,8 @@ generated quantities {
 ")
   return(stan_logistic)
 }
+
+
 
 
 
