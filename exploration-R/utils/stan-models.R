@@ -105,7 +105,7 @@ transformed parameters {
   array[n_data] real <lower=0,upper=1> theta;
   
   for (n in 1:n_data) {
-    theta[n] = inv_logit(
+    theta[n] = Phi(
     b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2] + 
     b[subj[n], 3] * x[n, 3] + b[subj[n], 4] * x[n, 4]);
   }
@@ -138,7 +138,7 @@ generated quantities {
   vector[n_data_predict] theta_predict;
 
   for (n in 1:n_data_predict) {
-    theta_predict[n] = inv_logit(
+    theta_predict[n] = Phi(
       b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2] + 
       b[subj_predict[n], 3] * x_predict[n, 3] + b[subj_predict[n], 4] * x_predict[n, 4]
       );
@@ -183,7 +183,7 @@ transformed parameters {
   array[n_data] real <lower=0,upper=1> theta;
   
   for (n in 1:n_data) {
-    theta[n] = inv_logit(b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2] + b[subj[n], 3] * x[n, 3]);
+    theta[n] = Phi(b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2] + b[subj[n], 3] * x[n, 3]);
   }
 }
 
@@ -212,7 +212,7 @@ generated quantities {
   vector[n_data_predict] theta_predict;
 
   for (n in 1:n_data_predict) {
-    theta_predict[n] = inv_logit(
+    theta_predict[n] = Phi(
       b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2] + 
       b[subj_predict[n], 3] * x_predict[n, 3]
       );
