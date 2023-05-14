@@ -3,6 +3,15 @@ library(lme4)
 library(rutils)
 library(grid)
 library(gridExtra)
+library(cmdstanr)
+
+home_grown <- c(
+  "exploration-R/utils/utils.R", 
+  "exploration-R/utils/plotting.R",
+  "exploration-R/utils/stan-models.R"
+  )
+walk(home_grown, source)
+
 
 # difference scores are always option 1 - option 2
 tbl_e1_prep <- read_csv("exploration-R/data/fan-exp1_bandit_task_scale.csv")
@@ -15,18 +24,19 @@ tbl_e1 <- tbl_e1_prep %>%
 tbl_e1$VTU_old <- tbl_e1$V_old / tbl_e1$TU_old
 tbl_e1$VTU <- scale(tbl_e1$VTU_old)[, 1]
 
-tbl_cor <- tbl_subset %>% group_by(sub) %>% summarize(r_v = cor(V, C), r_vtu = cor(VTU, C), r_v_vtu = cor(V, VTU))
-l_tbl_subset <- split(tbl_subset, tbl_subset$sub)
-sub_ids <- map_dbl(l_tbl_subset, ~ as_vector(.x[1, "sub"]))
-l_models <- map(l_tbl_subset, ~ glm(C ~ V + VTU + RU, data = .x))
+tbl_cor <- tbl_e1 %>% group_by(sub) %>% summarize(r_v = cor(V, C), r_vtu = cor(VTU, C), r_v_vtu = cor(V, VTU))
+
+l_tbl_e1 <- split(tbl_e1, tbl_e1$sub)
+sub_ids <- map_dbl(l_tbl_e1, ~ as_vector(.x[1, "sub"]))
+l_models <- map(l_tbl_e1, ~ glm(C ~ V + VTU + RU, data = .x))
 l_vifs <- map(l_models, car::vif)
 tbl_vifs <- reduce(l_vifs, rbind) %>%
   as.data.frame() %>% as_tibble() %>%
   mutate(sub = sub_ids) %>%
   relocate(sub, .before = V)
-sub_excl <- tbl_vifs$sub[(tbl_vifs$V > 3.5 | tbl_vifs$VTU > 3.5)]
+sub_incl <- tbl_vifs$sub[(tbl_vifs$V <= 2.5 | tbl_vifs$VTU <= 2.5)]
 
-tbl_subset <- tbl_e1 %>% filter(!(sub %in% sub_excl))
+tbl_subset <- tbl_e1 %>% filter(sub %in% sub_incl)
 tbl_subset$V_cut <- cut(tbl_subset$V, c(-10, -.1, .1, 10), labels = FALSE)
 tbl_subset$VTU_cut <- cut(tbl_subset$VTU, c(-10, -.1, .1, 10), labels = FALSE)
 tbl_subset$RU_cut <- cut(tbl_subset$RU, c(-10, -.1, .1, 10), labels = FALSE)
@@ -41,6 +51,12 @@ tbl_choices_agg <- tbl_e1 %>% group_by(sub) %>% summarize(n = n(), C1 = sum(C))
 cor(tbl_subset[, c("V", "VTU", "RU", "C")])
 
 
+
+
+
+# Frequentist Models in LME4 ----------------------------------------------
+
+
 m_ri <- glmer(
   C ~ 1 + (1 | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
   data = tbl_subset, 
@@ -48,12 +64,30 @@ m_ri <- glmer(
 )
 summary(m_ri)
 
-m_no_i <- glmer(
-  C ~ -1 + VTU + V + RU + (-1 + VTU + V + RU | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
+# full model with or without intercept does not converge
+
+m_no_vtu <- glmer(
+  C ~ 1 + V + RU + (1 + V + RU | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
   data = tbl_subset, 
   family = binomial(link = "logit")
 )
-summary(m_no_i)
+summary(m_no_vtu)
+
+m_only_vtu <- glmer(
+  C ~ 1 + VTU + (1 + VTU | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+summary(m_only_vtu)
+tbl_subset$preds_prob_vtu <- predict(m_only_vtu, type = "response")
+tbl_subset$preds_vtu <- as.numeric(rbernoulli(nrow(tbl_subset), tbl_subset$preds_prob_vtu))
+
+m_v_vtu <- glmer(
+  preds_vtu ~ 1 + V + VTU + (1 + V + VTU | sub), # VTU + VTU:Factor1_Somatic_Anxiety + 
+  data = tbl_subset, 
+  family = binomial(link = "logit")
+)
+summary(m_v_vtu)
 
 
 # predict keeping vtu constant, but see whether you can "recover" it
@@ -172,6 +206,187 @@ pl_VTU_C10 <- plot_univarite_relationship(VTU_cut, 10)
 pl_horizon10 <- arrangeGrob(pl_V_C10, pl_RU_C10, pl_VTU_C10, nrow = 1)
 
 grid.draw(arrangeGrob(pl_horizon2, pl_horizon4, pl_horizon7, pl_horizon10, nrow = 4))
+
+
+
+
+# Stan Models -------------------------------------------------------------
+
+# this data set is used for backcasts
+# backcasting on full data set is not feasible in terms of storage
+
+
+tbl_predict <- tbl_subset %>% group_by(sub) %>%
+  mutate(
+    randi = runif(length(block)),
+    ranking = row_number(randi)
+    ) %>%
+  arrange(sub, ranking) %>%
+  filter(ranking <= 10)
+
+
+
+# Fit 2-Parameter Model ---------------------------------------------------
+
+
+choice_model_reduced <- stan_choice_reduced()
+mod_choice_reduced <- cmdstan_model(choice_model_reduced)
+
+mm_choice <- model.matrix(
+  C ~ VTU + RU, data = tbl_subset
+) %>% as_tibble()
+colnames(mm_choice) <- c("ic", "VTU", "RU")
+mm_choice$sub <- tbl_subset$sub
+
+mm_choice_predict <- model.matrix(
+  C ~ VTU + RU, data = tbl_predict
+) %>% as_tibble()
+colnames(mm_choice_predict) <- c("ic", "VTU", "RU")
+mm_choice_predict$sub <- tbl_predict$sub
+
+l_data <- list(
+  n_data = nrow(mm_choice),
+  n_subj = length(unique(mm_choice$sub)),
+  choice = tbl_subset$C,
+  subj = as.numeric(factor(
+    tbl_subset$sub, 
+    labels = 1:length(unique(tbl_subset$sub))
+  )),
+  x = as.matrix(mm_choice[, c("ic", "VTU", "RU")]),
+  n_data_predict = nrow(mm_choice_predict),
+  subj_predict = as.numeric(factor(
+    tbl_predict$sub, 
+    labels = 1:length(unique(tbl_predict$sub))
+  )),
+  x_predict = as.matrix(mm_choice_predict[, c("ic", "VTU", "RU")])
+)
+
+fit_choice_reduced <- mod_choice_reduced$sample(
+  data = l_data, iter_sampling = 500, iter_warmup = 500, chains = 1
+)
+
+# 50 subjects: 500s
+# 200 subjects: 650s
+# 200 subjects with predictions: 770s
+
+
+# analyze group-level posterior parameters estimates
+pars_interest <- c("mu_tf")
+tbl_draws <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
+tbl_summary <- fit_choice_reduced$summary(variables = pars_interest)
+
+tbl_posterior <- tbl_draws %>% 
+  dplyr::select(starts_with(c("mu")), .chain) %>%
+  rename(chain = .chain) %>%
+  pivot_longer(starts_with(c("mu")), names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, labels = c("Intercept", "VTU", "RU")))
+
+params_bf <- c("Intercept", "VTU", "RU")
+l <- sd_bfs(tbl_posterior, params_bf, sqrt(2)/4)
+bfs <- l[[1]]
+tbl_thx <- l[[2]]
+
+# plot the posteriors and the bfs
+map(as.list(params_bf), plot_posterior, tbl_posterior, tbl_thx, bfs)
+
+
+tbl_preds <- fit_choice_reduced$draws(variables = "posterior_prediction", format = "df") %>%
+  select(starts_with("posterior_prediction"))
+
+# do backcasts align with data?
+pred_prob <- apply(tbl_preds, 2, mean) %>% unname()
+cor(pred_prob, tbl_predict$C)
+
+sample_ids <- sample(1:nrow(tbl_preds), replace = TRUE, size = ncol(tbl_preds))
+tbl_predict$backcast <- unlist(map2(tbl_preds, sample_ids, ~ .x[.y]))
+
+# looks ok
+table(tbl_predict[, c("C", "backcast")])
+
+
+
+# Recover on 3-Parameter Model --------------------------------------------
+
+
+choice_model <- stan_choice()
+mod_choice <- cmdstan_model(choice_model)
+
+mm_choice <- model.matrix(
+  backcast ~ V + RU + VTU, data = tbl_predict
+) %>% as_tibble()
+colnames(mm_choice) <- c("ic", "V", "RU", "VTU")
+mm_choice$sub <- tbl_predict$sub
+
+mm_choice_predict <- model.matrix(
+  backcast ~ V + RU + VTU, data = tbl_predict
+) %>% as_tibble()
+colnames(mm_choice_predict) <- c("ic", "V", "RU", "VTU")
+mm_choice_predict$sub <- tbl_predict$sub
+
+l_data <- list(
+  n_data = nrow(mm_choice),
+  n_subj = length(unique(mm_choice$sub)),
+  choice = tbl_predict$C,
+  subj = as.numeric(factor(
+    tbl_predict$sub, 
+    labels = 1:length(unique(tbl_predict$sub))
+  )),
+  x = as.matrix(mm_choice[, c("ic", "V", "RU", "VTU")]),
+  n_data_predict = nrow(mm_choice_predict),
+  subj_predict = as.numeric(factor(
+    tbl_predict$sub, 
+    labels = 1:length(unique(tbl_predict$sub))
+  )),
+  x_predict = as.matrix(mm_choice_predict[, c("ic", "V", "RU", "VTU")])
+)
+
+fit_choice <- mod_choice$sample(
+  data = l_data, iter_sampling = 3000, iter_warmup = 1000, chains = 1
+)
+
+# 50 subjects: 500s
+# 200 subjects: 650s
+
+
+# analyze group-level posterior parameters estimates
+pars_interest <- c("mu_tf")
+tbl_draws <- fit_choice$draws(variables = pars_interest, format = "df")
+tbl_summary <- fit_choice$summary(variables = pars_interest)
+
+tbl_posterior <- tbl_draws %>% 
+  dplyr::select(starts_with(c("mu")), .chain) %>%
+  rename(chain = .chain) %>%
+  pivot_longer(starts_with(c("mu")), names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, labels = c("Intercept", "V", "RU", "VTU")))
+
+params_bf <- c("Intercept", "V", "RU", "VTU")
+l <- sd_bfs(tbl_posterior, params_bf, sqrt(2)/4)
+bfs <- l[[1]]
+tbl_thx <- l[[2]]
+
+# plot the posteriors and the bfs
+map(as.list(params_bf), plot_posterior, tbl_posterior, tbl_thx, bfs)
+
+
+tbl_preds <- fit_choice$draws(variables = "posterior_prediction", format = "df") %>%
+  select(starts_with("posterior_prediction"))
+
+# do backcasts align with data?
+pred_prob <- apply(tbl_preds, 2, mean) %>% unname()
+plot(pred_prob, tbl_predict$C)
+
+
+sample_ids <- sample(1:nrow(tbl_preds), replace = TRUE, size = ncol(tbl_preds))
+tbl_predict$backcast <- unlist(map2(tbl_preds, sample_ids, ~ .x[.y]))
+
+# looks ok
+table(tbl_predict[, c("C", "backcast")])
+
+
+
+
+
+
 
 
 
