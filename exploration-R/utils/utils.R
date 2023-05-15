@@ -2193,17 +2193,18 @@ recover_ucb <- function(
 }
 
 
-recover_ru_thompson <- function(
+recover_mixture <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars
+    simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype, 
+    lambda, nr_vars
 ) {
   #' 
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
-  tbl_params_participants <- create_participant_sample_ru_thompson(
+  tbl_params_participants <- create_participant_sample_mixture(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data, 
-    nr_participants, nr_trials, lambda, nr_vars
+    nr_participants, nr_trials, lambda, nr_vars, mixturetype
     )
   
   # simulate one fixed data set in case needed
@@ -2216,7 +2217,7 @@ recover_ru_thompson <- function(
     tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
-  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
   
   return(l_goodness)
 }
@@ -2310,12 +2311,24 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  cat("\nfitting kalman ucb & thompson")
+  l_ucb_thompson <- future_map2(
+    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_rewards"),
+    safely(fit_mixture_no_variance_wrapper), 
+    condition_on_observed_choices = cond_on_choices,
+    f_fit = fit_kalman_ucb_thompson_no_variance,
+    .progress = TRUE, 
+    .options = furrr_options(seed = NULL)
+  )
+  
   cat("\nfitting kalman ru & thompson")
   l_ru_thompson <- future_map2(
     map(l_choices_simulated, "tbl_return"), 
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ru_thompson_no_variance_wrapper), 
+    safely(fit_mixture_no_variance_wrapper), 
     condition_on_observed_choices = cond_on_choices,
+    f_fit = fit_kalman_ru_thompson_no_variance,
     .progress = TRUE, 
     .options = furrr_options(seed = NULL)
   )
@@ -2346,6 +2359,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     softmax = l_softmax,
     thompson = l_thompson,
     ucb = l_ucb,
+    ucb_thompson = l_ucb_thompson,
     ru_thompson = l_ru_thompson,
     delta = l_delta,
     decay = l_decay
