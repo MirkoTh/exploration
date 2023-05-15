@@ -7,11 +7,14 @@ library(lme4)
 library(plyr)
 library(brms)
 library(tidyr)
+library(tidyverse)
 
 se<-function(x){sd(x, na.rm = T)/sqrt(length(na.omit(x)))}
 meann <- function(x){mean(x, na.rm = T)}
 
-dataSam <- read.csv("FanEtal/exp1_bandit_task_scale.csv")
+#dataSam <- read.csv("FanEtal/exp1_bandit_task_scale.csv")
+dataSam <- read_csv("exploration-R/data/fan-exp1_bandit_task_scale.csv")
+
 
 dataHoriz <- read.csv("ZallerEtal/data.csv")
 dataHoriz$Horizon <- factor(dataHoriz$Horizon, levels = dataHoriz$Horizon, labels = dataHoriz$Horizon)
@@ -129,12 +132,42 @@ ggplot(my_data_long, aes(Trial, correlations, color = parameters)) + geom_line(a
 
 ## already have all the learning model stuff in the dataframe
 
-cors <- ddply(dataSam, ~trial, summarise, VRU = cor(V, RU), VTU = cor(V,VTU))
+cors <- ddply(dataSam, ~trial, summarise, 'V vs. RU' = cor(V, RU), 'V vs. VTU' = cor(V,VTU))
 
 my_data_long <- pivot_longer(cors, 
                              cols = c(2,3), 
                              names_to = "parameters", 
                              values_to = "correlations")
-ggplot(my_data_long, aes(trial, correlations, color = parameters)) + geom_line() + geom_point()+
-  ggtitle("Sam's task")
+pl_fan <- ggplot(my_data_long %>% filter(trial >= 2), aes(trial, correlations, color = fct_rev(parameters))) + 
+  geom_hline(yintercept = c(1, -1), color = "grey", linetype = "dotdash") +
+  geom_hline(yintercept = 0, color = "forestgreen", linetype = "dotdash") +
+  geom_line() + geom_point() +
+  geom_label(aes(label = round(correlations, 2))) +
+  ggtitle("Fan et al. (2022)") + 
+  theme_bw() +
+  scale_color_brewer(palette = "Set1", name = "Variables") + 
+  theme_bw() +
+  scale_x_continuous(expand = c(0.03, 0.02)) +
+  scale_y_continuous(expand = c(0.02, 0.02)) +
+  labs(x = "Trial", y = "r") +
+  theme(strip.background = element_rect(fill = "white"))
+
+tbl_cors <- read_rds("exploration-R/data/gershman-2018-variable-correlations.Rds")
+levels(tbl_cors$name) <- c("V vs. VTU", "V vs. RU")
+pl_gershman <- ggplot(tbl_cors, aes(trial_id, value, group = name)) +
+  geom_hline(yintercept = c(1, -1), color = "grey", linetype = "dotdash") +
+  geom_hline(yintercept = 0, color = "forestgreen", linetype = "dotdash") +
+  geom_line(aes(color = name)) +
+  geom_point(size = 3, color = "white") +
+  geom_point(aes(color = name)) +
+  geom_label(aes(y = value - .1, x = trial_id + .1, label = round(value, 2), color = name)) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0.03, 0.02)) +
+  scale_y_continuous(expand = c(0.02, 0.02)) +
+  labs(x = "Trial", y = "r", title = "Gershman (2018)") +
+  theme(strip.background = element_rect(fill = "white")) +
+  scale_color_brewer(palette = "Set1", name = "Variables")
+
+grid.draw(arrangeGrob(pl_gershman, pl_fan, nrow = 1))
+
 
