@@ -224,8 +224,8 @@ grid.draw(arrangeGrob(pl_horizon2, pl_horizon4, pl_horizon7, pl_horizon10, nrow 
 
 # this data set is used for backcasts
 # backcasting on full data set is not feasible in terms of storage
-
-
+fit_or_load <- "fit"
+set.seed(4321)
 tbl_predict <- tbl_subset %>% group_by(sub) %>%
   mutate(
     randi = runif(length(block)),
@@ -273,7 +273,7 @@ l_data <- list(
 
 if (fit_or_load == "fit") {
   fit_choice_reduced <- mod_choice_reduced$sample(
-    data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
+    data = l_data, iter_sampling = 5000, iter_warmup = 2000, chains = 3,
     init = 0
   )
   fit_choice_reduced$save_object("exploration-R/data/fit_choice_reduced.rds")
@@ -387,13 +387,17 @@ l_data <- list(
   x_predict = as.matrix(mm_choice_predict[, c("ic", "V", "RU", "VTU")])
 )
 
-fit_choice <- mod_choice$sample(
-  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
-  init = 0
-)
 
-# 50 subjects: 500s
-# 200 subjects: 650s
+if (fit_or_load == "fit") {
+  fit_choice <- mod_choice$sample(
+    data = l_data, iter_sampling = 5000, iter_warmup = 2000, chains = 3,
+    init = 0
+  )
+  fit_choice$save_object("exploration-R/data/fit_choice.rds")
+} else if (fit_or_load == "load") {
+  fit_choice <- readRDS("exploration-R/data/fit_choice.rds")
+}
+
 
 
 # analyze group-level posterior parameters estimates
