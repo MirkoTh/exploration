@@ -377,7 +377,7 @@ tbl_exp2_features_learned <- pmap(
   }
 ) %>% reduce(rbind) %>%
   cbind(reduce(l_results_exp2, rbind)) %>%
-  rename(p_1 = V1, p_2 = V2) %>% 
+  dplyr::rename(p_1 = V1, p_2 = V2) %>% 
   as_tibble()
 tbl_exp2_features_learned <- tbl_exp2_features_learned %>%
   mutate(
@@ -408,6 +408,7 @@ tbl_cors <- tibble(v_vtu = cor_v_vtu, v_ru = cor_v_ru) %>%
   pivot_longer(-trial_id) %>%
   mutate(name = fct_inorder(factor(name)), name = fct_relabel(name, ~ c("V vs. V/TU", "V vs. RU")))
 
+saveRDS(tbl_cors, "exploration-R/data/gershman-2018-variable-correlations.Rds")
 ggplot(tbl_cors, aes(trial_id, value, group = name)) +
   geom_hline(yintercept = 1, linetype = "dotdash", color = "black") +
   geom_hline(yintercept = 0, linetype = "dotdash", color = "grey") +
