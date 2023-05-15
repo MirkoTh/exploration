@@ -14,7 +14,7 @@ home_grown <- c(
   "exploration-R/utils/utils.R", 
   "exploration-R/utils/plotting.R",
   "exploration-R/utils/stan-models.R"
-  )
+)
 walk(home_grown, source)
 
 
@@ -30,7 +30,7 @@ tbl_e1 <- tbl_e1_prep %>%
     sub, block, trial, C, V, RU, TU, V_old, RU_old, TU_old, 
     Factor1_Somatic_Anxiety, Factor2_Cognitive_Anxiety, 
     Factor3_Negative_Affect, Factor4_Low_Self_esteem
-    )
+  )
 tbl_e1$VTU_old <- tbl_e1$V_old / tbl_e1$TU_old
 tbl_e1$VTU <- scale(tbl_e1$VTU_old)[, 1]
 
@@ -230,7 +230,7 @@ tbl_predict <- tbl_subset %>% group_by(sub) %>%
   mutate(
     randi = runif(length(block)),
     ranking = row_number(randi)
-    ) %>%
+  ) %>%
   arrange(sub, ranking) %>%
   filter(ranking <= 10)
 
@@ -271,49 +271,81 @@ l_data <- list(
   x_predict = as.matrix(mm_choice_predict[, c("ic", "VTU", "RU")])
 )
 
-fit_choice_reduced <- mod_choice_reduced$sample(
-  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
-  init = 0
-)
-
-fit_choice_reduced@stanmodel@dso <- new("cxxdso")
-saveRDS(fit_choice_reduced, file = "exploration-R/data/fit_choice_reduced.rds")
-# 50 subjects: 500s
-# 200 subjects: 650s
-# 200 subjects with predictions: 770s
-
+if (fit_or_load == "fit") {
+  fit_choice_reduced <- mod_choice_reduced$sample(
+    data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
+    init = 0
+  )
+  fit_choice_reduced$save_object("exploration-R/data/fit_choice_reduced.rds")
+} else if (fit_or_load == "load") {
+  fit_choice_reduced <- readRDS("exploration-R/data/fit_choice_reduced.rds")
+}
 
 # analyze group-level posterior parameters estimates
-pars_interest <- c("mu_tf")
-tbl_draws <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
-tbl_summary <- fit_choice_reduced$summary(variables = pars_interest)
+pars_interest <- c("mu_tf", "posterior_prediction")
+tbl_draws_reduced <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
+tbl_summary_reduced <- fit_choice_reduced$summary(variables = pars_interest)
+saveRDS(tbl_draws_reduced, file = "exploration-R/data/choice-model-reduced-posteriors.rds")
+saveRDS(tbl_summary_reduced, file = "exploration-R/data/choice-model-reduced-summary.rds")
 
-saveRDS(tbl_draws, "")
 
-tbl_posterior <- tbl_draws %>% 
+tbl_posterior_reduced <- tbl_draws_reduced %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
   rename(chain = .chain) %>%
   pivot_longer(starts_with(c("mu")), names_to = "parameter", values_to = "value") %>%
   mutate(parameter = factor(parameter, labels = c("Intercept", "VTU", "RU")))
 
+
 params_bf <- c("Intercept", "VTU", "RU")
-l <- sd_bfs(tbl_posterior, params_bf, sqrt(2)/4)
+l <- sd_bfs(tbl_posterior_reduced, params_bf, sqrt(2)/4)
 bfs <- l[[1]]
 tbl_thx <- l[[2]]
 
 # plot the posteriors and the bfs
-map(as.list(params_bf), plot_posterior, tbl_posterior, tbl_thx, bfs)
+map(as.list(params_bf), plot_posterior, tbl_posterior_reduced, tbl_thx, bfs)
 
 
-tbl_preds <- fit_choice_reduced$draws(variables = "posterior_prediction", format = "df") %>%
+tbl_hdis_reduced <- tbl_posterior_reduced %>%
+  group_by(parameter) %>%
+  arrange(value) %>%
+  mutate(
+    rwn = row_number(value),
+    quant = rwn / max(rwn),
+    mean_value = mean(value)
+  ) %>%
+  filter(between(quant, .025, .975)) %>%
+  mutate(
+    lo_thx = quantile(value, .025),
+    hi_thx = quantile(value, .975)
+  ) %>%
+  filter(rwn == 50) %>%
+  select(-c(rwn, value, quant))
+
+pl_hdi_reduced <- ggplot(tbl_hdis_reduced, aes(parameter, mean_value, group = parameter)) +
+  geom_segment(aes(
+    y = lo_thx, yend = hi_thx, x = parameter, xend = parameter, color = parameter), 
+    size = 2, lineend = "round"
+  ) + 
+  geom_point(color = "black", size = 3, shape = 1) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  labs(x = "Posterior Parameter Value", y = "", title = "Two-Parameter Model: 95% HDIs") +
+  theme(strip.background = element_rect(fill = "white"), legend.position = "off") +
+  scale_color_manual(values = c("#3b528b", "#21918c", "#fde725")) +
+  coord_flip()
+
+
+
+tbl_preds_reduced <- tbl_draws_reduced %>%
   select(starts_with("posterior_prediction"))
 
 # do backcasts align with data?
-pred_prob <- apply(tbl_preds, 2, mean) %>% unname()
+pred_prob <- apply(tbl_preds_reduced, 2, mean) %>% unname()
 cor(pred_prob, tbl_predict$C)
 
-sample_ids <- sample(1:nrow(tbl_preds), replace = TRUE, size = ncol(tbl_preds))
-tbl_predict$backcast <- unlist(map2(tbl_preds, sample_ids, ~ .x[.y]))
+sample_ids <- sample(1:nrow(tbl_preds_reduced), replace = TRUE, size = ncol(tbl_preds_reduced))
+tbl_predict$backcast <- unlist(map2(tbl_preds_reduced, sample_ids, ~ .x[.y]))
 
 # looks ok
 table(tbl_predict[, c("C", "backcast")])
@@ -356,7 +388,8 @@ l_data <- list(
 )
 
 fit_choice <- mod_choice$sample(
-  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1
+  data = l_data, iter_sampling = 2000, iter_warmup = 1000, chains = 1,
+  init = 0
 )
 
 # 50 subjects: 500s
@@ -364,27 +397,67 @@ fit_choice <- mod_choice$sample(
 
 
 # analyze group-level posterior parameters estimates
-pars_interest <- c("mu", "Sigma")
-tbl_draws <- fit_choice$draws(variables = pars_interest, format = "df")
-tbl_summary <- fit_choice$summary(variables = pars_interest)
+pars_interest <- c("mu", "Sigma", "posterior_prediction")
+tbl_draws_full <- fit_choice$draws(variables = pars_interest, format = "df")
+tbl_summary_full <- fit_choice$summary(variables = pars_interest)
+saveRDS(tbl_draws_full, file = "exploration-R/data/choice-model-full-posteriors.rds")
+saveRDS(tbl_summary_full, file = "exploration-R/data/choice-model-full-summary.rds")
 
-tbl_posterior <- tbl_draws %>% 
+
+
+tbl_posterior_full <- tbl_draws_full %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
   rename(chain = .chain) %>%
   pivot_longer(starts_with(c("mu")), names_to = "parameter", values_to = "value") %>%
   mutate(parameter = factor(parameter, labels = c("Intercept", "V", "RU", "VTU")))
 
 params_bf <- c("Intercept", "V", "RU", "VTU")
-l <- sd_bfs(tbl_posterior, params_bf, sqrt(2)/4)
+l <- sd_bfs(tbl_posterior_full, params_bf, sqrt(2)/4)
 bfs <- l[[1]]
 tbl_thx <- l[[2]]
 
 # plot the posteriors and the bfs
-map(as.list(params_bf), plot_posterior, tbl_posterior, tbl_thx, bfs)
+map(as.list(params_bf), plot_posterior, tbl_posterior_full, tbl_thx, bfs)
 
+
+tbl_hdis_full <- tbl_posterior_full %>%
+  group_by(parameter) %>%
+  arrange(value) %>%
+  mutate(
+    rwn = row_number(value),
+    quant = rwn / max(rwn),
+    mean_value = mean(value)
+  ) %>%
+  filter(between(quant, .025, .975)) %>%
+  mutate(
+    lo_thx = quantile(value, .025),
+    hi_thx = quantile(value, .975)
+  ) %>%
+  filter(rwn == 50) %>%
+  select(-c(rwn, value, quant))
+
+tbl_hdis_full$parameter <- fct_relevel(tbl_hdis_full$parameter, "V", after = 3)
+tbl_hdis_full$parameter <- fct_relevel(tbl_hdis_full$parameter, "VTU", after = 1)
+
+pl_hdi_full <- ggplot(tbl_hdis_full, aes(parameter, mean_value, group = parameter)) +
+  geom_segment(aes(
+    y = lo_thx, yend = hi_thx, x = parameter, xend = parameter, color = parameter), 
+    size = 2, lineend = "round"
+  ) + 
+  geom_point(color = "black", size = 3, shape = 1) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  labs(x = "Posterior Parameter Value", y = "", title = "Full Three-Parameter Model: 95% HDIs") +
+  theme(strip.background = element_rect(fill = "white"), legend.position = "off") +
+  scale_color_manual(values = c("#3b528b", "#21918c", "#fde725", "#5ec962")) +
+  coord_flip()
+
+
+grid.draw(arrangeGrob(pl_hdi_reduced, pl_hdi_full, nrow = 2))
 
 # inspect the parameter correlations
-tbl_cor_posterior <- tbl_draws %>% 
+tbl_cor_posterior <- tbl_draws_full %>% 
   dplyr::select(c(`Sigma[2,3]`, `Sigma[2,4]`, `Sigma[3,4]`, .chain)) %>%
   rename(chain = .chain) %>%
   pivot_longer(starts_with(c("Sigma")), names_to = "parameter", values_to = "value") %>%
@@ -392,32 +465,34 @@ tbl_cor_posterior <- tbl_draws %>%
 
 library(ggbeeswarm)
 ggplot(tbl_cor_posterior, aes(parameter, value, group = parameter)) +
+  geom_hline(yintercept = c(-1, 1), linetype = "dotdash", color = "grey") +
+  geom_hline(yintercept = 0, color = "forestgreen", linetype = "dotdash") +
   geom_violin(aes(fill = parameter), alpha = .25) +
   geom_quasirandom(aes(color = parameter), cex = 1.75, alpha = .5, method = "quasirandom") +
   geom_boxplot(width = .25, aes(color = parameter), alpha = .7) +
   stat_summary(geom = "point", fun = "mean", color = "black", size = 3, shape = 23) +
   theme_bw() +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0.03, 0.02)) +
+  scale_y_continuous(expand = c(0.02, 0.02)) +
   labs(x = "", y = "Correlation") + 
-  theme(strip.background = element_rect(fill = "white"))
+  theme(strip.background = element_rect(fill = "white"), legend.position = "off")
 
 
 
-tbl_preds <- fit_choice$draws(variables = "posterior_prediction", format = "df") %>%
+tbl_preds_full <- tbl_draws_full %>%
   select(starts_with("posterior_prediction"))
 
 # do backcasts align with data?
-pred_prob <- apply(tbl_preds, 2, mean) %>% unname()
+pred_prob <- apply(tbl_preds_full, 2, mean) %>% unname()
 cor(pred_prob, tbl_predict$C)
 
 
-sample_ids <- sample(1:nrow(tbl_preds), replace = TRUE, size = ncol(tbl_preds))
-tbl_predict$backcast <- unlist(map2(tbl_preds, sample_ids, ~ .x[.y]))
+sample_ids <- sample(1:nrow(tbl_preds_full), replace = TRUE, size = ncol(tbl_preds_full))
+tbl_predict$backcast <- unlist(map2(tbl_preds_full, sample_ids, ~ .x[.y]))
+
 
 # looks ok
 table(tbl_predict[, c("C", "backcast")])
-
 
 
 
