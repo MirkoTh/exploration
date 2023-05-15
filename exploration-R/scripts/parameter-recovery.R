@@ -547,7 +547,7 @@ if (fit_or_load == "fit")  {
     saveRDS(l_results_mixture_0var_all, "exploration-R/data/recovery-mixture-no-variance.RDS")
   }
 } else if (fit_or_load == "load")  {
-  l_results_mixture_0var <- readRDS("exploration-R/data/recovery-mixture-no-variance.RDS")
+  l_results_mixture_0var_all <- readRDS("exploration-R/data/recovery-mixture-no-variance.RDS")
 }
 
 
@@ -585,9 +585,9 @@ tbl_cor_mixture_0var <- reduce(l_results_mix_0var, rbind) %>%
 tbl_cor_mixture_0var_long <- tbl_cor_mixture_0var %>% 
   mutate(
     simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    nr_trials = factor(nr_trials, labels = c("200 Trials", "400 Trials")),
-    w_mix_mn = factor(w_mix_mn, labels = c("w = .5", "w = .75")),
+    simulate_data = fct_recode(simulate_data, "Simulate Once" = "FALSE"), #"Simulate By Participant" = "TRUE", 
+    nr_trials = factor(nr_trials, labels = c("400 Trials")), # "200 Trials", 
+    w_mix_mn = factor(w_mix_mn, labels = c("w = .4", "w = .6")),
     beta_mn = factor(beta_mn, labels = c("Beta = .17", "Beta = 1.5"))
   ) %>% 
   rename(

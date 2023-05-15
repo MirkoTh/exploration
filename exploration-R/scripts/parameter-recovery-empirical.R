@@ -204,6 +204,69 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
 
 
 
+## UCB Thompson ------------------------------------------------------------
+
+
+if (fit_or_load == "fit") {
+  plan(multisession, workers = availableCores() - 2)
+  l_kalman_ucb_thompson_no_variance <- furrr:::future_map(
+    l_participants, fit_mixture_no_variance_wrapper,
+    tbl_rewards = tbl_rewards, f_fit = fit_kalman_ucb_thompson_no_variance,
+    condition_on_observed_choices = TRUE, .progress = TRUE
+  )
+  saveRDS(l_kalman_ucb_thompson_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-fit.rds")
+  
+  tbl_kalman_ucb_thompson_no_variance <- reduce(l_kalman_ucb_thompson_no_variance, rbind) %>%
+    as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, w_mix = V3, ll = V4)
+  
+  l_params_decision <- pmap(
+    list(
+      tbl_kalman_ucb_thompson_no_variance$gamma, 
+      tbl_kalman_ucb_thompson_no_variance$beta,
+      tbl_kalman_ucb_thompson_no_variance$w_mix
+    ),
+    ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ucb_thompson", no = 4)
+  )
+  
+  tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
+  tbl_results_kalman_ucb_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
+  tbl_results_kalman_ucb_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  
+  tbl_results_kalman_ucb_thompson <- rbind(tbl_results_kalman_ucb_thompson_fix, tbl_results_kalman_ucb_thompson_sim)
+  saveRDS(tbl_results_kalman_ucb_thompson, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-recovery.rds")
+} else if (fit_or_load == "load") {
+  l_kalman_ucb_thompson_no_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-fit.rds")
+  tbl_results_kalman_ucb_thompson <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-recovery.rds")
+}
+
+
+
+
+tbl_recovery_kalman_ucb_thompson <- tbl_results_kalman_ucb_thompson %>%
+  unnest_wider(params_decision) %>%
+  group_by(simulate_data) %>%
+  summarize(
+    r_gamma = cor(gamma, gamma_ml),
+    r_beta = cor(beta, beta_ml),
+    r_w_mix = cor(w_mix, w_mix_ml)
+  ) %>% ungroup()
+
+tbl_recovery_kalman_ucb_thompson_long <- tbl_recovery_kalman_ucb_thompson  %>% 
+  mutate(
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
+    beta_mn = "empirical",
+    gamma_mn = "empirical"
+  ) %>%
+  rename(
+    "Gamma" = r_gamma,
+    "Beta" = r_beta,
+    "w_mix" = r_w_mix
+  ) %>%
+  pivot_longer(cols = c(Gamma, Beta, w_mix))
+
+
 
 ## RU Thompson -------------------------------------------------------------
 
@@ -229,9 +292,9 @@ if (fit_or_load == "fit") {
   )
   
   tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
-  tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
   tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
-  tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_ru_thompson(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
   
   tbl_results_kalman_ru_thompson <- rbind(tbl_results_kalman_ru_thompson_fix, tbl_results_kalman_ru_thompson_sim)
   saveRDS(tbl_results_kalman_ru_thompson, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-recovery.rds")
@@ -438,15 +501,17 @@ wrangle_recoveries <- function(my_tbl, modelname) {
 
 km_sm <- wrangle_recoveries(tbl_recovery_kalman_softmax, "Kalman Softmax")
 km_ucb <- wrangle_recoveries(tbl_recovery_kalman_ucb, "Kalman UCB")
+km_ucb_thompson <- wrangle_recoveries(tbl_recovery_kalman_ucb_thompson, "Kalman UCB & Thompson")
 km_ru_thompson <- wrangle_recoveries(tbl_recovery_kalman_ru_thompson, "Kalman RU & Thompson")
 delta_sm <- wrangle_recoveries(tbl_recovery_delta_softmax, "Delta Softmax")
 decay_sm <- wrangle_recoveries(tbl_recovery_decay_softmax, "Decay Softmax")
 
-tbl_summary_pars <- rbind(km_sm, km_ucb, km_ru_thompson, delta_sm, decay_sm)
+tbl_summary_pars <- rbind(km_sm, km_ucb, km_ucb_thompson, km_ru_thompson, delta_sm, decay_sm)
 # visualize summary recovery of four models with reactable table
 badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
 
 colnames(tbl_summary_pars) <- c("simulate_data", "Model", "Beta", "Delta", "Gamma", "w_mix")
+tbl_summary_pars$Model <- fct_inorder(factor(tbl_summary_pars$Model))
 tbl_summary_pars <- tbl_summary_pars %>% relocate(Gamma, .before = Beta)
 tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")] <- map(tbl_summary_pars[, c("Gamma", "Beta", "Delta", "w_mix")], ~ round(.x, digits = 2))
 tbl_summary_pars$simulate_data <- factor(tbl_summary_pars$simulate_data)
@@ -456,7 +521,7 @@ tbl_summary_pars_long <- tbl_summary_pars %>% pivot_longer(-c(Model, "Random Wal
 tbl_summary_pars_long$name <- factor(tbl_summary_pars_long$name)
 levels(tbl_summary_pars_long$name) <- c("Beta", "Delta", "Gamma", "w_mix")
 tbl_summary_pars_long$name <- fct_relevel(tbl_summary_pars_long$name, "Beta", after = 2)
-ggplot(tbl_summary_pars_long, aes(name, Model)) +
+ggplot(tbl_summary_pars_long, aes(name, fct_rev(Model))) +
   geom_tile(aes(fill = value)) +
   geom_text(aes(label = round(value, 2)), color = "black") +
   theme_bw() +
@@ -480,6 +545,11 @@ tbl_gammas <- tbl_results_kalman_softmax %>%
     tbl_results_kalman_ru_thompson %>%
       select(gamma_ml) %>%
       mutate(Model = "Kalman RU & Thompson") 
+  )   %>%
+  rbind(
+    tbl_results_kalman_ucb_thompson %>%
+      select(gamma_ml) %>%
+      mutate(Model = "Kalman UCB & Thompson") 
   ) %>%
   rbind(
     tbl_results_delta_softmax %>%
@@ -543,6 +613,12 @@ tbl_beta <- tbl_results_kalman_ucb %>%
       select(beta_ml) %>%
       mutate(Model = "Kalman RU & Thompson") %>%
       rename(beta = beta_ml)
+  )   %>%
+  rbind(
+    tbl_results_kalman_ucb_thompson %>%
+      select(beta_ml) %>%
+      mutate(Model = "Kalman UCB & Thompson") %>%
+      rename(beta = beta_ml)
   ) 
 
 tbl_beta$Model <- factor(tbl_beta$Model)
@@ -565,7 +641,13 @@ pl_beta <- ggplot(tbl_beta, aes(Model, beta, group = Model)) +
 tbl_w_mix <- tbl_results_kalman_ru_thompson %>%
   select(w_mix_ml) %>%
   mutate(Model = "Kalman RU & Thompson") %>%
-  rename(w_mix = w_mix_ml)
+  rename(w_mix = w_mix_ml) %>%
+  rbind(
+    tbl_results_kalman_ucb_thompson %>%
+      select(w_mix_ml) %>%
+      mutate(Model = "Kalman UCB & Thompson") %>%
+      rename(w_mix = w_mix_ml)
+  )
 
 tbl_w_mix$Model <- factor(tbl_w_mix$Model)
 tbl_w_mix$Model <- fct_inorder(tbl_w_mix$Model)
@@ -584,7 +666,7 @@ pl_w_mix <- ggplot(tbl_w_mix, aes(Model, w_mix, group = Model)) +
 
 
 pl_params_empirical <- arrangeGrob(pl_gammas, pl_w_mix, pl_deltas, pl_beta, nrow = 1, widths = c(1, .25, .5, .5))
-save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical.pdf", 16.5, 5.5)
+save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical.pdf", 19.5, 5.5)
 #save_my_pdf(pl_params_empirical, "figures/estimated-parameters-empirical-individual-stimuli.pdf", 12, 4)
 
 

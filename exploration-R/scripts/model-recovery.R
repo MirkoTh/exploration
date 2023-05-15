@@ -1,3 +1,8 @@
+
+# Set Up ------------------------------------------------------------------
+
+
+
 rm(list = ls())
 
 library(tidyverse)
@@ -35,7 +40,7 @@ tbl_gammas <- tibble(
 )
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300)
+nr_trials <- c(400)
 cond_on_choices <- c(TRUE)
 
 tbl_params_softmax <- crossing(
@@ -71,15 +76,15 @@ names(tbl_table_softmax) <- c(
 )
 
 badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
-
-reactable(
-  tbl_table_softmax,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_table_softmax, span = 6:7, colors = badtogood_cols),
-  )
-)
+# 
+# reactable(
+#   tbl_table_softmax,
+#   defaultColDef = colDef(
+#     minWidth = 150,
+#     align = "center",
+#     cell = color_tiles(tbl_table_softmax, span = 6:7, colors = badtogood_cols),
+#   )
+# )
 
 
 
@@ -88,7 +93,7 @@ reactable(
 
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300)
+nr_trials <- c(400)
 cond_on_choices <- c(TRUE)
 
 
@@ -124,16 +129,16 @@ names(tbl_table_thompson) <- c(
   "Sim. by Participant", "Nr. Participants", 
   "Nr. Trials", "Prop. AIC", "Prop. BIC"
 )
-
-
-reactable(
-  tbl_table_thompson,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_table_thompson, span = 4:5, colors = badtogood_cols),
-  )
-)
+# 
+# 
+# reactable(
+#   tbl_table_thompson,
+#   defaultColDef = colDef(
+#     minWidth = 150,
+#     align = "center",
+#     cell = color_tiles(tbl_table_thompson, span = 4:5, colors = badtogood_cols),
+#   )
+# )
 
 
 # UCB ---------------------------------------------------------------------
@@ -149,7 +154,7 @@ tbl_betas <- tibble(
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(300)
+nr_trials <- c(400)
 cond_on_choices <- c(TRUE)
 
 tbl_params_ucb <- crossing(
@@ -187,21 +192,21 @@ names(tbl_table_ucb) <- c(
   "Nr. Trials", "Prop. AIC", "Prop. BIC"
 )
 
-
-reactable(
-  tbl_table_ucb,
-  defaultPageSize = 24,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_table_ucb, span = 8:9, colors = badtogood_cols),
-  )
-)
-
-
+# 
+# reactable(
+#   tbl_table_ucb,
+#   defaultPageSize = 24,
+#   defaultColDef = colDef(
+#     minWidth = 150,
+#     align = "center",
+#     cell = color_tiles(tbl_table_ucb, span = 8:9, colors = badtogood_cols),
+#   )
+# )
 
 
-# RU & Thompson -----------------------------------------------------------
+
+
+# Mixture ------------------------------------------------------------------
 
 
 
@@ -220,32 +225,33 @@ tbl_w_mix <- tibble(
 
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(300)
+nr_trials <- c(400)
 cond_on_choices <- c(TRUE)
+mixturetype <- c("ucb_thompson", "ru_thompson")
 
 
-tbl_params_ru_thompson <- crossing(
+tbl_params_mixture <- crossing(
   tbl_gammas, tbl_betas, tbl_w_mix,
-  simulate_data, nr_participants, nr_trials, cond_on_choices
+  simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype
 )
 
 if (fit_or_load == "fit")  {
-  l_model_recovery_ru_thompson <- pmap(
-    tbl_params_ru_thompson, recover_ru_thompson,
+  l_model_recovery_mixture <- pmap(
+    tbl_params_mixture, recover_mixture,
     lambda = lambda, nr_vars = 0
   )
-  saveRDS(l_model_recovery_ru_thompson, "exploration-R/data/model-recovery-ru-thompson.RDS")
+  saveRDS(l_model_recovery_mixture, "exploration-R/data/model-recovery-mixture.RDS")
 } else if (fit_or_load == "load")  {
-  l_model_recovery_ru_thompson <- readRDS("exploration-R/data/model-recovery-ru-thompson.RDS")
+  l_model_recovery_mixture <- readRDS("exploration-R/data/model-recovery-mixture.RDS")
 }
 
 
-tbl_results_ru_thompson <- cbind(tbl_params_ru_thompson, map(l_model_recovery_ru_thompson, ~ cbind(
+tbl_results_mixture <- cbind(tbl_params_mixture, map(l_model_recovery_mixture, ~ cbind(
   summarize_model_recovery(.x$tbl_lls, "aic") %>% pivot_wider(names_from = model, values_from = n),
   summarize_model_recovery(.x$tbl_lls, "bic") %>% pivot_wider(names_from = model, values_from = n)
 )) %>% reduce(rbind))
 
-tbl_table_ru_thompson <- tbl_results_ru_thompson %>% 
+tbl_table_mixture <- tbl_results_mixture %>% 
   mutate(
     aic_total = aic_softmax + aic_thompson + aic_ucb,
     bic_total = bic_softmax + bic_thompson + bic_ucb,
@@ -253,23 +259,23 @@ tbl_table_ru_thompson <- tbl_results_ru_thompson %>%
     prop_bic = bic_ucb / bic_total
   ) %>%
   select(-c(starts_with("aic"), starts_with("bic"), cond_on_choices))
-names(tbl_table_ru_thompson) <- c(
+names(tbl_table_mixture) <- c(
   "Gamma Mean", "Gamma SD", "Beta Mean", "Beta SD", 
   "w Thompson Mean", "w Thompson SD",
   "Sim. by Participant", "Nr. Participants", 
   "Nr. Trials", "Prop. AIC", "Prop. BIC"
 )
 
-
-reactable(
-  tbl_table_ru_thompson,
-  defaultPageSize = 24,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_table_ru_thompson, span = 8:9, colors = badtogood_cols),
-  )
-)
+# 
+# reactable(
+#   tbl_table_mixture,
+#   defaultPageSize = 24,
+#   defaultColDef = colDef(
+#     minWidth = 150,
+#     align = "center",
+#     cell = color_tiles(tbl_table_mixture, span = 8:9, colors = badtogood_cols),
+#   )
+# )
 
 
 
@@ -289,7 +295,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(300)
+nr_trials <- c(400)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -327,15 +333,15 @@ names(tbl_table_delta) <- c(
   "Sim. by Participant", "Nr. Participants", 
   "Nr. Trials", "Prop. AIC", "Prop. BIC"
 )
-
-
-reactable(
-  tbl_table_delta,
-  defaultPageSize = 24,
-  defaultColDef = colDef(
-    minWidth = 150,
-    align = "center",
-    cell = color_tiles(tbl_table_delta, span = 8:9, colors = badtogood_cols),
-  )
-)
-
+# 
+# 
+# reactable(
+#   tbl_table_delta,
+#   defaultPageSize = 24,
+#   defaultColDef = colDef(
+#     minWidth = 150,
+#     align = "center",
+#     cell = color_tiles(tbl_table_delta, span = 8:9, colors = badtogood_cols),
+#   )
+# )
+# 

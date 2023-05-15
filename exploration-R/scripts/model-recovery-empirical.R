@@ -126,6 +126,32 @@ l_goodness_kalman_ucb <- read_out_lls_and_ics(l_models_fit_kalman_ucb, nr_partic
 
 
 
+# UCB & Thompson -----------------------------------------------------------
+
+
+l_kalman_ucb_thompson_no_variance <- readRDS(
+  file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-fit.rds"
+)
+tbl_kalman_ucb_thompson_no_variance <- reduce(l_kalman_ucb_thompson_no_variance, rbind) %>%
+  as.data.frame() %>% as_tibble() %>% rename(gamma = V1, beta = V2, w_mix = V3, ll = V4)
+
+l_params_decision <- pmap(
+  list(
+    tbl_kalman_ucb_thompson_no_variance$gamma, 
+    tbl_kalman_ucb_thompson_no_variance$beta,
+    tbl_kalman_ucb_thompson_no_variance$w_mix
+  ),
+  ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = "ucb_thompson", no = 4)
+)
+
+tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
+l_models_fit_kalman_ucb_thompson <- simulate_and_fit_models(
+  tbl_participants_kalman_ucb_thompson, tbl_rewards, cond_on_choices, family = "kalman"
+)
+
+l_goodness_kalman_ucb_thompson <- read_out_lls_and_ics(l_models_fit_kalman_ucb_thompson, nr_participants)
+
+
 
 
 # RU & Thompson -----------------------------------------------------------
