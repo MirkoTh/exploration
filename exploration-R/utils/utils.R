@@ -2131,7 +2131,7 @@ recover_softmax <- function(
     tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
-  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
   
   return(l_goodness)
 }
@@ -2159,7 +2159,7 @@ recover_thompson <- function(
     tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
-  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
   
   return(l_goodness)
 }
@@ -2187,7 +2187,7 @@ recover_ucb <- function(
     tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
   )
   
-  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
   
   return(l_goodness)
 }
@@ -2234,7 +2234,7 @@ recover_delta <- function(
   tbl_params_participants <- create_participant_sample_delta(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
     nr_trials, is_decay, lambda
-  )
+  ) %>% select(-is_decay)
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
@@ -2243,10 +2243,10 @@ recover_delta <- function(
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "delta"
+    tbl_params_participants, tbl_rewards, cond_on_choices, family = "delta", is_decay = is_decay
   )
   
-  l_goodness <- read_out_lls_and_ics(l_models_fit)
+  l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
   
   return(l_goodness)
 }
@@ -2376,21 +2376,28 @@ read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
   neg2ll_softmax <- map_dbl(map(l_models_fit[["softmax"]], "result"), 2)
   neg2ll_thompson <- map_dbl(map(l_models_fit[["thompson"]], "result"), 2)
   neg2ll_ucb <- map_dbl(map(l_models_fit[["ucb"]], "result"), 3)
+  neg2ll_ucb_thompson <- map_dbl(map(l_models_fit[["ucb_thompson"]], "result"), 4)
   neg2ll_ru_thompson <- map_dbl(map(l_models_fit[["ru_thompson"]], "result"), 4)
   neg2ll_delta <- map_dbl(map(l_models_fit[["delta"]], "result"), 3)
   neg2ll_decay <- map_dbl(map(l_models_fit[["decay"]], "result"), 3)
   
   tbl_lls <- tibble(
     participant_id = 1:nr_participants,
+    
+    # bic
     bic_softmax = log(nr_participants) + neg2ll_softmax,
     bic_thompson = log(nr_participants) + neg2ll_thompson,
     bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
+    bic_ucb_thompson = 3*log(nr_participants) + neg2ll_ucb_thompson,
     bic_ru_thompson = 3*log(nr_participants) + neg2ll_ru_thompson,
     bic_delta = 2*log(nr_participants) + neg2ll_delta,
     bic_decay = 2*log(nr_participants) + neg2ll_decay,
+    
+    # aic
     aic_softmax = 2 + neg2ll_softmax,
     aic_thompson = 2 + neg2ll_thompson,
     aic_ucb = 4 + neg2ll_ucb,
+    aic_ucb_thompson = 6 + neg2ll_ucb_thompson,
     aic_ru_thompson = 6 + neg2ll_ru_thompson,
     aic_delta = 4 + neg2ll_delta,
     aic_decay = 4 + neg2ll_decay
@@ -2412,7 +2419,7 @@ summarize_model_recovery <- function(tbl_lls, ic) {
   #' 
   tbl_models <- tibble(
     model = str_c(
-      ic, c("_softmax", "_thompson", "_ucb", "_ru_thompson", "_delta", "_decay")
+      ic, c("_softmax", "_thompson", "_ucb", "_ucb_thompson", "_ru_thompson", "_delta", "_decay")
       ))
   
   tbl_recovered <- tbl_lls %>% 
