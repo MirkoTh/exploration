@@ -387,15 +387,17 @@ tbl_results_all <- rbind(
   model_out = str_match(model_out, "^[a-z]*_(.*)$")[, 2],
   model_out = fct_inorder(factor(model_out)),
   model_out = fct_relabel(model_out, ~ c(
-    "Kalman & Softmax", "Kalman & Thompson", "Kalman & UCB", 
-    "Kalman with RU & Thompson", "Kalman with UCB & Thompson", 
-    "Delta & Softmax", "Decay & Softmax"
-  )),
+    "Kalman &\nSoftmax", "Kalman &\nThompson", "Kalman &\nUCB", 
+    "Kalman & RU\nand Thompson", "Kalman & UCB\nand Thompson", 
+    "Delta &\nSoftmax", "Decay &\nSoftmax"
+    )
+),
   model_in = fct_relabel(fct_inorder(factor(model_in)), ~ c(
-    "Kalman & Softmax", "Kalman & Thompson", "Kalman & UCB", 
-    "Kalman with RU & Thompson", "Kalman with UCB & Thompson", 
-    "Delta & Softmax", "Decay & Softmax"
-  ))
+    "Kalman &\nSoftmax", "Kalman &\nThompson", "Kalman &\nUCB",
+    "Kalman & RU\nand Thompson", "Kalman & UCB\nand Thompson", 
+    "Delta &\nSoftmax", "Decay &\nSoftmax"
+    )
+)
 )
 
 pl_bic_aic <- ggplot(tbl_results_all, aes(model_in, model_out)) +

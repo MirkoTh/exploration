@@ -4,9 +4,9 @@ setwd("/Users/kwitte/Library/CloudStorage/OneDrive-Personal/CPI/ExplorationRevie
 library(ggplot2)
 theme_set(theme_classic(base_size = 15))
 library(lme4)
-library(plyr)
+#library(plyr)
 library(brms)
-library(tidyr)
+#library(tidyr)
 library(tidyverse)
 
 se<-function(x){sd(x, na.rm = T)/sqrt(length(na.omit(x)))}
