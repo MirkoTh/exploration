@@ -198,9 +198,9 @@ model {
     b[s, 3] ~ normal(mu_tf[3], sigma_subject[3]);
   }
 
-  sigma_subject[1] ~ uniform(0.001, 10);
-  sigma_subject[2] ~ uniform(0.001, 10);
-  sigma_subject[3] ~ uniform(0.001, 10);
+  sigma_subject[1] ~ gamma(1, .5);
+  sigma_subject[2] ~ gamma(1, .5);
+  sigma_subject[3] ~ gamma(1, .5);
   mu[1] ~ normal(0, 1);
   mu[2] ~ normal(0, 1);
   mu[3] ~ normal(0, 1);
@@ -273,7 +273,7 @@ model {
     b[s] ~ multi_normal_cholesky(mu, diag_pre_multiply(sigma_subject, L));
   }
 
-  sigma_subject ~ uniform(0.001, 10);
+  sigma_subject ~ gamma(1, .5);
   mu ~ normal(0, 1);
 }
 

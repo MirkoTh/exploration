@@ -9,6 +9,9 @@ library(rutils)
 library(grid)
 library(gridExtra)
 library(cmdstanr)
+library(bayesplot)
+library(ggbeeswarm)
+
 
 home_grown <- c(
   "exploration-R/utils/utils.R", 
@@ -224,7 +227,7 @@ grid.draw(arrangeGrob(pl_horizon2, pl_horizon4, pl_horizon7, pl_horizon10, nrow 
 
 # this data set is used for backcasts
 # backcasting on full data set is not feasible in terms of storage
-fit_or_load <- "fit"
+fit_or_load <- "load"
 set.seed(4321)
 tbl_predict <- tbl_subset %>% group_by(sub) %>%
   mutate(
@@ -232,7 +235,7 @@ tbl_predict <- tbl_subset %>% group_by(sub) %>%
     ranking = row_number(randi)
   ) %>%
   arrange(sub, ranking) %>%
-  filter(ranking <= 10)
+  filter(ranking <= 20)
 
 
 
@@ -271,23 +274,30 @@ l_data <- list(
   x_predict = as.matrix(mm_choice_predict[, c("ic", "VTU", "RU")])
 )
 
+n_warmup <- 2000
+n_samples <- 5000
+n_chains <- 3
 if (fit_or_load == "fit") {
   fit_choice_reduced <- mod_choice_reduced$sample(
-    data = l_data, iter_sampling = 5000, iter_warmup = 2000, chains = 3,
-    init = 0
+    data = l_data, iter_sampling = n_samples, iter_warmup = n_warmup, chains = n_chains,
+    init = 0, parallel_chains = 3
   )
-  fit_choice_reduced$save_object("exploration-R/data/fit_choice_reduced.rds")
+  # fit_choice_reduced$save_object("exploration-R/data/fit_choice_reduced.rds")
+  # analyze group-level posterior parameters estimates
+  pars_interest <- c("mu_tf", "posterior_prediction")
+  tbl_draws_reduced <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
+  tbl_summary_reduced <- fit_choice_reduced$summary(variables = pars_interest)
+  saveRDS(tbl_draws_reduced, file = "exploration-R/data/choice-model-reduced-posteriors.rds")
+  saveRDS(tbl_summary_reduced, file = "exploration-R/data/choice-model-reduced-summary.rds")
+  
 } else if (fit_or_load == "load") {
   fit_choice_reduced <- readRDS("exploration-R/data/fit_choice_reduced.rds")
+  tbl_draws_reduced <- readRDS("exploration-R/data/choice-model-reduced-posteriors.rds")
+  tbl_summary_reduced <- readRDS("exploration-R/data/choice-model-reduced-summary.rds")
 }
 
-# analyze group-level posterior parameters estimates
-pars_interest <- c("mu_tf", "posterior_prediction")
-tbl_draws_reduced <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
-tbl_summary_reduced <- fit_choice_reduced$summary(variables = pars_interest)
-saveRDS(tbl_draws_reduced, file = "exploration-R/data/choice-model-reduced-posteriors.rds")
-saveRDS(tbl_summary_reduced, file = "exploration-R/data/choice-model-reduced-summary.rds")
 
+bayesplot::mcmc_trace(tbl_draws_reduced,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = 2000)
 
 tbl_posterior_reduced <- tbl_draws_reduced %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
@@ -318,7 +328,7 @@ tbl_hdis_reduced <- tbl_posterior_reduced %>%
     lo_thx = quantile(value, .025),
     hi_thx = quantile(value, .975)
   ) %>%
-  filter(rwn == 50) %>%
+  filter(rwn == min(rwn)) %>%
   select(-c(rwn, value, quant))
 
 pl_hdi_reduced <- ggplot(tbl_hdis_reduced, aes(parameter, mean_value, group = parameter)) +
@@ -333,7 +343,7 @@ pl_hdi_reduced <- ggplot(tbl_hdis_reduced, aes(parameter, mean_value, group = pa
   labs(x = "Posterior Parameter Value", y = "", title = "Two-Parameter Model: 95% HDIs") +
   theme(strip.background = element_rect(fill = "white"), legend.position = "off") +
   scale_color_manual(values = c("#3b528b", "#21918c", "#fde725")) +
-  coord_flip()
+  coord_flip(ylim = c(-.5, 3.6))
 
 
 
@@ -342,7 +352,7 @@ tbl_preds_reduced <- tbl_draws_reduced %>%
 
 # do backcasts align with data?
 pred_prob <- apply(tbl_preds_reduced, 2, mean) %>% unname()
-cor(pred_prob, tbl_predict$C)
+cor(pred_prob, tbl_predict2$C)
 
 sample_ids <- sample(1:nrow(tbl_preds_reduced), replace = TRUE, size = ncol(tbl_preds_reduced))
 tbl_predict$backcast <- unlist(map2(tbl_preds_reduced, sample_ids, ~ .x[.y]))
@@ -350,39 +360,47 @@ tbl_predict$backcast <- unlist(map2(tbl_preds_reduced, sample_ids, ~ .x[.y]))
 # looks ok
 table(tbl_predict[, c("C", "backcast")])
 
+loo_reduced <- fit_choice_reduced$loo(variables = "posterior_prediction")
 
 
 # Recover on 3-Parameter Model --------------------------------------------
 
 
+tbl_predict2 <- tbl_predict %>%
+  mutate(
+    V = scale(V)[, 1],
+    RU = scale(RU)[, 1],
+    VTU = scale(VTU)[, 1]
+  )
+
 choice_model <- stan_choice_lkj()
 mod_choice <- cmdstan_model(choice_model)
 
 mm_choice <- model.matrix(
-  backcast ~ V + RU + VTU, data = tbl_predict
+  backcast ~ V + RU + VTU, data = tbl_predict2
 ) %>% as_tibble()
 colnames(mm_choice) <- c("ic", "V", "RU", "VTU")
-mm_choice$sub <- tbl_predict$sub
+mm_choice$sub <- tbl_predict2$sub
 
 mm_choice_predict <- model.matrix(
-  backcast ~ V + RU + VTU, data = tbl_predict
+  backcast ~ V + RU + VTU, data = tbl_predict2
 ) %>% as_tibble()
 colnames(mm_choice_predict) <- c("ic", "V", "RU", "VTU")
-mm_choice_predict$sub <- tbl_predict$sub
+mm_choice_predict$sub <- tbl_predict2$sub
 
 l_data <- list(
   n_data = nrow(mm_choice),
   n_subj = length(unique(mm_choice$sub)),
-  choice = tbl_predict$C,
+  choice = tbl_predict2$backcast,
   subj = as.numeric(factor(
-    tbl_predict$sub, 
-    labels = 1:length(unique(tbl_predict$sub))
+    tbl_predict2$sub, 
+    labels = 1:length(unique(tbl_predict2$sub))
   )),
   x = as.matrix(mm_choice[, c("ic", "V", "RU", "VTU")]),
   n_data_predict = nrow(mm_choice_predict),
   subj_predict = as.numeric(factor(
-    tbl_predict$sub, 
-    labels = 1:length(unique(tbl_predict$sub))
+    tbl_predict2$sub, 
+    labels = 1:length(unique(tbl_predict2$sub))
   )),
   x_predict = as.matrix(mm_choice_predict[, c("ic", "V", "RU", "VTU")])
 )
@@ -391,22 +409,24 @@ l_data <- list(
 if (fit_or_load == "fit") {
   fit_choice <- mod_choice$sample(
     data = l_data, iter_sampling = 5000, iter_warmup = 2000, chains = 3,
-    init = 0
+    init = 0, parallel_chains = 3, thin = 1
   )
-  fit_choice$save_object("exploration-R/data/fit_choice.rds")
+  # fit_choice$save_object("exploration-R/data/fit_choice.rds")
+  # analyze group-level posterior parameters estimates
+  pars_interest <- c("mu", "Sigma", "posterior_prediction")
+  tbl_draws_full <- fit_choice$draws(variables = pars_interest, format = "df")
+  tbl_summary_full <- fit_choice$summary(variables = pars_interest)
+  saveRDS(tbl_draws_full, file = "exploration-R/data/choice-model-full-posteriors.rds")
+  saveRDS(tbl_summary_full, file = "exploration-R/data/choice-model-full-summary.rds")
+  
 } else if (fit_or_load == "load") {
   fit_choice <- readRDS("exploration-R/data/fit_choice.rds")
+  tbl_draws_full <- readRDS("exploration-R/data/choice-model-full-posteriors.rds")
+  tbl_summary_full <- readRDS("exploration-R/data/choice-model-full-summary.rds")
 }
 
 
-
-# analyze group-level posterior parameters estimates
-pars_interest <- c("mu", "Sigma", "posterior_prediction")
-tbl_draws_full <- fit_choice$draws(variables = pars_interest, format = "df")
-tbl_summary_full <- fit_choice$summary(variables = pars_interest)
-saveRDS(tbl_draws_full, file = "exploration-R/data/choice-model-full-posteriors.rds")
-saveRDS(tbl_summary_full, file = "exploration-R/data/choice-model-full-summary.rds")
-
+bayesplot::mcmc_trace(tbl_draws_full,  pars = c("mu[1]", "mu[2]", "mu[3]", "mu[4]"), n_warmup = 0)
 
 
 tbl_posterior_full <- tbl_draws_full %>% 
@@ -437,7 +457,7 @@ tbl_hdis_full <- tbl_posterior_full %>%
     lo_thx = quantile(value, .025),
     hi_thx = quantile(value, .975)
   ) %>%
-  filter(rwn == 50) %>%
+  filter(rwn == min(rwn)) %>%
   select(-c(rwn, value, quant))
 
 tbl_hdis_full$parameter <- fct_relevel(tbl_hdis_full$parameter, "V", after = 3)
@@ -452,11 +472,10 @@ pl_hdi_full <- ggplot(tbl_hdis_full, aes(parameter, mean_value, group = paramete
   theme_bw() +
   scale_x_discrete(expand = c(0.1, 0.1)) +
   scale_y_continuous(expand = c(0.1, 0.1)) +
-  labs(x = "Posterior Parameter Value", y = "", title = "Full Three-Parameter Model: 95% HDIs") +
+  labs(x = "Posterior Parameter Value", y = "", title = "Three-Parameter Model: 95% HDIs") +
   theme(strip.background = element_rect(fill = "white"), legend.position = "off") +
   scale_color_manual(values = c("#3b528b", "#21918c", "#fde725", "#5ec962")) +
-  coord_flip()
-
+  coord_flip(ylim = c(-.5, 3.6))
 
 grid.draw(arrangeGrob(pl_hdi_reduced, pl_hdi_full, nrow = 2))
 
@@ -467,7 +486,6 @@ tbl_cor_posterior <- tbl_draws_full %>%
   pivot_longer(starts_with(c("Sigma")), names_to = "parameter", values_to = "value") %>%
   mutate(parameter = factor(parameter, labels = c("r(V, RU)", "r(V, VTU)", "r(RU, VTU)")))
 
-library(ggbeeswarm)
 ggplot(tbl_cor_posterior, aes(parameter, value, group = parameter)) +
   geom_hline(yintercept = c(-1, 1), linetype = "dotdash", color = "grey") +
   geom_hline(yintercept = 0, color = "forestgreen", linetype = "dotdash") +
@@ -488,19 +506,19 @@ tbl_preds_full <- tbl_draws_full %>%
 
 # do backcasts align with data?
 pred_prob <- apply(tbl_preds_full, 2, mean) %>% unname()
-cor(pred_prob, tbl_predict$C)
+cor(pred_prob, tbl_predict2$C)
 
 
 sample_ids <- sample(1:nrow(tbl_preds_full), replace = TRUE, size = ncol(tbl_preds_full))
-tbl_predict$backcast <- unlist(map2(tbl_preds_full, sample_ids, ~ .x[.y]))
+tbl_predict2$backcast <- unlist(map2(tbl_preds_full, sample_ids, ~ .x[.y]))
 
 
 # looks ok
-table(tbl_predict[, c("C", "backcast")])
+table(tbl_predict2[, c("C", "backcast")])
 
 
-
-
+loo_full <- fit_choice$loo(variables = "posterior_prediction")
+loo::loo_model_weights(list(loo_reduced, loo_full), method = "stacking")
 
 
 
