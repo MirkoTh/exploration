@@ -28,7 +28,7 @@ sigma_epsilon_sq <- 16
 lambda <- .9836
 
 
-fit_or_load <- "fit"
+fit_or_load <- "load"
 
 
 # Soft Max ----------------------------------------------------------------
@@ -64,8 +64,8 @@ tbl_results_softmax <- cbind(tbl_params_softmax, map(l_model_recovery_softmax, ~
 
 tbl_table_softmax <- tbl_results_softmax %>% 
   mutate(
-    aic_total = aic_softmax + aic_thompson + aic_ucb,
-    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    aic_total = aic_softmax + aic_thompson + aic_ucb + aic_ucb_thompson + aic_ru_thompson + aic_delta + aic_decay,
+    bic_total = bic_softmax + bic_thompson + bic_ucb + bic_ucb_thompson + bic_ru_thompson + bic_delta + bic_decay,
     prop_aic = aic_softmax / aic_total,
     prop_bic = bic_softmax / bic_total
   ) %>%
@@ -86,7 +86,10 @@ badtogood_cols <- c('#d65440', '#ffffff', "forestgreen")
 #   )
 # )
 
-
+tbl_results_softmax <- tbl_results_softmax %>%
+  pivot_longer(c(starts_with("aic"), starts_with("bic"))) %>%
+  mutate(model_in = "Kalman & Softmax") %>%
+  rename(model_out = name)
 
 # Thompson ----------------------------------------------------------------
 
@@ -119,8 +122,8 @@ tbl_results_thompson <- cbind(tbl_params_thompson, map(l_model_recovery_thompson
 
 tbl_table_thompson <- tbl_results_thompson %>% 
   mutate(
-    aic_total = aic_softmax + aic_thompson + aic_ucb,
-    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    aic_total = aic_softmax + aic_thompson + aic_ucb + aic_ucb_thompson + aic_ru_thompson + aic_delta + aic_decay,
+    bic_total = bic_softmax + bic_thompson + bic_ucb + bic_ucb_thompson + bic_ru_thompson + bic_delta + bic_decay,
     prop_aic = aic_thompson / aic_total,
     prop_bic = bic_thompson / bic_total
   ) %>%
@@ -139,7 +142,10 @@ names(tbl_table_thompson) <- c(
 #     cell = color_tiles(tbl_table_thompson, span = 4:5, colors = badtogood_cols),
 #   )
 # )
-
+tbl_results_thompson <- tbl_results_thompson %>%
+  pivot_longer(c(starts_with("aic"), starts_with("bic"))) %>%
+  mutate(model_in = "Kalman & Thompson") %>%
+  rename(model_out = name)
 
 # UCB ---------------------------------------------------------------------
 
@@ -180,8 +186,8 @@ tbl_results_ucb <- cbind(tbl_params_ucb, map(l_model_recovery_ucb, ~ cbind(
 
 tbl_table_ucb <- tbl_results_ucb %>% 
   mutate(
-    aic_total = aic_softmax + aic_thompson + aic_ucb,
-    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    aic_total = aic_softmax + aic_thompson + aic_ucb + aic_ucb_thompson + aic_ru_thompson + aic_delta + aic_decay,
+    bic_total = bic_softmax + bic_thompson + bic_ucb + bic_ucb_thompson + bic_ru_thompson + bic_delta + bic_decay,
     prop_aic = aic_ucb / aic_total,
     prop_bic = bic_ucb / bic_total
   ) %>%
@@ -203,8 +209,10 @@ names(tbl_table_ucb) <- c(
 #   )
 # )
 
-
-
+tbl_results_ucb <- tbl_results_ucb %>%
+  pivot_longer(c(starts_with("aic"), starts_with("bic"))) %>%
+  mutate(model_in = "Kalman & UCB") %>%
+  rename(model_out = name)
 
 # Mixture ------------------------------------------------------------------
 
@@ -253,8 +261,8 @@ tbl_results_mixture <- cbind(tbl_params_mixture, map(l_model_recovery_mixture, ~
 
 tbl_table_mixture <- tbl_results_mixture %>% 
   mutate(
-    aic_total = aic_softmax + aic_thompson + aic_ucb,
-    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    aic_total = aic_softmax + aic_thompson + aic_ucb + aic_ucb_thompson + aic_ru_thompson + aic_delta + aic_decay,
+    bic_total = bic_softmax + bic_thompson + bic_ucb + bic_ucb_thompson + bic_ru_thompson + bic_delta + bic_decay,
     prop_aic = aic_ucb / aic_total,
     prop_bic = bic_ucb / bic_total
   ) %>%
@@ -276,6 +284,14 @@ names(tbl_table_mixture) <- c(
 #     cell = color_tiles(tbl_table_mixture, span = 8:9, colors = badtogood_cols),
 #   )
 # )
+
+tbl_results_mixture <- tbl_results_mixture %>%
+  pivot_longer(c(starts_with("aic"), starts_with("bic"))) %>%
+  mutate(
+    model_in = fct_inorder(factor(mixturetype)),
+    model_in = fct_relabel(model_in, ~ c("Kalman with RU & Thompson", "Kalman with UCB & Thompson"))
+  ) %>%
+  rename(model_out = name)
 
 
 
@@ -322,8 +338,8 @@ tbl_results_delta <- cbind(tbl_params_delta, map(l_model_recovery_delta, ~ cbind
 
 tbl_table_delta <- tbl_results_delta %>% 
   mutate(
-    aic_total = aic_softmax + aic_thompson + aic_ucb,
-    bic_total = bic_softmax + bic_thompson + bic_ucb,
+    aic_total = aic_softmax + aic_thompson + aic_ucb + aic_ucb_thompson + aic_ru_thompson + aic_delta + aic_decay,
+    bic_total = bic_softmax + bic_thompson + bic_ucb + bic_ucb_thompson + bic_ru_thompson + bic_delta + bic_decay,
     prop_aic = aic_ucb / aic_total,
     prop_bic = bic_ucb / bic_total
   ) %>%
@@ -345,3 +361,54 @@ names(tbl_table_delta) <- c(
 #   )
 # )
 # 
+
+tbl_results_delta <- tbl_results_delta %>%
+  pivot_longer(c(starts_with("aic"), starts_with("bic"))) %>%
+  filter(gamma_sd == .05) %>%
+  mutate(
+    model_in = fct_inorder(factor(is_decay)),
+    model_in = fct_relabel(model_in, ~ c("Delta & Softmax", "Decay & Softmax"))
+  ) %>%
+  rename(model_out = name)
+
+
+
+# plot model confusion matrices -------------------------------------------
+
+tbl_results_all <- rbind(
+  tbl_results_softmax %>% select(model_in, model_out, value),
+  tbl_results_thompson %>% select(model_in, model_out, value),
+  tbl_results_ucb %>% select(model_in, model_out, value),
+  tbl_results_mixture %>% select(model_in, model_out, value),
+  tbl_results_delta %>% select(model_in, model_out, value)
+) %>% mutate(
+  metric = str_match(model_out, "(^[a-z]*)_")[, 2],
+  metric = fct_relabel(fct_inorder(factor(metric)), ~ c("AIC", "BIC")),
+  model_out = str_match(model_out, "^[a-z]*_(.*)$")[, 2],
+  model_out = fct_inorder(factor(model_out)),
+  model_out = fct_relabel(model_out, ~ c(
+    "Kalman & Softmax", "Kalman & Thompson", "Kalman & UCB", 
+    "Kalman with RU & Thompson", "Kalman with UCB & Thompson", 
+    "Delta & Softmax", "Decay & Softmax"
+  )),
+  model_in = fct_relabel(fct_inorder(factor(model_in)), ~ c(
+    "Kalman & Softmax", "Kalman & Thompson", "Kalman & UCB", 
+    "Kalman with RU & Thompson", "Kalman with UCB & Thompson", 
+    "Delta & Softmax", "Decay & Softmax"
+  ))
+)
+
+pl_bic_aic <- ggplot(tbl_results_all, aes(model_in, model_out)) +
+  geom_tile(aes(fill = value)) + 
+  geom_label(aes(label = value)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  facet_wrap(~ metric) +
+  labs(x = "Model In", y = "Model Out") +
+  theme(strip.background = element_rect(fill = "white")) +
+  scale_fill_viridis_c(guide = "none")
+
+save_my_pdf_and_tiff(pl_bic_aic, "figures/model-recovery-simulated", 12, 6.5)
+
