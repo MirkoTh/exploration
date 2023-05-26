@@ -861,7 +861,7 @@ fit_kalman_softmax <- function(x, tbl_results, nr_options) {
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
     gamma
   )
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
   return(-2*sllik)
@@ -879,7 +879,7 @@ fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
   l_learned <- kalman_learning_choose(tbl_results, tbl_rewards, nr_options, sigma_xi_sq, sigma_epsilon_sq, params_choice)
   p_choices <- as.data.frame(l_learned$c_probs)
   
-  lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
+  lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
   return(-2*sllik)
