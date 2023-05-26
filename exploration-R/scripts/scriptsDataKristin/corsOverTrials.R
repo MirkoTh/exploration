@@ -132,7 +132,8 @@ ggplot(my_data_long, aes(Trial, correlations, color = parameters)) + geom_line(a
 
 ## already have all the learning model stuff in the dataframe
 
-cors <- ddply(dataSam, ~trial, summarise, 'V vs. RU' = cor(V, RU), 'V vs. VTU' = cor(V,VTU))
+cors <- plyr::ddply(dataSam, ~trial, summarise, 'Soft vs. RU' = cor(V, RU), 'V vs. VTU' = cor(V,VTU))
+# , 'V vs. TU' = cor(V, TU), 'VTU vs. TU' = cor(VTU, TU)
 
 my_data_long <- pivot_longer(cors, 
                              cols = c(2,3), 
@@ -141,13 +142,15 @@ my_data_long <- pivot_longer(cors,
 pl_fan <- ggplot(my_data_long %>% filter(trial >= 2), aes(trial, correlations, color = fct_rev(parameters))) + 
   geom_hline(yintercept = c(1, -1), color = "grey", linetype = "dotdash") +
   geom_hline(yintercept = 0, color = "forestgreen", linetype = "dotdash") +
-  geom_line() + geom_point() +
-  geom_label(aes(label = round(correlations, 2))) +
-  ggtitle("Fan et al. (2022)") + 
+  geom_line(aes(color = fct_rev(parameters))) +
+  geom_point(size = 3, color = "white") +
+  geom_point(aes(color = fct_rev(parameters))) +
+  geom_label(aes(y = correlations - .1, x = trial + .1, label = round(correlations, 2))) +
+  ggtitle("Fan et al. (2023)") + 
   theme_bw() +
   scale_color_brewer(palette = "Set1", name = "Variables") + 
   theme_bw() +
-  scale_x_continuous(expand = c(0.03, 0.02)) +
+  scale_x_continuous(expand = c(0.1, 0.1), breaks = seq(2, 10, by = 2)) +
   scale_y_continuous(expand = c(0.02, 0.02)) +
   labs(x = "Trial", y = "r") +
   theme(strip.background = element_rect(fill = "white"))
@@ -162,12 +165,12 @@ pl_gershman <- ggplot(tbl_cors, aes(trial_id, value, group = name)) +
   geom_point(aes(color = name)) +
   geom_label(aes(y = value - .1, x = trial_id + .1, label = round(value, 2), color = name)) +
   theme_bw() +
-  scale_x_continuous(expand = c(0.03, 0.02)) +
+  scale_x_continuous(expand = c(0.1, 0.1), breaks = seq(2, 10, by = 2)) +
   scale_y_continuous(expand = c(0.02, 0.02)) +
   labs(x = "Trial", y = "r", title = "Gershman (2018)") +
   theme(strip.background = element_rect(fill = "white")) +
-  scale_color_brewer(palette = "Set1", name = "Variables")
+  scale_color_brewer(palette = "Set1", name = "Variables", guide = "none")
 
-grid.draw(arrangeGrob(pl_gershman, pl_fan, nrow = 1))
+grid.draw(arrangeGrob(pl_gershman, pl_fan, nrow = 1, widths = c(.8, 1)))
 
 
