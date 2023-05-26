@@ -113,7 +113,7 @@ l_goodness_softmax_kalman <- read_out_lls_and_ics(l_models_fit_softmax_kalman, n
 #     tbl_participants_kalman_thompson_fix, tbl_rewards, cond_on_choices, family = "kalman"
 #   )
 #   saveRDS(l_models_fit_kalman_thompson, file = "exploration-R/data/model-recovery-empirical-thompson.rds")
-#   
+# 
 # } else if (fit_or_load == "load") {
 #   l_models_fit_kalman_thompson <- readRDS(file = "exploration-R/data/model-recovery-empirical-thompson.rds")
 # }
@@ -306,15 +306,15 @@ my_ic_comparison <- function(ic){
     )
   tbl_ic$model <- factor(tbl_ic$model)
   levels(tbl_ic$model) <- c(
-    "Decay &\nSoftmax", "Delta &\nSoftmax", "Kalman & UCB\nand Thompson", 
+    "Decay &\nSoftmax", "Delta &\nSoftmax",
     "Kalman & RU\nand Thompson", "Kalman &\nSoftmax", "Kalman &\nThompson",
-    "Kalman &\nUCB"
+    "Kalman &\nUCB", "Kalman & UCB\nand Thompson"
   )
   tbl_ic$model_in <- factor(tbl_ic$model_in)
   levels(tbl_ic$model_in) <- c(
-    "Decay &\nSoftmax", "Delta &\nSoftmax", "Kalman & UCB\nand Thompson", 
+    "Decay &\nSoftmax", "Delta &\nSoftmax",
     "Kalman & RU\nand Thompson", "Kalman &\nSoftmax", "Kalman &\nThompson",
-    "Kalman &\nUCB"
+    "Kalman &\nUCB", "Kalman & UCB\nand Thompson"
   )
   tbl_ic %>% rename(model_out = model)
 }

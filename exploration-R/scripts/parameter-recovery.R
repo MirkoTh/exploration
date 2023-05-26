@@ -52,12 +52,12 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.08, .16, 1),#[1],
-  gamma_sd = c(.05, .1, .2)#[1]
+  gamma_mn = c(.08, .16, 1, 3),
+  gamma_sd = c(.05, .1, .2, .2)
 )
-simulate_data <- c(TRUE, FALSE)
-nr_participants <- c(200)
-nr_trials <- c(200, 400)
+simulate_data <- c(TRUE, FALSE)[1]
+nr_participants <- c(200) 
+nr_trials <- c(400)[1]
 cond_on_choices <- c(TRUE)
 
 
@@ -101,12 +101,26 @@ tbl_cor_softmax_long <- tbl_cor_softmax %>%
   filter(!is.na(gamma_mn)) %>%
   mutate(
     simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
+    #simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE")
   ) %>% rename("Sigma Xi" = r_sigma_xi, "Sigma Epsilon" = r_sigma_epsilon, "Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma, `Sigma Xi`, `Sigma Epsilon`))
 # 
 # pd <- position_dodge(width = .9)
 # plot_cor_recovery(tbl_cor_softmax_long, pd, "softmax")
+
+ggplot(tbl_cor_softmax_long, aes(gamma_mn, value, group = name)) +
+  geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
+  geom_line(aes(color = name)) +
+  geom_point(color = "white", size = 3) +
+  geom_point(aes(color = name)) +
+  ggrepel::geom_label_repel(aes(label = str_c("r = ", round(value, 2)), color = name)) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  scale_color_viridis_d(name = "Parameter") +
+  labs(x = "Gamma", y = "Correlation") +
+  theme(strip.background = element_rect(fill = "white"))
+  
 
 
 # cors between pars
