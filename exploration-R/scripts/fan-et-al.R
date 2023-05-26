@@ -358,7 +358,8 @@ sample_ids <- sample(1:nrow(tbl_preds_reduced), replace = TRUE, size = ncol(tbl_
 tbl_predict$backcast <- unlist(map2(tbl_preds_reduced, sample_ids, ~ .x[.y]))
 
 # looks ok
-table(tbl_predict[, c("C", "backcast")])
+class_mat <- table(tbl_predict[, c("C", "backcast")]) / sum(tbl_predict[, c("C", "backcast")])
+round(class_mat, 2) %>% DT::datatable()
 
 loo_reduced <- fit_choice_reduced$loo(variables = "posterior_prediction")
 
@@ -514,7 +515,8 @@ tbl_predict2$backcast <- unlist(map2(tbl_preds_full, sample_ids, ~ .x[.y]))
 
 
 # looks ok
-table(tbl_predict2[, c("C", "backcast")])
+class_mat_3 <- table(tbl_predict2[, c("C", "backcast")]) / sum(tbl_predict2[, c("C", "backcast")])
+round(class_mat_3, 2) %>% DT::datatable()
 
 
 loo_full <- fit_choice$loo(variables = "posterior_prediction")
