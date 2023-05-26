@@ -239,39 +239,41 @@ tbl_predict <- tbl_subset %>% group_by(sub) %>%
 
 
 
-# Fit 2-Parameter Model ---------------------------------------------------
+
+# Fit 2-Parameter Model including VTU -------------------------------------
+
 
 
 choice_model_reduced <- stan_choice_reduced()
 mod_choice_reduced <- cmdstan_model(choice_model_reduced)
 
-mm_choice <- model.matrix(
+mm_choice_vtu <- model.matrix(
   C ~ VTU + RU, data = tbl_subset
 ) %>% as_tibble()
-colnames(mm_choice) <- c("ic", "VTU", "RU")
-mm_choice$sub <- tbl_subset$sub
+colnames(mm_choice_vtu) <- c("ic", "VTU", "RU")
+mm_choice_vtu$sub <- tbl_subset$sub
 
-mm_choice_predict <- model.matrix(
+mm_choice_vtu_predict <- model.matrix(
   C ~ VTU + RU, data = tbl_predict
 ) %>% as_tibble()
-colnames(mm_choice_predict) <- c("ic", "VTU", "RU")
-mm_choice_predict$sub <- tbl_predict$sub
+colnames(mm_choice_vtu_predict) <- c("ic", "VTU", "RU")
+mm_choice_vtu_predict$sub <- tbl_predict$sub
 
 l_data <- list(
-  n_data = nrow(mm_choice),
-  n_subj = length(unique(mm_choice$sub)),
+  n_data = nrow(mm_choice_vtu),
+  n_subj = length(unique(mm_choice_vtu$sub)),
   choice = tbl_subset$C,
   subj = as.numeric(factor(
     tbl_subset$sub, 
     labels = 1:length(unique(tbl_subset$sub))
   )),
-  x = as.matrix(mm_choice[, c("ic", "VTU", "RU")]),
-  n_data_predict = nrow(mm_choice_predict),
+  x = as.matrix(mm_choice_vtu[, c("ic", "VTU", "RU")]),
+  n_data_predict = nrow(mm_choice_vtu_predict),
   subj_predict = as.numeric(factor(
     tbl_predict$sub, 
     labels = 1:length(unique(tbl_predict$sub))
   )),
-  x_predict = as.matrix(mm_choice_predict[, c("ic", "VTU", "RU")])
+  x_predict = as.matrix(mm_choice_vtu_predict[, c("ic", "VTU", "RU")])
 )
 
 n_warmup <- 2000
@@ -364,6 +366,130 @@ round(class_mat, 2) %>% DT::datatable()
 loo_reduced <- fit_choice_reduced$loo(variables = "posterior_prediction")
 
 
+
+# Fit 2-Parameter Model including V ---------------------------------------
+
+
+mm_choice_v <- model.matrix(
+  C ~ V + RU, data = tbl_subset
+) %>% as_tibble()
+colnames(mm_choice_v) <- c("ic", "V", "RU")
+mm_choice_v$sub <- tbl_subset$sub
+
+mm_choice_v_predict <- model.matrix(
+  C ~ VTU + RU, data = tbl_predict
+) %>% as_tibble()
+colnames(mm_choice_v_predict) <- c("ic", "VTU", "RU")
+mm_choice_v_predict$sub <- tbl_predict$sub
+
+l_data <- list(
+  n_data = nrow(mm_choice_v),
+  n_subj = length(unique(mm_choice_v$sub)),
+  choice = tbl_subset$C,
+  subj = as.numeric(factor(
+    tbl_subset$sub, 
+    labels = 1:length(unique(tbl_subset$sub))
+  )),
+  x = as.matrix(mm_choice_v[, c("ic", "VTU", "RU")]),
+  n_data_predict = nrow(mm_choice_v_predict),
+  subj_predict = as.numeric(factor(
+    tbl_predict$sub, 
+    labels = 1:length(unique(tbl_predict$sub))
+  )),
+  x_predict = as.matrix(mm_choice_v_predict[, c("ic", "VTU", "RU")])
+)
+
+n_warmup <- 2000
+n_samples <- 5000
+n_chains <- 3
+if (fit_or_load == "fit") {
+  fit_choice_reduced <- mod_choice_reduced$sample(
+    data = l_data, iter_sampling = n_samples, iter_warmup = n_warmup, chains = n_chains,
+    init = 0, parallel_chains = 3
+  )
+  # fit_choice_reduced$save_object("exploration-R/data/fit_choice_reduced.rds")
+  # analyze group-level posterior parameters estimates
+  pars_interest <- c("mu_tf", "posterior_prediction")
+  tbl_draws_reduced <- fit_choice_reduced$draws(variables = pars_interest, format = "df")
+  tbl_summary_reduced <- fit_choice_reduced$summary(variables = pars_interest)
+  saveRDS(tbl_draws_reduced, file = "exploration-R/data/choice-model-reduced-posteriors.rds")
+  saveRDS(tbl_summary_reduced, file = "exploration-R/data/choice-model-reduced-summary.rds")
+  
+} else if (fit_or_load == "load") {
+  fit_choice_reduced <- readRDS("exploration-R/data/fit_choice_reduced.rds")
+  tbl_draws_reduced <- readRDS("exploration-R/data/choice-model-reduced-posteriors.rds")
+  tbl_summary_reduced <- readRDS("exploration-R/data/choice-model-reduced-summary.rds")
+}
+
+
+bayesplot::mcmc_trace(tbl_draws_reduced,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = 2000)
+
+tbl_posterior_reduced <- tbl_draws_reduced %>% 
+  dplyr::select(starts_with(c("mu")), .chain) %>%
+  rename(chain = .chain) %>%
+  pivot_longer(starts_with(c("mu")), names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, labels = c("Intercept", "VTU", "RU")))
+
+
+params_bf <- c("Intercept", "VTU", "RU")
+l <- sd_bfs(tbl_posterior_reduced, params_bf, sqrt(2)/4)
+bfs <- l[[1]]
+tbl_thx <- l[[2]]
+
+# plot the posteriors and the bfs
+map(as.list(params_bf), plot_posterior, tbl_posterior_reduced, tbl_thx, bfs)
+
+
+tbl_hdis_reduced <- tbl_posterior_reduced %>%
+  group_by(parameter) %>%
+  arrange(value) %>%
+  mutate(
+    rwn = row_number(value),
+    quant = rwn / max(rwn),
+    mean_value = mean(value)
+  ) %>%
+  filter(between(quant, .025, .975)) %>%
+  mutate(
+    lo_thx = quantile(value, .025),
+    hi_thx = quantile(value, .975)
+  ) %>%
+  filter(rwn == min(rwn)) %>%
+  select(-c(rwn, value, quant))
+
+pl_hdi_reduced <- ggplot(tbl_hdis_reduced, aes(parameter, mean_value, group = parameter)) +
+  geom_segment(aes(
+    y = lo_thx, yend = hi_thx, x = parameter, xend = parameter, color = parameter), 
+    size = 2, lineend = "round"
+  ) + 
+  geom_point(color = "black", size = 3, shape = 1) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  labs(x = "Posterior Parameter Value", y = "", title = "Two-Parameter Model: 95% HDIs") +
+  theme(strip.background = element_rect(fill = "white"), legend.position = "off") +
+  scale_color_manual(values = c("#3b528b", "#21918c", "#fde725")) +
+  coord_flip(ylim = c(-.5, 3.6))
+
+
+
+tbl_preds_reduced <- tbl_draws_reduced %>%
+  select(starts_with("posterior_prediction"))
+
+# do backcasts align with data?
+pred_prob <- apply(tbl_preds_reduced, 2, mean) %>% unname()
+cor(pred_prob, tbl_predict2$C)
+
+sample_ids <- sample(1:nrow(tbl_preds_reduced), replace = TRUE, size = ncol(tbl_preds_reduced))
+tbl_predict$backcast <- unlist(map2(tbl_preds_reduced, sample_ids, ~ .x[.y]))
+
+# looks ok
+class_mat <- table(tbl_predict[, c("C", "backcast")]) / sum(tbl_predict[, c("C", "backcast")])
+round(class_mat, 2) %>% DT::datatable()
+
+
+
+
+
 # Recover on 3-Parameter Model --------------------------------------------
 
 
@@ -377,33 +503,33 @@ tbl_predict2 <- tbl_predict %>%
 choice_model <- stan_choice_lkj()
 mod_choice <- cmdstan_model(choice_model)
 
-mm_choice <- model.matrix(
+mm_choice_3par <- model.matrix(
   backcast ~ V + RU + VTU, data = tbl_predict2
 ) %>% as_tibble()
-colnames(mm_choice) <- c("ic", "V", "RU", "VTU")
-mm_choice$sub <- tbl_predict2$sub
+colnames(mm_choice_3par) <- c("ic", "V", "RU", "VTU")
+mm_choice_3par$sub <- tbl_predict2$sub
 
-mm_choice_predict <- model.matrix(
+mm_choice_3par_predict <- model.matrix(
   backcast ~ V + RU + VTU, data = tbl_predict2
 ) %>% as_tibble()
-colnames(mm_choice_predict) <- c("ic", "V", "RU", "VTU")
-mm_choice_predict$sub <- tbl_predict2$sub
+colnames(mm_choice_3par_predict) <- c("ic", "V", "RU", "VTU")
+mm_choice_3par_predict$sub <- tbl_predict2$sub
 
 l_data <- list(
-  n_data = nrow(mm_choice),
-  n_subj = length(unique(mm_choice$sub)),
+  n_data = nrow(mm_choice_3par),
+  n_subj = length(unique(mm_choice_3par$sub)),
   choice = tbl_predict2$backcast,
   subj = as.numeric(factor(
     tbl_predict2$sub, 
     labels = 1:length(unique(tbl_predict2$sub))
   )),
-  x = as.matrix(mm_choice[, c("ic", "V", "RU", "VTU")]),
-  n_data_predict = nrow(mm_choice_predict),
+  x = as.matrix(mm_choice_3par[, c("ic", "V", "RU", "VTU")]),
+  n_data_predict = nrow(mm_choice_3par_predict),
   subj_predict = as.numeric(factor(
     tbl_predict2$sub, 
     labels = 1:length(unique(tbl_predict2$sub))
   )),
-  x_predict = as.matrix(mm_choice_predict[, c("ic", "V", "RU", "VTU")])
+  x_predict = as.matrix(mm_choice_3par_predict[, c("ic", "V", "RU", "VTU")])
 )
 
 
@@ -414,14 +540,14 @@ if (fit_or_load == "fit") {
   )
   # fit_choice$save_object("exploration-R/data/fit_choice.rds")
   # analyze group-level posterior parameters estimates
-  pars_interest <- c("mu", "Sigma", "posterior_prediction")
+  pars_interest <- c("mu", "Sigma", "posterior_prediction", "sigma_subject", "b")
   tbl_draws_full <- fit_choice$draws(variables = pars_interest, format = "df")
   tbl_summary_full <- fit_choice$summary(variables = pars_interest)
   saveRDS(tbl_draws_full, file = "exploration-R/data/choice-model-full-posteriors.rds")
   saveRDS(tbl_summary_full, file = "exploration-R/data/choice-model-full-summary.rds")
   
 } else if (fit_or_load == "load") {
-  fit_choice <- readRDS("exploration-R/data/fit_choice.rds")
+  #fit_choice <- readRDS("exploration-R/data/fit_choice.rds")
   tbl_draws_full <- readRDS("exploration-R/data/choice-model-full-posteriors.rds")
   tbl_summary_full <- readRDS("exploration-R/data/choice-model-full-summary.rds")
 }
