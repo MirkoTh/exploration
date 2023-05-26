@@ -151,6 +151,77 @@ generated quantities {
 }
 
 
+
+stan_choice_reduced_no_intercept <- function() {
+  
+  stan_logistic <- write_stan_file("
+data {
+  int n_data;
+  int n_subj;
+  array[n_data] int choice;
+  array[n_data] int subj;
+  matrix[n_data, 2] x; // v/vtu, ru
+  int n_data_predict;
+  array[n_data_predict] int subj_predict;
+  matrix[n_data_predict, 2] x_predict; // v or vtu, ru
+}
+
+transformed data {
+  real scale_cont = sqrt(2) / 4;
+}
+
+parameters {
+  matrix[n_subj, 2] b;
+  vector[2] mu;
+  vector <lower=0>[2] sigma_subject;
+}
+
+transformed parameters {
+  array[2] real mu_tf;
+  mu_tf[1] = mu[1];
+  mu_tf[2] = mu[2];
+  array[n_data] real <lower=0,upper=1> theta;
+  
+  for (n in 1:n_data) {
+    theta[n] = Phi(b[subj[n], 1] * x[n, 1] + b[subj[n], 2] * x[n, 2]);
+  }
+}
+
+model {
+  for (n in 1:n_data) {
+    choice[n] ~ bernoulli(theta[n]);
+  }
+
+  for (s in 1:n_subj) {
+    b[s, 1] ~ normal(mu_tf[1], sigma_subject[1]);
+    b[s, 2] ~ normal(mu_tf[2], sigma_subject[2]);
+  }
+
+  sigma_subject[1] ~ gamma(1, .5);
+  sigma_subject[2] ~ gamma(1, .5);
+  mu[1] ~ normal(0, 1);
+  mu[2] ~ normal(0, 1);
+}
+
+
+generated quantities {
+  vector[n_data_predict] posterior_prediction;
+  vector[n_data_predict] theta_predict;
+
+  for (n in 1:n_data_predict) {
+    theta_predict[n] = Phi(
+      b[subj_predict[n], 1] * x_predict[n, 1] + b[subj_predict[n], 2] * x_predict[n, 2]
+      );
+    posterior_prediction[n] = bernoulli_rng(theta_predict[n]);
+  }
+}
+
+")
+  return(stan_logistic)
+}
+
+
+
 stan_choice_reduced <- function() {
   
   stan_logistic <- write_stan_file("
