@@ -10,7 +10,7 @@ se<-function(x){sd(x, na.rm = T)/sqrt(length(na.omit(x)))}
 meann <- function(x){mean(x, na.rm = T)}
 
 #data <- read.csv("~/reliability/data.csv")
-data <- read.csv("data.csv")
+data <- read.csv("exploration-R/data/data.csv")
 data$Horizon <- factor(data$Horizon, levels = data$Horizon, labels = data$Horizon)
 
 # task_id <-  as.numeric(commandArgs(TRUE)[1])
