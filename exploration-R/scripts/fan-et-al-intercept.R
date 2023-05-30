@@ -62,6 +62,13 @@ tbl_subset %>%
 tbl_choices_agg <- tbl_e1 %>% group_by(sub) %>% summarize(n = n(), C1 = sum(C))
 cor(tbl_subset[, c("V", "VTU", "RU", "C")])
 
+tbl_predict <- tbl_subset %>% group_by(sub) %>%
+  mutate(
+    randi = runif(length(block)),
+    ranking = row_number(randi)
+  ) %>%
+  arrange(sub, ranking) %>%
+  filter(ranking <= 20)
 
 # compare models including a (random) intercept term against model omitting it
 # fit on whole data set
@@ -86,6 +93,7 @@ mm_choice_vtu_predict <- model.matrix(
 colnames(mm_choice_vtu_predict) <- c("ic", "VTU", "RU")
 mm_choice_vtu_predict$sub <- tbl_predict$sub
 
+
 l_data <- list(
   n_data = nrow(mm_choice_vtu),
   n_subj = length(unique(mm_choice_vtu$sub)),
@@ -95,24 +103,26 @@ l_data <- list(
     labels = 1:length(unique(tbl_subset$sub))
   )),
   n_data_predict = nrow(mm_choice_vtu_predict),
+  choice_predict = tbl_predict$C,
   subj_predict = as.numeric(factor(
     tbl_predict$sub, 
     labels = 1:length(unique(tbl_predict$sub))
-  )),
-  x_predict = as.matrix(mm_choice_vtu_predict[, c("ic", "VTU", "RU")])
+  ))
 )
 
 with_intercept <- c(TRUE, FALSE)
-pars_interest <- c("mu_tf", "posterior_prediction", "sigma_subject", "b")
+pars_interest <- c("mu_tf", "sigma_subject", "b")
 for (ic in with_intercept) {
   path_ending <- c("no-intercept", "intercept")[ic + 1]
   # select model
   if (ic){
     l_data$x <- as.matrix(mm_choice_vtu[, c("ic", "VTU", "RU")])
-    choice_model_ic <- stan_choice_reduced()
+    l_data$x_predict <- as.matrix(mm_choice_vtu_predict[, c("ic", "VTU", "RU")])
+    choice_model_ic <- stan_choice_reduced_intercept()
     mod_choice <- cmdstan_model(choice_model_ic)
   } else if (!ic) {
     l_data$x <- as.matrix(mm_choice_vtu[, c("VTU", "RU")])
+    l_data$x_predict <- as.matrix(mm_choice_vtu_predict[, c("VTU", "RU")])
     choice_model_no_ic <- stan_choice_reduced_no_intercept()
     mod_choice <- cmdstan_model(choice_model_no_ic)
   }
@@ -124,11 +134,12 @@ for (ic in with_intercept) {
   )
   # save mcmc samples and summary stats
   tbl_summary_vtu <- fit_choice_vtu$summary(variables = pars_interest)
-  if(max(tbl_summary_vtu$Rhat) > 1.03){stop(str_c("Rhat values too large\ncloser inspect VTU ", path_ending, " model"))}
+  if(max(tbl_summary_vtu$rhat) > 1.03){stop(str_c("Rhat values too large\ncloser inspect VTU ", path_ending, " model"))}
  
   tbl_draws_vtu <- fit_choice_vtu$draws(variables = pars_interest, format = "df")
-  bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup)
-  
+  x11()
+  bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("VTU & ", path_ending))
+
   loo <- fit_choice_vtu$loo(variables = "log_lik_pred")
   
   saveRDS(loo, file = str_c("exploration-R/data/loo-vtu-", path_ending, ".rds"))
@@ -155,6 +166,7 @@ mm_choice_v_predict <- model.matrix(
 colnames(mm_choice_v_predict) <- c("ic", "V", "RU")
 mm_choice_v_predict$sub <- tbl_predict$sub
 
+
 l_data <- list(
   n_data = nrow(mm_choice_v),
   n_subj = length(unique(mm_choice_v$sub)),
@@ -164,23 +176,23 @@ l_data <- list(
     labels = 1:length(unique(tbl_subset$sub))
   )),
   n_data_predict = nrow(mm_choice_v_predict),
+  choice_predict = tbl_predict$C,
   subj_predict = as.numeric(factor(
     tbl_predict$sub, 
     labels = 1:length(unique(tbl_predict$sub))
-  )),
-  x_predict = as.matrix(mm_choice_v_predict[, c("ic", "V", "RU")])
+  ))
 )
 
-with_intercept <- c(TRUE, FALSE)
-pars_interest <- c("mu_tf", "posterior_prediction", "sigma_subject", "b")
 for (ic in with_intercept) {
   path_ending <- c("no-intercept", "intercept")[ic + 1]
   # select model
   if (ic){
     l_data$x <- as.matrix(mm_choice_v[, c("ic", "V", "RU")])
-    choice_model_ic <- stan_choice_reduced()
+    l_data$x_predict <- as.matrix(mm_choice_v_predict[, c("ic", "V", "RU")])
+    choice_model_ic <- stan_choice_reduced_intercept()
     mod_choice <- cmdstan_model(choice_model_ic)
   } else if (!ic) {
+    l_data$x_predict <- as.matrix(mm_choice_v_predict[, c("V", "RU")])
     l_data$x <- as.matrix(mm_choice_v[, c("V", "RU")])
     choice_model_no_ic <- stan_choice_reduced_no_intercept()
     mod_choice <- cmdstan_model(choice_model_no_ic)
@@ -196,7 +208,8 @@ for (ic in with_intercept) {
   if(max(tbl_summary_v$Rhat) > 1.03){stop(str_c("Rhat values too large\ncloser inspect V ", path_ending, " model"))}
   
   tbl_draws_v <- fit_choice_v$draws(variables = pars_interest, format = "df")
-  bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup)
+  x11()
+  bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("V & ", path_ending))
   
   loo <- fit_choice_v$loo(variables = "log_lik_pred")
   
