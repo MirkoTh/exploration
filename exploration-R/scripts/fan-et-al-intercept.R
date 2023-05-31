@@ -1,3 +1,4 @@
+rm(list = ls())
 # Set Up Script -----------------------------------------------------------
 
 
@@ -62,13 +63,16 @@ tbl_subset %>%
 tbl_choices_agg <- tbl_e1 %>% group_by(sub) %>% summarize(n = n(), C1 = sum(C))
 cor(tbl_subset[, c("V", "VTU", "RU", "C")])
 
+# use a random subset to test model predictions
+# set seed to make results replicable
+set.seed(99839)
 tbl_predict <- tbl_subset %>% group_by(sub) %>%
   mutate(
     randi = runif(length(block)),
     ranking = row_number(randi)
   ) %>%
   arrange(sub, ranking) %>%
-  filter(ranking <= 20)
+  filter(ranking <= 30)
 
 # compare models including a (random) intercept term against model omitting it
 # fit on whole data set
@@ -130,22 +134,24 @@ for (ic in with_intercept) {
   # run model
   fit_choice_vtu <- mod_choice$sample(
     data = l_data, iter_sampling = n_samples, iter_warmup = n_warmup, chains = n_chains,
-    init = 0, parallel_chains = n_chains
+    init = 1, parallel_chains = n_chains
   )
   # save mcmc samples and summary stats
   tbl_summary_vtu <- fit_choice_vtu$summary(variables = pars_interest)
-  if(max(tbl_summary_vtu$rhat) > 1.03){stop(str_c("Rhat values too large\ncloser inspect VTU ", path_ending, " model"))}
- 
+  if(max(tbl_summary_vtu$rhat) > 1.02){stop(str_c("Rhat values too large\ncloser inspect VTU ", path_ending, " model"))}
+  
   tbl_draws_vtu <- fit_choice_vtu$draws(variables = pars_interest, format = "df")
-  x11()
-  bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("VTU & ", path_ending))
-
+  if (ic){
+    pl_caterpillar <- bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("VTU & ", path_ending))
+  } else if (!ic) {
+    pl_caterpillar <- bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]"), n_warmup = n_warmup) + ggtitle(str_c("VTU & ", path_ending))
+  }
   loo <- fit_choice_vtu$loo(variables = "log_lik_pred")
   
   saveRDS(loo, file = str_c("exploration-R/data/loo-vtu-", path_ending, ".rds"))
   saveRDS(tbl_draws_vtu, file = str_c("exploration-R/data/choice-model-vtu-", path_ending, ".rds"))
   saveRDS(tbl_summary_vtu, file = str_c("exploration-R/data/choice-model-vtu-summary-", path_ending, ".rds"))
-  
+  save_my_pdf_and_tiff(pl_caterpillar, str_c("exploration-R/data/caterpillar-2-params-vtu-", path_ending), 6, 4)
 }
 
 
@@ -201,21 +207,24 @@ for (ic in with_intercept) {
   # run model
   fit_choice_v <- mod_choice$sample(
     data = l_data, iter_sampling = n_samples, iter_warmup = n_warmup, chains = n_chains,
-    init = 0, parallel_chains = n_chains
+    init = 1, parallel_chains = n_chains
   )
   # save mcmc samples and summary stats
   tbl_summary_v <- fit_choice_v$summary(variables = pars_interest)
-  if(max(tbl_summary_v$Rhat) > 1.03){stop(str_c("Rhat values too large\ncloser inspect V ", path_ending, " model"))}
+  if(max(tbl_summary_v$rhat) > 1.02){stop(str_c("Rhat values too large\ncloser inspect V ", path_ending, " model"))}
   
   tbl_draws_v <- fit_choice_v$draws(variables = pars_interest, format = "df")
-  x11()
-  bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("V & ", path_ending))
-  
+  if (ic){
+    pl_caterpillar <- bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) + ggtitle(str_c("V & ", path_ending))
+  } else if (!ic) {
+    pl_caterpillar <- bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]"), n_warmup = n_warmup) + ggtitle(str_c("V & ", path_ending))
+  }
   loo <- fit_choice_v$loo(variables = "log_lik_pred")
   
   saveRDS(loo, file = str_c("exploration-R/data/loo-v-", path_ending, ".rds"))
   saveRDS(tbl_draws_v, file = str_c("exploration-R/data/choice-model-v-", path_ending, ".rds"))
   saveRDS(tbl_summary_v, file = str_c("exploration-R/data/choice-model-v-summary-", path_ending, ".rds"))
+  save_my_pdf_and_tiff(pl_caterpillar, str_c("exploration-R/data/caterpillar-2-params-v-", path_ending), 6, 4)
   
 }
 
@@ -231,11 +240,22 @@ loo_vtu_intercept <- readRDS("exploration-R/data/loo-vtu-intercept.rds")
 loo_v_no_intercept <- readRDS("exploration-R/data/loo-v-no-intercept.rds")
 loo_v_intercept <- readRDS("exploration-R/data/loo-v-intercept.rds")
 
+# all four
 loo::loo_model_weights(list(
-  loo_vtu_no_intercept, loo_vtu_intercept,loo_v_no_intercept, loo_v_intercept
-  ), method = "stacking")
-
-
+  loo_vtu_no_intercept, loo_vtu_intercept, loo_v_no_intercept, loo_v_intercept
+), method = "stacking")
+# only vtu
+loo::loo_model_weights(list(
+  loo_vtu_no_intercept, loo_vtu_intercept
+), method = "stacking")
+# only v
+loo::loo_model_weights(list(
+  loo_v_no_intercept, loo_v_intercept
+), method = "stacking")
+# best from the two variable combinations
+loo::loo_model_weights(list(
+  loo_vtu_no_intercept, loo_v_intercept
+), method = "stacking")
 
 
 
