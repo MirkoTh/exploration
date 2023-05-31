@@ -306,9 +306,9 @@ if (fit_or_load == "fit") {
   tbl_summary_vtu <- readRDS("exploration-R/data/choice-model-vtu-summary.rds")
 }
 
-x11()
-bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) +
+pl_caterpillar_vtu <- bayesplot::mcmc_trace(tbl_draws_vtu,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) +
   ggtitle("2-params VTU specificity")
+save_my_pdf_and_tiff(pl_caterpillar_vtu, str_c("exploration-R/data/caterpillar-2-params-vtu-specificity.rds"), 8, 5)
 
 tbl_posterior_vtu <- tbl_draws_vtu %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
@@ -425,9 +425,9 @@ if (fit_or_load == "fit") {
   tbl_summary_v <- readRDS("exploration-R/data/choice-model-v-summary.rds")
 }
 
-x11()
-bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = n_warmup) +
+pl_caterpillar_v <- bayesplot::mcmc_trace(tbl_draws_v,  pars = c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]"), n_warmup = 0) +
   ggtitle("2-params V specificity")
+save_my_pdf_and_tiff(pl_caterpillar_v, str_c("exploration-R/data/caterpillar-2-params-v-specificity.rds"), 8, 5)
 
 tbl_posterior_v <- tbl_draws_v %>% 
   dplyr::select(starts_with(c("mu")), .chain) %>%
@@ -538,22 +538,21 @@ fit_v_or_vtu_backcasts <- c("VTU", "V")
 
 for (v_index in fit_v_or_vtu_backcasts) {
   if (v_index == "VTU") {
-    l_data$choice <- tbl_predict$backcast_V
+    l_data$choice <- tbl_predict$backcast_VTU
     path_ending <- "-backcast-VTU"
   } else if (v_index == "V") {
-    l_data$choice <- tbl_predict$backcast_VTU
+    l_data$choice <- tbl_predict$backcast_V
     path_ending <- "-backcast-V"
   }
   
   
-  
   if (fit_or_load == "fit") {
     fit_choice <- mod_choice$sample(
-      data = l_data, iter_sampling = 10000, iter_warmup = 4000, chains = 3, # 10k, 4k
-      init = 0, parallel_chains = 3, thin = 1
+      data = l_data, iter_sampling = 5000, iter_warmup = 3000, chains = 3,
+      init = 1, parallel_chains = 3, thin = 1
     )
     # analyze group-level posterior parameters estimates
-    pars_interest <- c("mu", "Sigma", "posterior_prediction", "sigma_subject", "b")
+    pars_interest <- c("mu", "Sigma", "sigma_subject", "b")
     tbl_draws_full <- fit_choice$draws(variables = pars_interest, format = "df")
     tbl_summary_full <- fit_choice$summary(variables = pars_interest)
     saveRDS(tbl_draws_full, file = str_c("exploration-R/data/choice-model-full-posteriors", path_ending, ".rds"))
@@ -564,8 +563,7 @@ for (v_index in fit_v_or_vtu_backcasts) {
     tbl_summary_full <- readRDS(str_c("exploration-R/data/choice-model-full-summary", path_ending, ".rds"))
   }
   
-  x11()
-  bayesplot::mcmc_trace(tbl_draws_full,  pars = c("mu[1]", "mu[2]", "mu[3]", "mu[4]"), n_warmup = 0) +
+  pl_caterpillar <- bayesplot::mcmc_trace(tbl_draws_full,  pars = c("mu[1]", "mu[2]", "mu[3]", "mu[4]"), n_warmup = 0) +
     ggtitle(str_c("3-params specificity, predictions from ", v_index))
   
   
@@ -606,7 +604,7 @@ for (v_index in fit_v_or_vtu_backcasts) {
   pl_hdi_full <- ggplot(tbl_hdis_full, aes(parameter, mean_value, group = parameter)) +
     geom_segment(aes(
       y = lo_thx, yend = hi_thx, x = parameter, xend = parameter, color = parameter), 
-      size = 2, lineend = "round"
+      linewidth = 2, lineend = "round"
     ) + 
     geom_point(color = "black", size = 3, shape = 1) +
     theme_bw() +
@@ -622,8 +620,8 @@ for (v_index in fit_v_or_vtu_backcasts) {
   } else if (v_index == "V") {
     pl <- arrangeGrob(pl_hdi_v, pl_hdi_full, nrow = 2)
   }
-  save_my_pdf_and_tiff(pl, str_c("exploration-R/data/hdi-3-params-specificity", path_ending, ".rds"), 6, 3.5)
-  
+  save_my_pdf_and_tiff(pl, str_c("exploration-R/data/hdi-3-params-specificity", path_ending, ".rds"), 6, 4)
+  save_my_pdf_and_tiff(pl_caterpillar, str_c("exploration-R/data/caterpillar-3-params-specificity", path_ending, ".rds"), 6, 4)
 }
 
 # inspect the parameter correlations
