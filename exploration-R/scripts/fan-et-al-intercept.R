@@ -241,7 +241,7 @@ loo_v_no_intercept <- readRDS("exploration-R/data/loo-v-no-intercept.rds")
 loo_v_intercept <- readRDS("exploration-R/data/loo-v-intercept.rds")
 
 # all four
-loo::loo_model_weights(list(
+loo_four_models <- loo::loo_model_weights(list(
   loo_vtu_no_intercept, loo_vtu_intercept, loo_v_no_intercept, loo_v_intercept
 ), method = "stacking")
 # only vtu
@@ -254,10 +254,29 @@ loo::loo_model_weights(list(
 ), method = "stacking")
 # best from the two variable combinations
 loo::loo_model_weights(list(
-  loo_vtu_no_intercept, loo_v_intercept
+  loo_vtu_intercept, loo_v_intercept
 ), method = "stacking")
 
+tbl_loo_four <- tibble(
+  Model = c("V/TU No Intercept", "V/TU Intercept", "V No Intercept", "V Intercept"),
+  vars = factor(rep(c("V/TU", "V"), each = 2)),
+  ic = factor(rep(c("No Intercept", "Intercept"), 2)),
+  loo = as.numeric(loo_four_models)
+)
 
-
-
+ggplot(tbl_loo_four, aes(ic, vars)) +
+  geom_tile(aes(fill = loo)) +
+  geom_label(aes(label = str_c(round(loo, 2)))) +
+  scale_fill_viridis_c(name = "LOO Model Weight", guide = "none") + 
+  theme_bw() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    strip.background = element_rect(fill = "white")
+    ) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(caption = "Note. All models include RU as an independent variable.")
+  
+  
 
