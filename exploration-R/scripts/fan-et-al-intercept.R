@@ -279,4 +279,22 @@ ggplot(tbl_loo_four, aes(ic, vars)) +
   labs(caption = "Note. All models include RU as an independent variable.")
   
   
+tbl_draws_v_noic <- readRDS("exploration-R/data/choice-model-v-no-intercept.rds")
+tbl_draws_v_ic <- readRDS("exploration-R/data/choice-model-v-intercept.rds")
+tbl_draws_vtu_noic <- readRDS("exploration-R/data/choice-model-vtu-no-intercept.rds")
+tbl_draws_vtu_ic <- readRDS("exploration-R/data/choice-model-vtu-intercept.rds")
+
+
+tbl_draws_v_noic %>%
+  filter(`mu_tf[1]`, `mu_tf[2]`) %>%
+  summarize(mean(`mu_tf[1]`), mean(`mu_tf[2]`))
+
+
+
+colMeans(tbl_draws_v_noic[, c("mu_tf[1]", "mu_tf[2]")])
+colMeans(tbl_draws_v_ic[, c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]")])
+
+colMeans(tbl_draws_vtu_noic[, c("mu_tf[1]", "mu_tf[2]")])
+colMeans(tbl_draws_vtu_ic[, c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]")])
+
 
