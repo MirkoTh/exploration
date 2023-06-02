@@ -229,8 +229,6 @@ for (ic in with_intercept) {
 }
 
 
-
-
 # Model Comparison --------------------------------------------------------
 
 
@@ -297,4 +295,25 @@ colMeans(tbl_draws_v_ic[, c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]")])
 colMeans(tbl_draws_vtu_noic[, c("mu_tf[1]", "mu_tf[2]")])
 colMeans(tbl_draws_vtu_ic[, c("mu_tf[1]", "mu_tf[2]", "mu_tf[3]")])
 
+
+
+
+# variability in intercept across subjects --------------------------------
+
+tbl_draws_v <- readRDS("exploration-R/data/choice-model-v-intercept.rds")
+
+
+n_samples <- 10000
+tbl_sd_intercept_map <- tibble(
+  id = 1:n_samples,
+  sample = 1/(1+exp(rnorm(n_samples, mean(tbl_draws_v$`mu_tf[1]`), mean(tbl_draws_v$`sigma_subject[1]`))))
+)
+ggplot(tbl_sd_intercept_map, aes(sample)) +
+  geom_density() + 
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0.1)) +
+  labs(x = "Probability Right", y = "Density") +
+  theme(strip.background = element_rect(fill = "white"))
+  
 
