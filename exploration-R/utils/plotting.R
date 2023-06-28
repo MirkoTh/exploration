@@ -489,6 +489,84 @@ plot_my_heatmap_thompson <- function(tbl_x) {
 }
 
 
+plot_my_heatmap_ucb <- function(tbl_x) {
+
+    tbl_cor <- tbl_x %>% 
+      mutate(my_vars = colnames(tbl_x[1:2])) %>%
+      pivot_longer(cols = c(beta_ml, gamma_ml)) %>%
+      mutate(
+        my_vars = factor(my_vars),
+        my_vars = fct_recode(my_vars, "Beta" = "beta_mn", "Gamma" = "gamma_mn"),
+        name = factor(name),
+        name = fct_recode(name, "Beta" = "beta_ml", "Gamma" = "gamma_ml")
+      )
+
+  ggplot(tbl_cor, aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c("Gamma = ", tbl_x[1, "gamma_mn"], ",\nBeta = ", tbl_x[1, "beta_mn"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"]))
+}
+
+
+plot_my_heatmap_mixture <- function(tbl_x) {
+  
+  tbl_cor <- tbl_x %>% 
+    mutate(my_vars = colnames(tbl_x[1:3])) %>%
+    pivot_longer(cols = c(beta_ml, gamma_ml, w_mix_ml)) %>%
+    mutate(
+      my_vars = factor(my_vars),
+      my_vars = fct_recode(my_vars, "Beta" = "beta_mn", "Gamma" = "gamma_mn", "w_mix" = "w_mix_mn"),
+      name = factor(name),
+      name = fct_recode(name, "Beta" = "beta_ml", "Gamma" = "gamma_ml", "w_mix" = "w_mix_ml")
+    )
+  
+  ggplot(tbl_cor, aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c(
+      "Gamma = ", tbl_x[1, "gamma_mn"], ",\nBeta = ", tbl_x[1, "beta_mn"], 
+      ",\nw(mix) = ", tbl_x[1, "w_mix_mn"], ",\nNr. Trials = ", tbl_x[1, "nr_trials"])
+      )
+}
+
+
+plot_my_heatmap_delta <- function(tbl_x) {
+  
+  tbl_cor <- tbl_x %>%
+    mutate(my_vars = colnames(tbl_x[1:2])) %>%
+    pivot_longer(cols = c(delta_ml, gamma_ml)) %>%
+    mutate(
+      my_vars = factor(my_vars),
+      my_vars = fct_recode(my_vars, "Delta" = "delta_mn", "Gamma" = "gamma_mn"),
+      name = factor(name),
+      name = fct_recode(name, "Delta" = "delta_ml", "Gamma" = "gamma_ml")
+    )
+  
+  ggplot(tbl_cor, aes(my_vars, name)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(name = "") +
+    geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    labs(title = str_c(
+      "Gamma = ", tbl_x[1, "gamma_mn"], ",\nBeta = ", tbl_x[1, "delta_mn"], 
+      ",\nNr. Trials = ", tbl_x[1, "nr_trials"])
+    )
+}
+
+
 plot_cor_recovery <- function(tbl_cor, pd, expl_strat = "softmax") {
   if (expl_strat == "softmax") {
     pl <- ggplot(tbl_cor, aes(as.factor(gamma_mn), value, group = as.factor(nr_trials))) +

@@ -272,8 +272,8 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
   filter(!is.na(gamma_mn)) %>%
   mutate(
     simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    nr_trials = factor(nr_trials, labels = c("200 Trials", "400 Trials"))
+    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE"),#, "Simulate Once" = "FALSE"),
+    nr_trials = factor(nr_trials, labels = c("400 Trials"))#"200 Trials", 
   ) %>%
   rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
@@ -296,16 +296,16 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
 # Kalman & Thompson: fit Xi and Epsilon Variances --------------------------
 
 
-# simulate_data <- c(TRUE, FALSE)#[1]
-# nr_participants <- c(200)
-# nr_trials <- c(300, 500)
-# cond_on_choices <- c(TRUE)
-# 
-# 
-# tbl_params_thompson <- crossing(
-#   simulate_data, nr_participants, nr_trials, cond_on_choices
-# )
-# 
+simulate_data <- c(TRUE, FALSE)#[1]
+nr_participants <- c(200)
+nr_trials <- c(300, 500)
+cond_on_choices <- c(TRUE)
+
+
+tbl_params_thompson <- crossing(
+  simulate_data, nr_participants, nr_trials, cond_on_choices
+)
+
 # 
 # if (fit_or_load == "fit")  {
 #   l_results_thompson <- pmap(
@@ -372,7 +372,7 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
 
 # Kalman & Thompson: Fit Xi Variance --------------------------------------
 
-
+# 
 # 
 # if (fit_or_load == "fit")  {
 #   l_results_thompson_1var <- pmap(
@@ -409,9 +409,9 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
 #   pivot_longer(cols = c(`Sigma Xi`))
 # 
 # pd <- position_dodge(width = 1)
-# plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson")
-#   facet_wrap(~ name) +
-# possibly adopt plot_cor_recovery function, if error here
+# plot_cor_recovery(tbl_cor_thompson_long_1var, pd, "thompson") +
+#   facet_wrap(~ name)
+# #possibly adopt plot_cor_recovery function, if error here
 
 
 
@@ -517,8 +517,43 @@ plot_ucb_param_recovery <- function(param, ttl) {
 plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
 plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
 
+# correlations between parameters
 
+f_clean_cor_ucb <- function(x) {
+  x <- x[x$gamma_ml < 2.9 & x$beta_ml < 2.9, ]
+  cor(x[, c("beta_ml", "gamma_ml")])
+}
 
+l_cors_params <- map(
+  l_results_c_0var, f_clean_cor_ucb
+)
+
+counter <- 1
+counter_params <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_ucb[counter_params, ]
+  ))
+  counter <- counter + 1
+  counter_params <- counter_params + 1
+  if (counter_params > nrow(tbl_params_ucb)) {
+    counter_params <- 1
+  }
+}
+
+l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
+  mutate(param = rep(c("Beta", "Gamma"), nrow(.)/2)) %>%
+  group_by(param, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
+  filter(gamma_mn <= .16) %>%
+  summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml)) %>%
+  ungroup() %>% select(-param) %>%
+  split(interaction(.$gamma_mn, .$beta_mn, .$simulate_data, .$nr_trials))
+
+l_heatmaps_par_cor <- map(l_cors_params_agg, plot_my_heatmap_ucb)
+pl_tradeoffs_ucb <- do.call("arrangeGrob", c(l_heatmaps_par_cor, ncol = 4))
+save_my_pdf_and_tiff(
+  pl_tradeoffs_ucb, "figures/4arlb-ucb-param-correlations", 12, 9
+)
 
 
 # Kalman & Mixture: Fix Variances ------------------------------------------
@@ -635,6 +670,43 @@ plot_ru_thompson_param_recovery("Beta", "Beta (inf. bonus)")
 plot_ru_thompson_param_recovery("w_mix", "Mixture (Thompson)")
 
 
+# correlations between parameters
+
+
+
+f_clean_cor_mixture <- function(x) {
+  x <- x[x$gamma_ml < 2.9 & x$beta_ml < 2.9, ]
+  cor(x[, c("beta_ml", "gamma_ml", "w_mix_ml")])
+}
+
+l_cors_params <- map(
+  l_results_mixture_0var, f_clean_cor_mixture
+)
+
+counter <- 1
+counter_params <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_mixture[counter_params, ]
+  ))
+  counter <- counter + 1
+  counter_params <- counter_params + 1
+  if (counter_params > nrow(tbl_params_mixture)) {
+    counter_params <- 1
+  }
+}
+l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
+  mutate(param = rep(c("Beta", "Gamma", "w_mix"), nrow(.)/3)) %>%
+  group_by(param, beta_mn, gamma_mn, w_mix_mn, simulate_data, nr_trials, mixturetype) %>%
+  summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml), w_mix_ml = mean(w_mix_ml)) %>%
+  ungroup() %>% select(-param) %>%
+  split(interaction(.$beta_mn, .$gamma_mn, .$w_mix_mn, .$simulate_data, .$nr_trials))
+
+l_heatmaps_par_cor <- map(l_cors_params_agg, plot_my_heatmap_mixture)
+pl_tradeoffs_mixture <- do.call("arrangeGrob", c(l_heatmaps_par_cor, ncol = 4))
+save_my_pdf_and_tiff(
+  pl_tradeoffs_mixture, "figures/4arlb-ucb-thompson-mixture-param-correlations", 16, 7
+)
 
 
 # Delta & Softmax ---------------------------------------------------------
@@ -766,8 +838,43 @@ plot_delta_param_recovery("Decay Rule", "Gamma", "Decay Rule: Parameter = Gamma 
 plot_delta_param_recovery("Decay Rule", "Delta", "Decay Rule: Parameter = Delta (learning rate)")
 
 
+# correlations between parameters
 
 
+
+f_clean_cor_delta <- function(x) {
+  x <- x[x$gamma_ml < 2.9, ]
+  cor(x[, c("delta_ml", "gamma_ml")])
+}
+
+l_cors_params <- map(
+  l_results_c_delta_softmax, f_clean_cor_delta
+)
+
+counter <- 1
+counter_params <- 1
+for (tbl_r in l_cors_params) {
+  l_cors_params[[counter]] <- as_tibble(cbind(
+    tbl_r, tbl_params_delta[counter_params, ]
+  ))
+  counter <- counter + 1
+  counter_params <- counter_params + 1
+  if (counter_params > nrow(tbl_params_delta)) {
+    counter_params <- 1
+  }
+}
+l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
+  mutate(param = rep(c("Delta", "Gamma"), nrow(.)/2)) %>%
+  group_by(param, delta_mn, gamma_mn, simulate_data, nr_trials) %>%
+  summarize(delta_ml = mean(delta_ml), gamma_ml = mean(gamma_ml)) %>%
+  ungroup() %>% select(-param) %>%
+  split(interaction(.$delta_mn, .$gamma_mn, .$simulate_data, .$nr_trials))
+
+l_heatmaps_par_cor <- map(l_cors_params_agg, plot_my_heatmap_delta)
+pl_tradeoffs_delta <- do.call("arrangeGrob", c(l_heatmaps_par_cor, ncol = 4))
+save_my_pdf_and_tiff(
+  pl_tradeoffs_delta, "figures/4arlb-delta-param-correlations", 12, 10
+)
 # Summarize Parameter Recoveries of All Models ----------------------------
 
 
