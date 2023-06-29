@@ -521,7 +521,7 @@ plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
 
 f_clean_cor_ucb <- function(x) {
   x <- x[x$gamma_ml < 2.9 & x$beta_ml < 2.9, ]
-  cor(x[, c("beta_ml", "gamma_ml")])
+  cor(x[, c("beta", "gamma", "beta_ml", "gamma_ml")])
 }
 
 l_cors_params <- map(
@@ -542,9 +542,12 @@ for (tbl_r in l_cors_params) {
 }
 
 l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
-  mutate(param = rep(c("Beta", "Gamma"), nrow(.)/2)) %>%
+  mutate(
+    req = rep(seq(1, 4, by = 1), nrow(.)/4),
+    param = rep(c("Beta", "Gamma"), nrow(.)/2)
+    ) %>%
+  filter(gamma_mn <= .16 & req <= 2) %>%
   group_by(param, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
-  filter(gamma_mn <= .16) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml)) %>%
   ungroup() %>% select(-param) %>%
   split(interaction(.$gamma_mn, .$beta_mn, .$simulate_data, .$nr_trials))
@@ -675,8 +678,8 @@ plot_ru_thompson_param_recovery("w_mix", "Mixture (Thompson)")
 
 
 f_clean_cor_mixture <- function(x) {
-  x <- x[x$gamma_ml < 2.9 & x$beta_ml < 2.9, ]
-  cor(x[, c("beta_ml", "gamma_ml", "w_mix_ml")])
+  x <- x[x$gamma_ml < 2.9 & x$beta_ml < 2.9, ] %>% unnest_wider(params_decision)
+  cor(x[, c("beta", "gamma", "w_mix", "beta_ml", "gamma_ml", "w_mix_ml")])
 }
 
 l_cors_params <- map(
@@ -696,7 +699,11 @@ for (tbl_r in l_cors_params) {
   }
 }
 l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
-  mutate(param = rep(c("Beta", "Gamma", "w_mix"), nrow(.)/3)) %>%
+  mutate(
+    req = rep(seq(1, 6, by = 1), nrow(.)/6),
+    param = rep(c("Beta", "Gamma", "w_mix"), nrow(.)/3)
+    ) %>%
+  filter(req <= 3) %>%
   group_by(param, beta_mn, gamma_mn, w_mix_mn, simulate_data, nr_trials, mixturetype) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml), w_mix_ml = mean(w_mix_ml)) %>%
   ungroup() %>% select(-param) %>%
@@ -844,7 +851,7 @@ plot_delta_param_recovery("Decay Rule", "Delta", "Decay Rule: Parameter = Delta 
 
 f_clean_cor_delta <- function(x) {
   x <- x[x$gamma_ml < 2.9, ]
-  cor(x[, c("delta_ml", "gamma_ml")])
+  cor(x[, c("delta", "gamma", "delta_ml", "gamma_ml")])
 }
 
 l_cors_params <- map(
@@ -864,7 +871,11 @@ for (tbl_r in l_cors_params) {
   }
 }
 l_cors_params_agg <- reduce(l_cors_params, rbind) %>% 
-  mutate(param = rep(c("Delta", "Gamma"), nrow(.)/2)) %>%
+  mutate(
+    req = rep(seq(1, 4, by = 1), nrow(.)/4),
+    param = rep(c("Delta", "Gamma"), nrow(.)/2)
+    ) %>%
+  filter(req <= 2) %>%
   group_by(param, delta_mn, gamma_mn, simulate_data, nr_trials) %>%
   summarize(delta_ml = mean(delta_ml), gamma_ml = mean(gamma_ml)) %>%
   ungroup() %>% select(-param) %>%
