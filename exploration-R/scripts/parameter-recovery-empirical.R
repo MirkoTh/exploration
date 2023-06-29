@@ -186,7 +186,9 @@ tbl_recovery_kalman_ucb <- tbl_results_kalman_ucb %>%
   group_by(simulate_data) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
-    r_beta = cor(beta, beta_ml)
+    r_beta = cor(beta, beta_ml),
+    r_gamma_beta = cor(gamma, beta_ml),
+    r_beta_gamma = cor(beta, gamma_ml)
   ) %>% ungroup()
 
 tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>% 
@@ -198,10 +200,26 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
   ) %>%
   rename(
     "Gamma" = r_gamma,
-    "Beta" = r_beta
+    "Beta" = r_beta,
+    "Gamma in Beta out" = r_gamma_beta,
+    "Beta in Gamma out" = r_beta_gamma
   ) %>%
-  pivot_longer(cols = c(Gamma, Beta))
+  pivot_longer(cols = c(Gamma, Beta, `Gamma in Beta out`, `Beta in Gamma out`)) %>%
+  mutate(
+    param_in = rep(c("Gamma", "Beta"), 4),
+    param_out = rep(c("Gamma", "Beta", "Beta", "Gamma"), 2)
+  )
 
+ggplot(tbl_recovery_kalman_ucb_long, aes(param_in, param_out)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2))) +
+  facet_wrap(~ simulate_data) +
+  scale_fill_gradient2(name = "") +
+  geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0))
 
 
 ## UCB Thompson ------------------------------------------------------------
