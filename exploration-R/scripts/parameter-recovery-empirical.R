@@ -210,7 +210,7 @@ tbl_recovery_kalman_ucb_long <- tbl_recovery_kalman_ucb  %>%
     param_out = rep(c("Gamma", "Beta", "Beta", "Gamma"), 2)
   )
 
-ggplot(tbl_recovery_kalman_ucb_long, aes(param_in, param_out)) +
+pl_recov_ucb_sm <- ggplot(tbl_recovery_kalman_ucb_long, aes(param_in, param_out)) +
   geom_tile(aes(fill = value)) +
   geom_text(aes(label = round(value, 2))) +
   facet_wrap(~ simulate_data) +
@@ -221,6 +221,11 @@ ggplot(tbl_recovery_kalman_ucb_long, aes(param_in, param_out)) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_discrete(expand = c(0, 0))
 
+
+
+save_my_pdf_and_tiff(
+  pl_recov_ucb_sm, "figures/4arlb-ucb-softmax-param-correlations-empirical", 5.5, 3
+)
 
 ## UCB Thompson ------------------------------------------------------------
 
@@ -267,7 +272,13 @@ tbl_recovery_kalman_ucb_thompson <- tbl_results_kalman_ucb_thompson %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml),
-    r_w_mix = cor(w_mix, w_mix_ml)
+    r_w_mix = cor(w_mix, w_mix_ml),
+    r_gamma_beta = cor(gamma, beta_ml),
+    r_gamma_w_mix = cor(gamma, w_mix_ml),
+    r_beta_gamma = cor(beta, gamma_ml),
+    r_beta_w_mix = cor(beta, w_mix_ml),
+    r_w_mix_gamma = cor(w_mix, gamma_ml),
+    r_w_mix_beta = cor(w_mix, beta_ml)
   ) %>% ungroup()
 
 tbl_recovery_kalman_ucb_thompson_long <- tbl_recovery_kalman_ucb_thompson  %>% 
@@ -280,10 +291,41 @@ tbl_recovery_kalman_ucb_thompson_long <- tbl_recovery_kalman_ucb_thompson  %>%
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta,
-    "w_mix" = r_w_mix
+    "w_mix" = r_w_mix,
+    "Gamma in Beta out" = r_gamma_beta,
+    "Gamma in w_mix out" = r_gamma_w_mix,
+    "Beta in Gamma out" = r_beta_gamma,
+    "Beta in w_mix out" = r_beta_w_mix,
+    "w_mix in Gamma out" = r_w_mix_gamma,
+    "w_mix in Beta out" = r_w_mix_beta
   ) %>%
-  pivot_longer(cols = c(Gamma, Beta, w_mix))
+  pivot_longer(cols = c(
+    Gamma, Beta, w_mix, `Gamma in Beta out`, `Gamma in w_mix out`,
+    `Beta in Gamma out`, `Beta in w_mix out`, 
+    `w_mix in Gamma out`, `w_mix in Beta out`
+  )) %>%
+  mutate(
+    param_in = rep(c(c("Gamma", "Beta", "w_mix"), rep(c("Gamma", "Beta", "w_mix"), each = 2)), 2),
+    param_out = rep(c(
+      "Gamma", "Beta", "w_mix", "Beta", "w_mix", "Gamma", "w_mix", "Gamma", "Beta"
+    ), 2)
+  )
 
+pl_recov_ucb_thompson <- ggplot(tbl_recovery_kalman_ucb_thompson_long, aes(param_in, param_out)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2))) +
+  facet_wrap(~ simulate_data) +
+  scale_fill_gradient2(name = "") +
+  geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0))
+
+
+save_my_pdf_and_tiff(
+  pl_recov_ucb_thompson, "figures/4arlb-ucb-thompson-param-correlations-empirical", 5.5, 3
+)
 
 
 ## RU Thompson -------------------------------------------------------------
@@ -291,9 +333,15 @@ tbl_recovery_kalman_ucb_thompson_long <- tbl_recovery_kalman_ucb_thompson  %>%
 if (fit_or_load == "fit") {
   plan(multisession, workers = availableCores() - 2)
   l_kalman_ru_thompson_no_variance <- furrr:::future_map(
-    l_participants, fit_ru_thompson_no_variance_wrapper,
-    tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-    .progress = TRUE
+    l_participants, fit_mixture_no_variance_wrapper,
+    tbl_rewards = tbl_rewards, f_fit = fit_kalman_ru_thompson_no_variance,
+    condition_on_observed_choices = TRUE, .progress = TRUE
+  )
+  
+  l_kalman_ucb_thompson_no_variance <- furrr:::future_map(
+    l_participants, fit_mixture_no_variance_wrapper,
+    tbl_rewards = tbl_rewards, f_fit = fit_kalman_ucb_thompson_no_variance,
+    condition_on_observed_choices = TRUE, .progress = TRUE
   )
   saveRDS(l_kalman_ru_thompson_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-fit.rds")
   
@@ -323,14 +371,19 @@ if (fit_or_load == "fit") {
 
 
 
-
 tbl_recovery_kalman_ru_thompson <- tbl_results_kalman_ru_thompson %>%
   unnest_wider(params_decision) %>%
   group_by(simulate_data) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml),
-    r_w_mix = cor(w_mix, w_mix_ml)
+    r_w_mix = cor(w_mix, w_mix_ml),
+    r_gamma_beta = cor(gamma, beta_ml),
+    r_gamma_w_mix = cor(gamma, w_mix_ml),
+    r_beta_gamma = cor(beta, gamma_ml),
+    r_beta_w_mix = cor(beta, w_mix_ml),
+    r_w_mix_gamma = cor(w_mix, gamma_ml),
+    r_w_mix_beta = cor(w_mix, beta_ml)
   ) %>% ungroup()
 
 tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>% 
@@ -343,11 +396,41 @@ tbl_recovery_kalman_ru_thompson_long <- tbl_recovery_kalman_ru_thompson  %>%
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta,
-    "w_mix" = r_w_mix
+    "w_mix" = r_w_mix,
+    "Gamma in Beta out" = r_gamma_beta,
+    "Gamma in w_mix out" = r_gamma_w_mix,
+    "Beta in Gamma out" = r_beta_gamma,
+    "Beta in w_mix out" = r_beta_w_mix,
+    "w_mix in Gamma out" = r_w_mix_gamma,
+    "w_mix in Beta out" = r_w_mix_beta
   ) %>%
-  pivot_longer(cols = c(Gamma, Beta, w_mix))
+  pivot_longer(cols = c(
+    Gamma, Beta, w_mix, `Gamma in Beta out`, `Gamma in w_mix out`,
+    `Beta in Gamma out`, `Beta in w_mix out`, 
+    `w_mix in Gamma out`, `w_mix in Beta out`
+  )) %>%
+  mutate(
+    param_in = rep(c(c("Gamma", "Beta", "w_mix"), rep(c("Gamma", "Beta", "w_mix"), each = 2)), 2),
+    param_out = rep(c(
+      "Gamma", "Beta", "w_mix", "Beta", "w_mix", "Gamma", "w_mix", "Gamma", "Beta"
+    ), 2)
+  )
+
+pl_recov_ru_thompson <- ggplot(tbl_recovery_kalman_ru_thompson_long, aes(param_in, param_out)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2))) +
+  facet_wrap(~ simulate_data) +
+  scale_fill_gradient2(name = "") +
+  geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0))
 
 
+save_my_pdf_and_tiff(
+  pl_recov_ru_thompson, "figures/4arlb-ru-thompson-param-correlations-empirical", 7, 3.5
+)
 
 ## Thompson Sampling (Xi Variance) ----------------------------------------
 
@@ -425,7 +508,9 @@ tbl_recovery_delta_softmax <- tbl_results_delta_softmax %>%
   group_by(simulate_data) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
-    r_delta = cor(delta, delta_ml)
+    r_delta = cor(delta, delta_ml),
+    r_gamma_delta = cor(gamma, delta_ml),
+    r_delta_gamma = cor(delta, gamma_ml)
   ) %>% ungroup()
 
 tbl_recovery_delta_softmax_long <- tbl_recovery_delta_softmax %>% 
@@ -437,11 +522,34 @@ tbl_recovery_delta_softmax_long <- tbl_recovery_delta_softmax %>%
   ) %>% 
   rename(
     "Gamma" = r_gamma,
-    "Delta" = r_delta
+    "Delta" = r_delta, 
+    "Gamma in Delta out" = r_gamma_delta,
+    "Delta in Gamma out" = r_delta_gamma
   ) %>%
-  pivot_longer(cols = c(Gamma, Delta))
+  pivot_longer(cols = c(Gamma, Delta, `Gamma in Delta out`, `Delta in Gamma out`)) %>%
+  mutate(
+    param_in = rep(c("Gamma", "Delta"), 4),
+    param_out = rep(c(
+      "Gamma", "Delta", "Delta", "Gamma"
+    ), 2))
 
 
+pl_recov_delta <- ggplot(tbl_recovery_delta_softmax_long, aes(param_in, param_out)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2))) +
+  facet_wrap(~ simulate_data) +
+  scale_fill_gradient2(name = "") +
+  geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0))
+
+
+
+save_my_pdf_and_tiff(
+  pl_recov_delta, "figures/4arlb-delta-param-correlations-empirical", 5.5, 3
+)
 
 ## Decay Rule -------------------------------------------------------------
 
@@ -481,26 +589,70 @@ tbl_recovery_decay_softmax <- tbl_results_decay_softmax %>%
   group_by(simulate_data) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
-    r_delta = cor(delta, delta_ml)
+    r_delta = cor(delta, delta_ml),
+    r_gamma_delta = cor(gamma, delta_ml),
+    r_delta_gamma = cor(delta, gamma_ml)
   ) %>% ungroup()
 
 tbl_recovery_decay_softmax_long <- tbl_recovery_decay_softmax %>% 
   mutate(
     gamma_mn = "empirical",
     is_decay = TRUE,
-    simulate_data = factor(simulate_data),
     is_decay = factor(is_decay),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
+    simulate_data = factor(simulate_data),
+    simulate_data = fct_recode(
+      simulate_data, 
+      "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"
+    ),
   ) %>% 
   rename(
     "Gamma" = r_gamma,
-    "Delta" = r_delta
+    "Delta" = r_delta, 
+    "Gamma in Delta out" = r_gamma_delta,
+    "Delta in Gamma out" = r_delta_gamma
   ) %>%
-  pivot_longer(cols = c(Gamma, Delta))
+  pivot_longer(cols = c(Gamma, Delta, `Gamma in Delta out`, `Delta in Gamma out`)) %>%
+  mutate(
+    param_in = rep(c("Gamma", "Delta"), 4),
+    param_out = rep(c(
+      "Gamma", "Delta", "Delta", "Gamma"
+    ), 2))
+
+pl_recov_decay <- ggplot(tbl_recovery_decay_softmax_long, aes(param_in, param_out)) +
+  geom_tile(aes(fill = value)) +
+  geom_text(aes(label = round(value, 2))) +
+  facet_wrap(~ simulate_data) +
+  scale_fill_gradient2(name = "") +
+  geom_label(aes(label = str_c("r = ", round(value, 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0))
+
+
+save_my_pdf_and_tiff(
+  pl_recov_decay, "figures/4arlb-decay-param-correlations-empirical", 5.5, 3
+)
 
 
 
-# Summarize Results -------------------------------------------------------
+pl_recov_all_models <- arrangeGrob(
+  pl_recov_ucb_sm + ggtitle("UCB"), 
+  pl_recov_ucb_thompson + ggtitle("UCB & Thompson Mixture"), 
+  pl_recov_ru_thompson + ggtitle("RU & Thompson Mixture"),
+  pl_recov_delta + ggtitle("Delta Rule"), 
+  pl_recov_decay + ggtitle("Decay Rule"),
+  top = "Empirical Parameter Recovery"
+)
+
+save_my_pdf_and_tiff(
+  pl_recov_all_models,
+  "figures/4arlb-all-models-param-correlations-empirical",
+  12, 10
+)
+
+
+    # Summarize Results -------------------------------------------------------
 
 wrangle_recoveries <- function(my_tbl, modelname) {
   tbl_summary <- crossing(
