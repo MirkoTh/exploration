@@ -43,8 +43,8 @@
   //----- CUSTOMIZABLE VARIABLES -----------------------------------------
 
   minSetSize = 4 // starting length of each trial (i.e., min number of letters in a trial)
-  maxSetSize = 4 // ending length of each trial (i.e., max number of letters in a trial)
-  repSet = 1 // number of times each set size should be repeated
+  maxSetSize = 5 // ending length of each trial (i.e., max number of letters in a trial)
+  repSet = 2 // number of times each set size should be repeated
   randomize = true // present different set sizes in random order. if false, set sizes will be presented in ascending order
   file_name = null // file name for data file. if null, a default name consisting of the participant ID and a unique number is chosen.
   local = true // save the data file locally.
@@ -202,6 +202,9 @@
     is_local: function () {
       return local
     },
+    participant_id: function () {
+      return participant_id
+    },
     on_finish: function () {
       proc_position = proc_position + 1;
       var acc = jsPsych.data.get().last(1).values()[0].accuracy;
@@ -227,6 +230,9 @@
     choices: ["True", "False"],
     is_local: function () {
       return local
+    },
+    participant_id: function () {
+      return participant_id
     },
     on_finish: function () {
       proc_position = proc_position + 1;
@@ -285,6 +291,9 @@
     },
     trial_id_recall: function () {
       return n
+    },
+    participant_id: function () {
+      return participant_id
     },
     on_finish: function () {
       nLetters = setSizes[n]
@@ -366,62 +375,21 @@
       var data_recall = jsPsych.data.get().filter([{ type: 'operation-span-recall' }]);
       var data_processing = jsPsych.data.get().filter([{ type: 'html-button-operationspan' }])
 
-      const file_name_recall = "OS_recall";
-      const file_name_processing = "OS_processing";
+      const file_name_recall = "OS_recall_";
+      const file_name_processing = "OS_processing_";
       file_names = [file_name_recall, file_name_processing];
       var file_name;
 
       for (var i = 0; i <= file_names.length - 1; i++) {
         file_name = file_names[i];
-        if (file_name == "OS_recall") {
-          var trial_id_recall = data_recall.select("trial_id_recall");
-          var set_size = data_recall.select("set_size");
-          var stimuli = data_recall.select("stimuli");
-          var response = data_recall.select("response");
-          var n_correct = data_recall.select("accuracy");
-          var rt = data_recall.select("rt");
-          var data_clean = {
-            trial_id_recall: trial_id_recall,
-            set_size: set_size,
-            stimuli: stimuli,
-            response: response,
-            n_correct: n_correct,
-            rt: rt
-          };
-        } else if (file_name == "OS_processing") {
-          var trial_id_recall = data_processing.select("trial_id_recall");
-          var trial_id_processing = data_processing.select("trial_id_processing");
-          var set_size = data_processing.select("set_size");
-          var accuracy = data_processing.select("accuracy");
-          var rt = data_processing.select("rt");
-          var data_clean = {
-            trial_id_recall: trial_id_recall,
-            trial_id_processing: trial_id_processing,
-            set_size: set_size,
-            accuracy: accuracy,
-            rt: rt
-          };
+        if (file_name == "OS_recall_") {
+          var data_recall = jsPsych.data.get().last(1);//.filter([{ trial_type: 'operation-span-recall' }]);
+          data_clean = prepare_recall(data_recall);
+        } else if (file_name == "OS_processing_") {
+          data_clean = prepare_processing(data_processing);
         }
-        if (local) {
-          /* var n_data = data_clean.length;
-          for (var i = 0; i < n_data; i++) {
-            console.log(JSON.stringify(data_clean[i]))
-          }
- */
-          /*           var dataStr;
-                    for (var i = 0; i < rt.length; i++) {
-                      dataStr[i] = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data_clean[i]));
-                    }
-                    var dlAnchorElem = document.getElementById('downloadAnchorElem');
-                    dlAnchorElem.setAttribute("href", dataStr);
-                    dlAnchorElem.setAttribute("download", file_name);
-                    dlAnchorElem.click(); */
-
-          //data_clean.localSave('csv', file_name + participant_id + ".csv")
-          //download(data_clean, file_name, "json")
-        } else {
-          saveSeveralData(JSON.stringify(data_clean), file_name)
-          //saveData(file_name + participant_id + ".csv", data_clean.csv());
+        if (!local) {
+          saveSeveralData(JSON.stringify(data_clean), file_name + participant_id + ".json")
         }
       }
 
