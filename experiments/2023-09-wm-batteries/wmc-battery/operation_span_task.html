@@ -1,7 +1,14 @@
 <html>
 
+<!-- 
+// todos
+2. save data on our server
+3. test script on our server
+ -->
+
 <head>
   <title>WM operation span task</title>
+  <script src="jquery.min.js"></script>
   <script src="jspsych-6.0.4/jspsych.js"></script>
   <script src="jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
   <script src="jspsych-6.0.4/plugins/jspsych-html-button-operationspan.js"></script>
@@ -9,8 +16,11 @@
   <script src="jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
   <script src="jspsych-6.0.4/plugins/jspsych-fullscreen.js"></script>
   <script src="jspsych-6.0.4/plugins/jspsych-operation-span-recall.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <script srf="jspsych-6.0.4/npm/jstat/dist/jstat.min.js"></script>
+  <script src="js-helpers.js"></script>
+  <script src="jstat.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script> -->
   <link href="jspsych-6.0.4/css/jspsych_operationspan.css" rel="stylesheet" type="text/css">
   </link>
 </head>
@@ -33,8 +43,8 @@
   //----- CUSTOMIZABLE VARIABLES -----------------------------------------
 
   minSetSize = 4 // starting length of each trial (i.e., min number of letters in a trial)
-  maxSetSize = 7 // ending length of each trial (i.e., max number of letters in a trial)
-  repSet = 3 // number of times each set size should be repeated
+  maxSetSize = 4 // ending length of each trial (i.e., max number of letters in a trial)
+  repSet = 1 // number of times each set size should be repeated
   randomize = true // present different set sizes in random order. if false, set sizes will be presented in ascending order
   file_name = null // file name for data file. if null, a default name consisting of the participant ID and a unique number is chosen.
   local = true // save the data file locally.
@@ -44,6 +54,20 @@
   // Incase of problems, feel free to contact me :)
 
   //----------------------------------------------------------------------
+  // participant info
+  if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
+    var participant_id = getQueryVariable('PROLIFIC_PID');
+  }
+  // If no ID is present, generate one using random numbers - this is useful for testing
+  else {
+    var participant_id = Math.floor(Math.random() * 1000);
+  }
+  // STUDY ID
+  if (window.location.search.indexOf('STUDY_ID') > -1) {
+    var studyID = getQueryVariable('STUDY_ID');
+  }
+
+  console.log("current participant_id = " + participant_id);
 
   var possibleLetters = ["B", "C", "D", "F", "G", "H", "K", "L", "M", "N", "P", "R", "S", "T", "V", "W", "X", "Z"]
   const ncols_mat = 4;
@@ -75,6 +99,7 @@
   var n = 0 //keeps track of number of trials gone by
   var selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
   var selection_id = 0 //keeps track of recall items within a test stack
+  var proc_position = 0 // keeps track of processing position within one memory trial
 
   var nLetterRecalled = 0 // feedback
   var nMathAcc = 0 // feedback
@@ -155,6 +180,7 @@
     show_clickable_nav: true
   }
 
+
   var cog_load_demo = {
     type: 'html-button-operationspan',
     equation_accuracy: function () {
@@ -171,12 +197,18 @@
     stimulus: function () {
       return cogloadf(eqCorrect)
     },
+    trial_id_processing: function () { return proc_position },
     choices: ["True", "False"],
+    is_local: function () {
+      return local
+    },
     on_finish: function () {
+      proc_position = proc_position + 1;
       var acc = jsPsych.data.get().last(1).values()[0].accuracy;
       if (acc == 1) {
         nMathAcc += 1
-      }
+      };
+
     }
   }
 
@@ -189,13 +221,20 @@
     stimulus: function () {
       return cogloadf(eqCorrect)
     },
+    trial_id_processing: function () { return proc_position },
+    trial_id_recall: function () { return n },
     trial_duration: 6000,
     choices: ["True", "False"],
+    is_local: function () {
+      return local
+    },
     on_finish: function () {
+      proc_position = proc_position + 1;
       var acc = jsPsych.data.get().last(1).values()[0].accuracy;
       if (acc == 1) {
         nMathAcc += 1
-      }
+      };
+
     }
   }
 
@@ -241,12 +280,19 @@
     data: function () {
       return { set_size: setSizes[n] }
     },
+    is_local: function () {
+      return local
+    },
+    trial_id_recall: function () {
+      return n
+    },
     on_finish: function () {
       nLetters = setSizes[n]
       nLettersRecalled = jsPsych.data.get().last(1).values()[0].accuracy;
       n += 1
       selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
-      selection_id = 0
+      selection_id = 0;
+      proc_position = 0;
     }
   }
 
@@ -301,34 +347,84 @@
       //  console.log(partN)
     }
   }
-
-  function saveData(filename, filedata) {
-    $.ajax({
-      type: 'post',
-      cache: false,
-      url: 'save_data.php', // this is the path to the above PHP script
-      data: { filename: filename, filedata: filedata }
-    });
-  };
-
-  var IDsub = Date.now()
+  /* 
+    function saveData(filename, filedata) {
+      $.ajax({
+        type: 'post',
+        cache: false,
+        url: 'save_data.php', // this is the path to the above PHP script
+        data: { filename: filename, filedata: filedata }
+      });
+    };
+   */
+  //var IDsub = Date.now()
   var dataLog = {
     type: 'html-keyboard-response',
     stimulus: " ",
     trial_duration: 100,
     on_finish: function (data) {
-      var data = jsPsych.data.get().filter([{ trial_type: 'operation-span-recall' }, { trial_type: 'html-button-operationspan' }]);
-      if (file_name == null) {
-        file_name = "WM_operation_span_" + partN + "_" + IDsub.toString() + ".csv"
+      var data_recall = jsPsych.data.get().filter([{ type: 'operation-span-recall' }]);
+      var data_processing = jsPsych.data.get().filter([{ type: 'html-button-operationspan' }])
+
+      const file_name_recall = "OS_recall";
+      const file_name_processing = "OS_processing";
+      file_names = [file_name_recall, file_name_processing];
+      var file_name;
+
+      for (var i = 0; i <= file_names.length - 1; i++) {
+        file_name = file_names[i];
+        if (file_name == "OS_recall") {
+          var trial_id_recall = data_recall.select("trial_id_recall");
+          var set_size = data_recall.select("set_size");
+          var stimuli = data_recall.select("stimuli");
+          var response = data_recall.select("response");
+          var n_correct = data_recall.select("accuracy");
+          var rt = data_recall.select("rt");
+          var data_clean = {
+            trial_id_recall: trial_id_recall,
+            set_size: set_size,
+            stimuli: stimuli,
+            response: response,
+            n_correct: n_correct,
+            rt: rt
+          };
+        } else if (file_name == "OS_processing") {
+          var trial_id_recall = data_processing.select("trial_id_recall");
+          var trial_id_processing = data_processing.select("trial_id_processing");
+          var set_size = data_processing.select("set_size");
+          var accuracy = data_processing.select("accuracy");
+          var rt = data_processing.select("rt");
+          var data_clean = {
+            trial_id_recall: trial_id_recall,
+            trial_id_processing: trial_id_processing,
+            set_size: set_size,
+            accuracy: accuracy,
+            rt: rt
+          };
+        }
+        if (local) {
+          /* var n_data = data_clean.length;
+          for (var i = 0; i < n_data; i++) {
+            console.log(JSON.stringify(data_clean[i]))
+          }
+ */
+          /*           var dataStr;
+                    for (var i = 0; i < rt.length; i++) {
+                      dataStr[i] = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data_clean[i]));
+                    }
+                    var dlAnchorElem = document.getElementById('downloadAnchorElem');
+                    dlAnchorElem.setAttribute("href", dataStr);
+                    dlAnchorElem.setAttribute("download", file_name);
+                    dlAnchorElem.click(); */
+
+          //data_clean.localSave('csv', file_name + participant_id + ".csv")
+          //download(data_clean, file_name, "json")
+        } else {
+          saveSeveralData(JSON.stringify(data_clean), file_name)
+          //saveData(file_name + participant_id + ".csv", data_clean.csv());
+        }
       }
-      else {
-        file_name += ".csv"
-      }
-      if (local) {
-        data.localSave('csv', file_name)
-      } else {
-        saveData(file_name, data.csv());
-      }
+
     }
   }
 
@@ -363,13 +459,14 @@
     repetitions: nfullDemo
   }
 
-  timeline = [p_details]
+  timeline = []; //p_details we do not need to ask for participant id, can get it directly from prolific url
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: true
   });
 
-  timeline = timeline.concat([instructions, lettersDemo, instructions2, loadDemo, instructions3, fullDemo, instructions4, test_procedure])
+  //timeline = timeline.concat([instructions, lettersDemo, instructions2, loadDemo, instructions3, fullDemo, instructions4, test_procedure]);
+  timeline = timeline.concat([test_procedure]);
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: false
@@ -384,5 +481,7 @@
     }
   });
 </script>
+
+<a id="downloadAnchorElem" style="display:none"></a>
 
 </html>

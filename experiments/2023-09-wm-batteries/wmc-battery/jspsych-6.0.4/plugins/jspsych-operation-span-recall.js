@@ -46,6 +46,18 @@ jsPsych.plugins["operation-span-recall"] = (function () {
         type: jsPsych.plugins.parameterType.INT,
         default: undefined,
         description: 'Number cols of the response grid'
+      },
+      trial_id_recall: {
+        type: jsPsych.plugins.parameterType.INT,
+        pretty_name: 'Memory Trial ID',
+        default: null,
+        description: "counter over memory trials"
+      },
+      is_local: {
+        type: jsPsych.plugins.parameterType.BOOL,
+        pretty_name: 'save data locally',
+        default: true,
+        description: "should data be saved locally or on server"
       }
     }
   }
@@ -57,9 +69,10 @@ jsPsych.plugins["operation-span-recall"] = (function () {
     var grid = 3;
     var recalledGrid = [];
     var correctLetters = trial.correct_order
-    var display = " "
+    var display = " ";
 
     var setSize = correctLetters.length
+    var trial_id_recall = trial.trial_id_recall;
     var leftOver = trial.nrows_matrix * trial.ncols_matrix - setSize
 
 
@@ -195,6 +208,7 @@ jsPsych.plugins["operation-span-recall"] = (function () {
 
       // gather the data to store for the trial
       var trial_data = {
+        trial_id_recall: trial.trial_id_recall,
         rt: response.rt,
         recall: recalledGrid,
         stimuli: correctLetters,
@@ -203,6 +217,28 @@ jsPsych.plugins["operation-span-recall"] = (function () {
 
       // move on to the next trial
       jsPsych.finishTrial(trial_data);
+
+      if (trial.is_local) {
+        var data_recall = jsPsych.data.get().last(1);//.filter([{ trial_type: 'operation-span-recall' }]);
+        var trial_id_recall = data_recall.select("trial_id_recall");
+        var set_size = data_recall.select("set_size");
+        var stimuli = data_recall.select("stimuli");
+        var responses = data_recall.select("recall");
+        var n_correct = data_recall.select("accuracy");
+        var rt = data_recall.select("rt");
+        var data_recall_clean = {
+          trial_id_recall: trial_id_recall,
+          set_size: set_size,
+          stimuli: stimuli,
+          response: responses,
+          n_correct: n_correct,
+          rt: rt
+        };
+        console.log(data_recall_clean);
+
+
+        //console.log(jsPsych.data.get().filter([{ trial_type: 'html-button-operationspan', trial_type: 'operation-span-recall' }]).csv());
+      }
     }
   };
 
