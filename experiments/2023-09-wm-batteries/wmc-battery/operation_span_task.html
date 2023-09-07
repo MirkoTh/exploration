@@ -8,6 +8,7 @@
 
 <head>
   <title>WM operation span task</title>
+  <script src="seedrandom.min.js"></script>
   <script src="jquery.min.js"></script>
   <script src="jspsych-6.0.4/jspsych.js"></script>
   <script src="jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
@@ -41,6 +42,8 @@
   */
 
   //----- CUSTOMIZABLE VARIABLES -----------------------------------------
+
+  session_id = 1; // this variable has to be read out from prolific url, eventually
 
   minSetSize = 4 // starting length of each trial (i.e., min number of letters in a trial)
   maxSetSize = 5 // ending length of each trial (i.e., max number of letters in a trial)
@@ -83,6 +86,7 @@
 
   var nTrials = setSizes.length // number of trials
 
+  Math.seedrandom((13876 * session_id).toString());
   if (randomize) {
     setSizes = jsPsych.randomization.sampleWithoutReplacement(setSizes, nTrials)
   } // shuffle through the set sizes
@@ -104,21 +108,55 @@
   var nLetterRecalled = 0 // feedback
   var nMathAcc = 0 // feedback
 
+  // initialize all randomly drawn values for the processing task with the same seed
+  const sample_size_sufficient = (maxSetSize + 1) * nTrials;
+  var possibleOperations = [" + ", " - "];
+  eqsCorrect = jsPsych.randomization.sampleWithReplacement([true, false], sample_size_sufficient);
+  eqsCorrect_demo = jsPsych.randomization.sampleWithReplacement([true, false], 100);
+  operations = jsPsych.randomization.sampleWithReplacement(possibleOperations, sample_size_sufficient);
+
+  var num1plus = [];
+  var num2plus = [];
+  var num1minus = [];
+  var num2minus = [];
+
+  ansDiffs = jsPsych.randomization.sampleWithReplacement([1, 2], sample_size_sufficient)
+  coinFlips = jsPsych.randomization.sampleWithReplacement([true, false], sample_size_sufficient)
+
+  for (var i = 0; i <= sample_size_sufficient; i++) {
+    Math.seedrandom((13876 * session_id).toString());
+    num1plus.push(Math.floor(jStat.uniform.sample(1, 11)));
+    num2plus.push(Math.floor(jStat.uniform.sample(1, 11)));
+    var num1 = Math.floor(jStat.uniform.sample(1, 11));
+    num1minus.push(num1);
+    num2minus.push(Math.floor(jStat.uniform.sample(1, num1)));
+  }
+
   var cogloadf = function (correct) {  // generates math questions
-    var possibleOperations = [" + ", " - "]
-    operation = jsPsych.randomization.sampleWithReplacement(possibleOperations, 1)[0]
+    //var possibleOperations = [" + ", " - "]
+    var id_current = (n) * maxSetSize + proc_position;
+    operation = operations[id_current];
+    //operation = jsPsych.randomization.sampleWithReplacement(possibleOperations, 1)[0]
     if (operation == " + ") {
-      num1 = Math.floor(jStat.uniform.sample(1, 11))
-      num2 = Math.floor(jStat.uniform.sample(1, 11))
+      //num1 = Math.floor(jStat.uniform.sample(1, 11))
+      //num2 = Math.floor(jStat.uniform.sample(1, 11))
+      num1 = num1plus[id_current];
+      num2 = num2plus[id_current];
       ans = num1 + num2
     } else if (operation == " - ") {
-      num1 = Math.floor(jStat.uniform.sample(1, 11))
-      num2 = Math.floor(jStat.uniform.sample(1, num1))
+      //num1 = Math.floor(jStat.uniform.sample(1, 11))
+      //num2 = Math.floor(jStat.uniform.sample(1, num1))
+      num1 = num1minus[id_current];
+      num2 = num2minus[id_current];
       ans = num1 - num2
     }
+
+
     if (!correct) {   // generates incorrect answers
-      ansDiff = jsPsych.randomization.sampleWithReplacement([1, 2], 1)[0]
-      coinFlip = jsPsych.randomization.sampleWithReplacement([true, false], 1)[0]
+      //ansDiff = jsPsych.randomization.sampleWithReplacement([1, 2], 1)[0]
+      //coinFlip = jsPsych.randomization.sampleWithReplacement([true, false], 1)[0]
+      ansDiff = ansDiffs[id_current];
+      coinFlip = coinFlips[id_current];
       if (coinFlip) {
         ans += ansDiff
       } else {
@@ -180,7 +218,7 @@
     show_clickable_nav: true
   }
 
-
+  var id_current_demo = 0;
   var cog_load_demo = {
     type: 'html-button-operationspan',
     equation_accuracy: function () {
@@ -190,7 +228,8 @@
       } else if (nCogLoadDemo == 2) {
         eqCorrect = false
       } else {
-        eqCorrect = jsPsych.randomization.sampleWithReplacement([true, false], 1)[0]
+        //eqCorrect = jsPsych.randomization.sampleWithReplacement([true, false], 1)[0]
+        eqCorrect = eqsCorrect_demo[id_current_demo];
       }
       return eqCorrect
     },
@@ -211,7 +250,7 @@
       if (acc == 1) {
         nMathAcc += 1
       };
-
+      id_current_demo += 1;
     }
   }
 
