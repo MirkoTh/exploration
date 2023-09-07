@@ -109,6 +109,8 @@ jsPsych.plugins["operation-span-recall"] = (function () {
       }
     };
 
+    matrix.splice(trial.response_options.length, matrix.length);
+
     var paper_size = [(trial.ncols_matrix * (trial.size_cells + 30)), ((trial.nrows_matrix * (trial.size_cells + 20)) + 100)];
 
     display_element.innerHTML = '<div id="jspsych-html-button-response-btngroup" style= "position: relative; width:' + paper_size[0] + 'px; height:' + paper_size[1] + 'px"></div>';
@@ -118,7 +120,6 @@ jsPsych.plugins["operation-span-recall"] = (function () {
 
 
     var buttons = trial.response_options;
-    //var buttons = ["B", "C", "D", "F", "G", "H", "J", "K", "L", "N", "P", "Q", "R", "S", "T", "V"]
 
     for (var i = 0; i < matrix.length; i++) {
       var str = buttons[i]
