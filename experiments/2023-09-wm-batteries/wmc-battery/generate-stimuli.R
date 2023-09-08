@@ -1,7 +1,7 @@
 library(tidyverse)
 
 my_two_seeds <- c(39737632, 8567389)
-session_id <- 2
+session_id <- 1
 
 set.seed(my_two_seeds[session_id])
 
@@ -10,6 +10,14 @@ minSetSize <- 4
 n_reps <- 3
 SetSizes <- seq(minSetSize, maxSetSize, by = 1)
 nTrials <- length(SetSizes) * n_reps
+SetSizes_shuffled <- sample(rep(SetSizes, n_reps), nTrials, replace = FALSE)
+
+possibleLetters <- c(
+  "B", "C", "D", "F", "G", "H", "K", "L", "M", 
+  "N", "P", "R", "S", "T", "V", "W", "X", "Z"
+)
+
+l_letters <- map(SetSizes_shuffled, ~ sample(possibleLetters, .x, replace = FALSE))
 
 sample_size_sufficient <- (maxSetSize + 1) * nTrials
 possibleOperations <- c(" + ", " - ")
@@ -24,6 +32,19 @@ num1plus <- floor(runif(sample_size_sufficient, min = 1, max = 11))
 num2plus <- floor(runif(sample_size_sufficient, min = 1, max = 11))
 num1minus <- floor(runif(sample_size_sufficient, min = 1, max = 11))
 num2minus <- floor(runif(sample_size_sufficient, min = 1, max = num1minus))
+
+
+
+SetSizes_shuffled_str <- reduce(c("[", str_c(SetSizes_shuffled, ", ")), str_c)
+str_c(str_replace_all(SetSizes_shuffled_str, "(,) $", replacement=""), "]")
+
+l_letters_str <- map(l_letters, ~ reduce(c("['", str_c(.x, "', '")), str_c))
+df_lists <- map(l_letters_str, ~ str_c(str_replace_all(.x, "(,) $", replacement=""), "]")) %>%
+  reduce(rbind)
+rownames(df_lists) <- rep("", nrow(df_lists))
+l_lists <- str_c("[", reduce(str_c(reduce(df_lists, c), ", "), str_c), "]")
+str_c(str_replace(l_lists, "(, ')(\\])", replacement=, "\\2"), "]")
+
 
 eqsCorrect_str <- reduce(c("[", str_c(eqsCorrect, ", ")), str_c)
 str_c(str_replace_all(eqsCorrect_str, "(e)(,) $", replacement="\\1"), "]")

@@ -47,8 +47,8 @@
   // 0 meaning session 1, 1 meaning session 2
 
   minSetSize = 4 // starting length of each trial (i.e., min number of letters in a trial)
-  maxSetSize = 5 // ending length of each trial (i.e., max number of letters in a trial)
-  repSet = 2 // number of times each set size should be repeated
+  maxSetSize = 8 // ending length of each trial (i.e., max number of letters in a trial)
+  repSet = 3 // number of times each set size should be repeated
   randomize = true // present different set sizes in random order. if false, set sizes will be presented in ascending order
   file_name = null // file name for data file. if null, a default name consisting of the participant ID and a unique number is chosen.
   local = true // save the data file locally.
@@ -89,11 +89,12 @@
 
   Math.seedrandom((13876 * session_id).toString());
   if (randomize) {
-    setSizes = jsPsych.randomization.sampleWithoutReplacement(setSizes, nTrials)
+    //setSizes = jsPsych.randomization.sampleWithoutReplacement(setSizes, nTrials)
+    setSizes = SetSizes_prep[session_id];
   } // shuffle through the set sizes
 
-  var letterMemDemoArray = [3, 4, 5]  // set sizes of initial demo trials
-  var fullDemoArray = [3, 4]       // set sizes of full demo trials
+  var letterMemDemoArray = [4, 5]  // set sizes of initial demo trials
+  var fullDemoArray = [4, 5]       // set sizes of full demo trials
   var nPracticeTrials = letterMemDemoArray.length
   var nfullDemo = fullDemoArray.length
   var nCogLoadDemo = 0
@@ -102,7 +103,11 @@
   var totalTrials = setSizes.length //total number of trials in the entire task (demo + main task)
 
   var n = 0 //keeps track of number of trials gone by
-  var selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
+  //var selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
+  var letterLists = letterlists_prep[session_id];
+  var demolists = [["C", "M", "L", "K"], ["Z", "R", "V", "X", "B"]]
+  var all_letterLists = demolists.concat(letterLists);
+  var selection = all_letterLists[n];
   var selection_id = 0 //keeps track of recall items within a test stack
   var proc_position = 0 // keeps track of processing position within one memory trial
 
@@ -112,26 +117,6 @@
   // initialize all randomly drawn values for the processing task with the same seed
   const sample_size_sufficient = (maxSetSize + 1) * nTrials;
   var possibleOperations = [" + ", " - "];
-  /* eqsCorrect = jsPsych.randomization.sampleWithReplacement([true, false], sample_size_sufficient);
-  eqsCorrect_demo = jsPsych.randomization.sampleWithReplacement([true, false], 100);
-  operations = jsPsych.randomization.sampleWithReplacement(possibleOperations, sample_size_sufficient);
-
-  var num1plus = [];
-  var num2plus = [];
-  var num1minus = [];
-  var num2minus = [];
-
-  ansDiffs = jsPsych.randomization.sampleWithReplacement([1, 2], sample_size_sufficient)
-  coinFlips = jsPsych.randomization.sampleWithReplacement([true, false], sample_size_sufficient)
-
-  for (var i = 0; i <= sample_size_sufficient; i++) {
-    //Math.seedrandom((13876 * session_id).toString());
-    num1plus.push(Math.floor(jStat.uniform.sample(1, 11)));
-    num2plus.push(Math.floor(jStat.uniform.sample(1, 11)));
-    var num1 = Math.floor(jStat.uniform.sample(1, 11));
-    num1minus.push(num1);
-    num2minus.push(Math.floor(jStat.uniform.sample(1, num1)));
-  } */
 
   var cogloadf = function (correct) {  // generates math questions
     //var possibleOperations = [" + ", " - "]
@@ -341,7 +326,8 @@
       nLetters = setSizes[n]
       nLettersRecalled = jsPsych.data.get().last(1).values()[0].accuracy;
       n += 1
-      selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
+      //selection = jsPsych.randomization.sampleWithoutReplacement(possibleLetters, setSizes[n])
+      selection = all_letterLists[n];
       selection_id = 0;
       proc_position = 0;
     }
@@ -475,8 +461,8 @@
     fullscreen_mode: true
   });
 
-  //timeline = timeline.concat([instructions, lettersDemo, instructions2, loadDemo, instructions3, fullDemo, instructions4, test_procedure]);
-  timeline = timeline.concat([test_procedure]);
+  timeline = timeline.concat([instructions, lettersDemo, instructions2, loadDemo, instructions3, fullDemo, instructions4, test_procedure]);
+  //timeline = timeline.concat([test_procedure]);
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: false
