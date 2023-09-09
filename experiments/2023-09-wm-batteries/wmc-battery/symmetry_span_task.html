@@ -145,7 +145,10 @@
     trial_duration: null,
     number_darkened: [17, 18, 19],
     stimulus: "Is this image symmetric?",
+    session_id: function () { return session_id },
+    counter_symmetry: function () { return counter_symmetry },
     proportion: function () {
+      counter_symmetry += 1;
       nProportionDemo += 1
       if (nProportionDemo == 1) {
         return 1
@@ -156,17 +159,20 @@
       }
     }
   }
+  console.log("blackBoxesAll = " + blackBoxesAll)
+  console.log("blackBoxesAll[0][0][0] = " + blackBoxesAll[0][0][0])
 
+  console.log("session_id = " + session_id)
+  console.log("counter_symmetry = " + counter_symmetry)
+  blackBoxesAll[session_id][counter_symmetry]
   var cog_load = {
     type: 'symmetry-judgement-task',
     size: 8,
     trial_duration: 6000,
     number_darkened: [17, 18, 19],
     stimulus: "Is this image symmetric?",
-    blackBoxNumbers: function () { blackBoxNumbers[session_id][counter_symmetry] },
-    blackBoxes: function () { blackBoxesAll[session_id][counter_symmetry] },
-    pSymmetric: function () { pSymmetric[session_id][counter_symmetry] },
-    blackBoxes_modified: function () { blackBoxesModified[session_id][counter_symmetry] },
+    session_id: function () { return session_id },
+    counter_symmetry: function () { return counter_symmetry },
     on_finish: function () {
       var acc = jsPsych.data.get().last(1).values()[0].accuracy;
       counter_symmetry += 1;
@@ -343,7 +349,8 @@
     type: 'fullscreen',
     fullscreen_mode: true
   });
-  timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
+  //timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
+  timeline = timeline.concat([instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: false
