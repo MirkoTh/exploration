@@ -157,10 +157,50 @@ str_c(str_replace_all(pSymmetric_str, "(,) $", replacement=""), "]")
 str_replace(l_matrix_pos, "(, )(\\])$", replacement=, "\\2")
 
 
-// prepare: 
-  // blackBoxNumbers samples from 17 - 19 (nr. trials * setSize + nr. practice trials)
-// blackBoxes: indices for matrix to select blackBoxes (nr. trials * setSize + nr. practice trials)
-// pSymmetric (nr. trials * setSize + nr. practice trials)
-// numberboxesDifferent samples from 3-4 (nr. trials * setSize + nr. practice trials)
-// boxes which 3-4 boxes to change subset from blackBoxes
-// boxesAdd which 3-4 boxes to change from white to black
+
+# WM Updating -------------------------------------------------------------
+
+
+set_size <- 4
+n_upd_steps <- 7
+possibleNumbers <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+nTrials_update <- 20
+nTrials_immediate <- 5
+nPracticeTrials <- 2
+
+
+totalTrials <- nPracticeTrials + nTrials_update + nTrials_immediate
+
+trial_type <- c(
+  # two practice trials
+  "update", "immediate",
+  # shuffled immediate and update trials
+  sample(
+    c(rep("update", nTrials_update), rep("immediate", nTrials_immediate)), 
+    size = nTrials_update + nTrials_immediate)
+  )
+
+initial_locations <- seq(0, set_size - 1, by = 1)
+initial_set <- map(rep(set_size, nTrials_update + 1), ~ sample(possibleNumbers, .x))
+locations_update <- map(rep(n_upd_steps, nTrials_update + 1), ~ sample(initial_locations, .x, replace = TRUE))
+items_replace <- map(rep(n_upd_steps, nTrials_update + 1), ~ sample(possibleNumbers, .x, replace = TRUE))
+
+final_set <- initial_set
+for (i in 1:(nTrials_update + 1)) {
+  for (j in 1:n_upd_steps) {
+    final_set[[i]][locations_update[[i]][[j]]] <- items_replace[[i]][[j]]
+  }
+}
+
+immediate_set <- map(rep(set_size, nTrials_immediate + 1), ~ sample(possibleNumbers, .x))
+
+map(immediate_set, ~ map_chr(.x, ~ str_c(.x, ", ")))
+
+
+
+
+
+
+
+
+
