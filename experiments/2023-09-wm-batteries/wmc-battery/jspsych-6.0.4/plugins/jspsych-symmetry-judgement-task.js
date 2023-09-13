@@ -172,11 +172,11 @@ jsPsych.plugins["symmetry-judgement-task"] = (function () {
 
 
     for (i = 0; i < matrix.length; i++) {
-      paper.innerHTML += '<img src="img/whitebox.png" style="position: absolute; top:' + matrix[i][0] * (trial.size_cells - 2) + 'px; left:' + matrix[i][1] * (trial.size_cells - 2) + 'px; width:' + trial.size_cells + 'px; height:' + trial.size_cells + 'px;"></img>';
+      paper.innerHTML += '<img src="../img/whitebox.png" style="position: absolute; top:' + matrix[i][0] * (trial.size_cells - 2) + 'px; left:' + matrix[i][1] * (trial.size_cells - 2) + 'px; width:' + trial.size_cells + 'px; height:' + trial.size_cells + 'px;"></img>';
     }
 
     for (i = 0; i < blackBoxesFinal.length; i++) {
-      paper.innerHTML += '<img src="img/blackbox.png" style="position: absolute; top:' + blackBoxesFinal[i][0] * (trial.size_cells - 2) + 'px; left:' + blackBoxesFinal[i][1] * (trial.size_cells - 2) + 'px; width:' + trial.size_cells + 'px; height:' + trial.size_cells + 'px;"></img>';
+      paper.innerHTML += '<img src="../img/blackbox.png" style="position: absolute; top:' + blackBoxesFinal[i][0] * (trial.size_cells - 2) + 'px; left:' + blackBoxesFinal[i][1] * (trial.size_cells - 2) + 'px; width:' + trial.size_cells + 'px; height:' + trial.size_cells + 'px;"></img>';
     }
 
     var buttons = [];

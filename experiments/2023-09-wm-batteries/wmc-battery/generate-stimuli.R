@@ -188,15 +188,28 @@ items_replace <- map(rep(n_upd_steps, nTrials_update + 1), ~ sample(possibleNumb
 final_set <- initial_set
 for (i in 1:(nTrials_update + 1)) {
   for (j in 1:n_upd_steps) {
-    final_set[[i]][locations_update[[i]][[j]]] <- items_replace[[i]][[j]]
+    final_set[[i]][locations_update[[i]][[j]] + 1] <- items_replace[[i]][[j]]
   }
 }
 
 immediate_set <- map(rep(set_size, nTrials_immediate + 1), ~ sample(possibleNumbers, .x))
 
-map(immediate_set, ~ map_chr(.x, ~ str_c(.x, ", ")))
+immediate_set_str <- str_c("[", map(immediate_set, ~ paste(str_c(map_chr(.x, ~ str_c(.x, ", "))), collapse = "")), "]")
+initial_set_str <- str_c("[", map(initial_set, ~ paste(str_c(map_chr(.x, ~ str_c(.x, ", "))), collapse = "")), "]")
+locations_update_str <- str_c("[", map(locations_update, ~ paste(str_c(map_chr(.x, ~ str_c(.x, ", "))), collapse = "")), "]")
+items_replace_str <- str_c("[", map(items_replace, ~ paste(str_c(map_chr(.x, ~ str_c(.x, ", "))), collapse = "")), "]")
+final_set_str <- str_c("[", map(final_set, ~ paste(str_c(map_chr(.x, ~ str_c(.x, ", "))), collapse = "")), "]")
 
 
+
+trial_type_str <- reduce(c("[", str_c("'", trial_type, "', ")), str_c)
+str_c(str_replace_all(trial_type_str, "(,) $", replacement=""), "]")
+
+str_c("[", str_replace_all(paste(immediate_set_str, collapse = ","), "(, )(])", replacement = "\\2"), "]")
+str_c("[", str_replace_all(paste(initial_set_str, collapse = ","), "(, )(])", replacement = "\\2"), "]")
+str_c("[", str_replace_all(paste(locations_update_str, collapse = ","), "(, )(])", replacement = "\\2"), "]")
+str_c("[", str_replace_all(paste(items_replace_str, collapse = ","), "(, )(])", replacement = "\\2"), "]")
+str_c("[", str_replace_all(paste(final_set_str, collapse = ","), "(, )(])", replacement = "\\2"), "]")
 
 
 

@@ -2,21 +2,21 @@
 
 <head>
   <title>WM symmetry span task</title>
-  <script src="seedrandom.min.js"></script>
-  <script src="jquery.min.js"></script>
-  <script src="js-helpers.js"></script>
-  <script src="jstat.js"></script>
-  <script src="jspsych-6.0.4/jspsych.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-symmetry-judgement-task.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-survey-text.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-fullscreen.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-spatial-span.js"></script>
-  <script src="jspsych-6.0.4/plugins/jspsych-spatial-span-recall.js"></script>
+  <script src="../seedrandom.min.js"></script>
+  <script src="../jquery.min.js"></script>
+  <script src="../js-helpers.js"></script>
+  <script src="../jstat.js"></script>
+  <script src="../jspsych-6.0.4/jspsych.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-symmetry-judgement-task.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-survey-text.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-fullscreen.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-spatial-span.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-spatial-span-recall.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-  <link href="jspsych-6.0.4/css/jspsych_grid.css" rel="stylesheet" type="text/css">
+  <link href="../jspsych-6.0.4/css/jspsych_grid.css" rel="stylesheet" type="text/css">
   </link>
 </head>
 
@@ -49,6 +49,20 @@
   // Incase of problems, feel free to contact me :)
 
   //----------------------------------------------------------------------
+  if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
+    var participant_id = getQueryVariable('PROLIFIC_PID');
+  }
+  // If no ID is present, generate one using random numbers - this is useful for testing
+  else {
+    var participant_id = Math.floor(Math.random() * 1000);
+  }
+  // STUDY ID
+  if (window.location.search.indexOf('STUDY_ID') > -1) {
+    var studyID = getQueryVariable('STUDY_ID');
+  }
+
+  console.log("current participant_id = " + participant_id);
+
 
   var setSizes = []    // different set sizes
   for (var i = minSetSize; i <= maxSetSize; i++) {
@@ -94,7 +108,7 @@
     type: 'instructions',
     pages: function () {
       pageOne = '<div style="font-size:20px;"><b>INSTRUCTIONS</b><br><br><br>This is the symmetry span task. <br><br>This task has two parts: <br>(1) Square memorization <br>(2) Symmetry judgement<br><br><br></div>'
-      pageTwo = '<div style="font-size:20px;">We will first practice SQUARE MEMORIZATION.<br><br>You will see a grid of squares on the screen.<br>Several squares will turn red one at a time (around 3 to 6 in a trial).<br>Try to remember which squares turned red and the order in which they turned red.<br><br>Below is an example of the grid with one square colored red. <br><br> <img src="img/symmetrySpanExampleGrid.png" style="height:300px; width:400px"></img></div>'
+      pageTwo = '<div style="font-size:20px;">We will first practice SQUARE MEMORIZATION.<br><br>You will see a grid of squares on the screen.<br>Several squares will turn red one at a time (around 3 to 6 in a trial).<br>Try to remember which squares turned red and the order in which they turned red.<br><br>Below is an example of the grid with one square colored red. <br><br> <img src="../img/symmetrySpanExampleGrid.png" style="height:300px; width:400px"></img></div>'
       pageThree = '<div style="font-size:20px;">After this, you will be shown an empty grid.<br>Your task is to select the squares that turned red in their correct presentation order. <br><br>Use the mouse to select the appropriate squares. <br>If you make a mistake use the provided "Backspace" button to clear your last response. <br><br>Remember, it is important that you select the squares in the order that you saw them.<br> So if you forget one of the squares, guess the best you can for that one, and select the rest in their correct order.<br><br>Press "Next" for practice trials.<br><br></div>'
       return [pageOne, pageTwo, pageThree]
     },
@@ -106,7 +120,7 @@
   var instructions2 = {
     type: 'instructions',
     pages: function () {
-      pageOne = '<div style="font-size:20px;">We will now practice SYMMETRY JUDGEMENTS.<br><br>A black and white picture will appear on the screen and you have to judge if the picture is symmetrical or asymetrical.<br>A picture is symmetrical if its left half is identical to the right half when flipped.<br>Below are examples of symmetrical and asymetrical pictures:<br> <img src="img/symm_instructions.png" style="height:300px; width:450px"></img><br><br>Please ask the Research Assistant if you have not understood the difference between the symmetrical and asymetrical pictures.<br>Press "Next" to start practicing symmetry judgements.</div>'
+      pageOne = '<div style="font-size:20px;">We will now practice SYMMETRY JUDGEMENTS.<br><br>A black and white picture will appear on the screen and you have to judge if the picture is symmetrical or asymetrical.<br>A picture is symmetrical if its left half is identical to the right half when flipped.<br>Below are examples of symmetrical and asymetrical pictures:<br> <img src="../img/symm_instructions.png" style="height:300px; width:450px"></img><br><br>Please ask the Research Assistant if you have not understood the difference between the symmetrical and asymetrical pictures.<br>Press "Next" to start practicing symmetry judgements.</div>'
       return [pageOne]
     },
     allow_backward: false,
@@ -284,14 +298,14 @@
     }
   }
 
-  function saveData(filename, filedata) {
+  /* function saveData(filename, filedata) {
     $.ajax({
       type: 'post',
       cache: false,
       url: 'save_data.php', // this is the path to the above PHP script
       data: { filename: filename, filedata: filedata }
     });
-  };
+  }; */
 
   var IDsub = Date.now()
   var dataLog = {
@@ -299,7 +313,29 @@
     stimulus: " ",
     trial_duration: 100,
     on_finish: function (data) {
-      var data = jsPsych.data.get().filter([{ trial_type: 'spatial-span-recall' }, { trial_type: 'symmetry-judgement-task' }]);
+
+      var data_recall = jsPsych.data.get().filter([{ type: 'spatial-span-recall' }]);
+      var data_processing = jsPsych.data.get().filter([{ type: 'symmetry-judgement-task' }])
+
+      const file_name_recall = "SS_recall_";
+      const file_name_processing = "SS_processing_";
+      file_names = [file_name_recall, file_name_processing];
+      var file_name;
+
+      for (var i = 0; i <= file_names.length - 1; i++) {
+        file_name = file_names[i];
+        if (file_name == "SS_recall_") {
+          var data_recall = jsPsych.data.get().last(1);//.filter([{ trial_type: 'operation-span-recall' }]);
+          data_clean = prepare_recall(data_recall);
+        } else if (file_name == "SS_processing_") {
+          data_clean = prepare_processing(data_processing);
+        }
+        if (!local) {
+          saveSeveralData(JSON.stringify(data_clean), file_name + participant_id + ".json")
+        }
+      }
+
+      /* var data = jsPsych.data.get().filter([{ trial_type: 'spatial-span-recall' }, { trial_type: 'symmetry-judgement-task' }]);
       if (file_name == null) {
         file_name = "WM_symmetry_span_" + partN + "_" + IDsub.toString() + ".csv"
       }
@@ -310,7 +346,7 @@
         data.localSave('csv', file_name)
       } else {
         saveData(file_name, data.csv());
-      }
+      } */
     }
   }
 
@@ -344,13 +380,13 @@
     repetitions: nfullDemo
   }
 
-  timeline = [p_details]
+  timeline = []; //p_details we do not have to ask for participant id when run via prolific
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: true
   });
-  //timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
-  timeline = timeline.concat([instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
+  timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
+  //timeline = timeline.concat([instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
   timeline.push({
     type: 'fullscreen',
     fullscreen_mode: false
