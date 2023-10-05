@@ -1,7 +1,7 @@
 library(tidyverse)
 
 my_two_seeds <- c(39737632, 8567389)
-session_id <- 1
+session_id <- 2
 set.seed(my_two_seeds[session_id])
 
 
