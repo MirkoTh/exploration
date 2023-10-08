@@ -13,11 +13,11 @@
     <script src="../jspsych-psychophysics.js"></script>
     <link rel="stylesheet" href="../jspsych-dist/dist/jspsych.css">
     <link rel="stylesheet" href="my-style.css">
-    <style> 
+    <style>
         .jspsych-display-element {
-          font-size: 40px;
+            font-size: 40px;
         }
-      </style>
+    </style>
     </link>
 </head>
 
@@ -44,7 +44,7 @@
     const pixi_flag = jsPsych.data.getURLVariable('pixi_flag') === '1' ? true : false;
 
 
-    session_id = 0; 
+    session_id = 0;
     set_size = 4 // starting length of each trial (i.e., min number of letters in a trial)
     n_upd_steps = 7 // ending length of each trial (i.e., max number of letters in a trial)
     rep_set = 3 // number of times each set size should be repeated
@@ -61,11 +61,11 @@
 
 
     if (window.location.search.indexOf('PROLIFIC_PID') > -1) {
-    var participant_id = getQueryVariable('PROLIFIC_PID');
+        var participant_id = getQueryVariable('PROLIFIC_PID');
     }
     // If no ID is present, generate one using random numbers - this is useful for testing
     else {
-    var participant_id = Math.floor(Math.random() * 1000);
+        var participant_id = Math.floor(Math.random() * 1000);
     }
     // STUDY ID
     if (window.location.search.indexOf('STUDY_ID') > -1) {
@@ -88,10 +88,10 @@
     var n = 0 //keeps track of number of trials gone by
     var n_update = 0;
     var n_immediate = 0;
-    
-    
+
+
     // uncomment below and comment references to pre-loaded arrays below to randomly generate stimuli for every participant on the fly
-    
+
     /* var tr_update = "update ".repeat(nTrials_update).split(" ");
     tr_update.pop();
     var tr_immediate = "immediate ".repeat(nTrials_immediate).split(" ");
@@ -139,7 +139,7 @@
     var n_recalled;
     var n_recalled_correctly;
 
-    
+
     var instructions1 = {
         type: jsPsychHtmlButtonResponse,
         stimulus: '<div style="font-size:30px;"><b>INSTRUCTIONS</b><br><br>This is the updating task. <br>This task has two parts: <br>(1) Memorization of the initially presented digits <br>(2) Individually updating selected digits <br><br><br><br><br><br><br><br><br><br><br></div>',
@@ -166,17 +166,21 @@
         choices: ["Start Main Part"]
     };
 
+    rect_object_ll = make_rect(340, 285);
+    rect_object_l = make_rect(540, 285);
+    rect_object_r = make_rect(740, 285);
+    rect_object_rr = make_rect(940, 285);
 
-    const updating_object = [];
-    for (let i = 0; i < (n_upd_steps + set_size); i++) {
+    const updating_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
+    for (let i = set_size; i < (n_upd_steps + 2 * set_size); i++) {
         const updating_temporal_object = {
             obj_type: 'text',
         }
         updating_object.push(updating_temporal_object)
     }
 
-    const immediate_object = [];
-    for (let i = 0; i < set_size; i++) {
+    const immediate_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
+    for (let i = set_size; i < 2 * set_size; i++) {
         const immediate_temporal_object = {
             obj_type: 'text',
         }
@@ -191,10 +195,11 @@
         type: jsPsychSurveyText,
         textarea: "width:40%;height:40%",
         questions: [
-            { prompt: `Please recall the four items from left to right;<br>
+            {
+                prompt: `Please recall the four items from left to right;<br>
                 Please guess when you are unsure about a position: `}
         ],
-        on_finish: function(data) {
+        on_finish: function (data) {
             var str_response = data.response["Q0"].toString();
             var str_trim = str_response.trim();
             var regex = /[.,;:]/g;
@@ -205,10 +210,10 @@
 
             var n_type;
             var correct_sequence;
-            if (trial_type[n] == "update"){
+            if (trial_type[n] == "update") {
                 n_type = n_update;
                 correct_sequence = final_set[n_update];
-            } else if (trial_type[n] == "immediate"){
+            } else if (trial_type[n] == "immediate") {
                 n_type = n_immediate;
                 correct_sequence = immediate_set[n_immediate];
             }
@@ -225,24 +230,24 @@
 
             // update trial counters
             console.log("trial_type[n] = " + trial_type[n])
-            if (trial_type[n] == "update"){
+            if (trial_type[n] == "update") {
                 n_update += 1;
-            } else if (trial_type[n] == "immediate"){
+            } else if (trial_type[n] == "immediate") {
                 n_immediate += 1;
             }
             n += 1;
         }
-        };
+    };
 
 
-        const mixed_trial = {
+    const mixed_trial = {
         type: jsPsychPsychophysics,
 
         pixi: pixi_flag,
-        stimuli: function() {
-            if (trial_type[n] == "update"){
+        stimuli: function () {
+            if (trial_type[n] == "update") {
                 return updating_object
-            } else if (trial_type[n] == "immediate"){
+            } else if (trial_type[n] == "immediate") {
                 return immediate_object
             }
         },
@@ -250,36 +255,36 @@
         //response_start_time: viewing_time_initial + (viewing_time_updating + isi) * n_upd_steps - isi, // not to respond until all images are presented.
         on_start: function (trial) {
             // Set parameters for each image dynamically
-            if (trial_type[n] == "update"){
-            for (let i = 0; i < set_size; i++) {
-                trial.stimuli[i].content = initial_set[n_update][i].toString();
-                trial.stimuli[i].show_start_time = 0;
-                trial.stimuli[i].show_end_time = viewing_time_initial;
-                trial.stimuli[i].origin_center = true;
-                trial.stimuli[i].startX = [-300, -100, 100, 300][i];
-                trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i];
-                trial.stimuli[i].font = '60px Arial';
+            if (trial_type[n] == "update") {
+                for (let i = set_size; i < 2 * set_size; i++) {
+                    trial.stimuli[i].content = initial_set[n_update][i - set_size].toString();
+                    trial.stimuli[i].show_start_time = 0;
+                    trial.stimuli[i].show_end_time = viewing_time_initial;
+                    trial.stimuli[i].origin_center = true;
+                    trial.stimuli[i].startX = [-300, -100, 100, 300][i - set_size];
+                    trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i - set_size];
+                    trial.stimuli[i].font = '60px Arial';
+                }
+                for (let i = 2 * set_size; i < (n_upd_steps + 2 * set_size); i++) {
+                    trial.stimuli[i].content = items_replace[n_update][i - 2 * set_size].toString();
+                    trial.stimuli[i].show_start_time = viewing_time_initial + viewing_time_updating * (i - 2 * set_size);
+                    trial.stimuli[i].show_end_time = viewing_time_initial + viewing_time_updating * (i - 2 * set_size) + viewing_time_updating;
+                    trial.stimuli[i].origin_center = true;
+                    trial.stimuli[i].startX = [-300, -100, 100, 300][locations_update[n_update][i - 2 * set_size]];
+                    trial.stimuli[i].text_color = ["black", "green", "red", "blue"][locations_update[n_update][i - 2 * set_size]];
+                    trial.stimuli[i].font = '60px Arial';
+                }
+            } else if (trial_type[n] == "immediate") {
+                for (let i = 0; i < set_size; i++) {
+                    trial.stimuli[i].content = immediate_set[n_immediate][i - set_size].toString();
+                    trial.stimuli[i].show_start_time = 0;
+                    trial.stimuli[i].origin_center = true;
+                    trial.stimuli[i].show_end_time = viewing_time_initial;
+                    trial.stimuli[i].startX = [-300, -100, 100, 300][i - set_size];
+                    trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i - set_size];
+                    trial.stimuli[i].font = '60px Arial';
+                }
             }
-                for (let i = set_size; i < (n_upd_steps + set_size); i++) {
-                trial.stimuli[i].content = items_replace[n_update][i - set_size].toString();
-                trial.stimuli[i].show_start_time = viewing_time_initial + viewing_time_updating * (i - set_size);
-                trial.stimuli[i].show_end_time = viewing_time_initial + viewing_time_updating * (i - set_size) + viewing_time_updating;
-                trial.stimuli[i].origin_center = true;
-                trial.stimuli[i].startX = [-300, -100, 100, 300][locations_update[n_update][i - set_size]];
-                trial.stimuli[i].text_color = ["black", "green", "red", "blue"][locations_update[n_update][i - set_size]];
-                trial.stimuli[i].font = '60px Arial';
-            }
-        } else if (trial_type[n] == "immediate"){
-            for (let i = 0; i < set_size; i++) {
-                trial.stimuli[i].content = immediate_set[n_immediate][i].toString();
-                trial.stimuli[i].show_start_time = 0;
-                trial.stimuli[i].origin_center = true;
-                trial.stimuli[i].show_end_time = viewing_time_initial;
-                trial.stimuli[i].startX = [-300, -100, 100, 300][i];
-                trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i];
-                trial.stimuli[i].font = '60px Arial';
-            }
-        }
             //trial.stimuli[n_upd_steps + set_size - 1].trial_duration = 0;
             console.log(trial.stimuli)
         }
@@ -288,13 +293,13 @@
     const mixed_node_practice = {
         timeline: [mixed_trial, cued_response],
         repetitions: 2,
-                /* loop_function: function (data) {
-            if (jsPsych.pluginAPI.compareKeys(data.values()[0].response, ' ')) {
-                return true;
-            } else {
-                return false;
-            }
-        } */
+        /* loop_function: function (data) {
+    if (jsPsych.pluginAPI.compareKeys(data.values()[0].response, ' ')) {
+        return true;
+    } else {
+        return false;
+    }
+} */
     };
     const mixed_node_main = {
         timeline: [mixed_trial, cued_response],
@@ -302,9 +307,9 @@
     };
 
 
-jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
+    jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
 
-    /* 
+    /*
         const image1 = {
             obj_type: 'image',
             file: jsPsych.timelineVariable('first_image'),
