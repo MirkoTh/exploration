@@ -67,13 +67,14 @@ function prepare_processing(data_processing) {
     return (data_clean)
 }
 
-function make_rect(x_start, y_start) {
+
+function make_rect(x_start, y_start, stepsize_x, stepsize_y) {
     const rect_object = {
         obj_type: 'rect',
-        startX: x_start, // location of the rectangle's center in the canvas
-        startY: y_start,
-        width: 200,
-        height: 100,
+        startX: screen.width / 2 + x_start, //x_start, // location of the rectangle's center in the canvas
+        startY: screen.height / 2 + y_start,
+        width: stepsize_x,
+        height: stepsize_y,
         line_color: 'black', // You can use the HTML color name instead of the HEX color.
         line_width: 3,
         show_start_time: 0, // ms after the start of the trial

@@ -166,10 +166,13 @@
         choices: ["Start Main Part"]
     };
 
-    rect_object_ll = make_rect(340, 285);
-    rect_object_l = make_rect(540, 285);
-    rect_object_r = make_rect(740, 285);
-    rect_object_rr = make_rect(940, 285);
+    stepsize_x = screen.width / 10;
+    stepsize_y = screen.height / 10;
+
+    rect_object_ll = make_rect(-1.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
+    rect_object_l = make_rect(-.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
+    rect_object_r = make_rect(.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
+    rect_object_rr = make_rect(1.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
 
     const updating_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
     for (let i = set_size; i < (n_upd_steps + 2 * set_size); i++) {
@@ -256,31 +259,31 @@
         on_start: function (trial) {
             // Set parameters for each image dynamically
             if (trial_type[n] == "update") {
-                for (let i = set_size; i < 2 * set_size; i++) {
+                for (let i = set_size; i < (2 * set_size); i++) {
                     trial.stimuli[i].content = initial_set[n_update][i - set_size].toString();
                     trial.stimuli[i].show_start_time = 0;
                     trial.stimuli[i].show_end_time = viewing_time_initial;
                     trial.stimuli[i].origin_center = true;
-                    trial.stimuli[i].startX = [-300, -100, 100, 300][i - set_size];
+                    trial.stimuli[i].startX = [-1.5*stepsize_x, -.5*stepsize_x, .5*stepsize_x, 1.5*stepsize_x][i - set_size];
                     trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i - set_size];
                     trial.stimuli[i].font = '60px Arial';
                 }
-                for (let i = 2 * set_size; i < (n_upd_steps + 2 * set_size); i++) {
+                for (let i = (2 * set_size); i < (n_upd_steps + 2 * set_size); i++) {
                     trial.stimuli[i].content = items_replace[n_update][i - 2 * set_size].toString();
                     trial.stimuli[i].show_start_time = viewing_time_initial + viewing_time_updating * (i - 2 * set_size);
                     trial.stimuli[i].show_end_time = viewing_time_initial + viewing_time_updating * (i - 2 * set_size) + viewing_time_updating;
                     trial.stimuli[i].origin_center = true;
-                    trial.stimuli[i].startX = [-300, -100, 100, 300][locations_update[n_update][i - 2 * set_size]];
+                    trial.stimuli[i].startX = [-1.5*stepsize_x, -.5*stepsize_x, .5*stepsize_x, 1.5*stepsize_x][locations_update[n_update][i - 2 * set_size]];
                     trial.stimuli[i].text_color = ["black", "green", "red", "blue"][locations_update[n_update][i - 2 * set_size]];
                     trial.stimuli[i].font = '60px Arial';
                 }
             } else if (trial_type[n] == "immediate") {
-                for (let i = 0; i < set_size; i++) {
+                for (let i = set_size; i < (2*set_size); i++) {
                     trial.stimuli[i].content = immediate_set[n_immediate][i - set_size].toString();
                     trial.stimuli[i].show_start_time = 0;
                     trial.stimuli[i].origin_center = true;
                     trial.stimuli[i].show_end_time = viewing_time_initial;
-                    trial.stimuli[i].startX = [-300, -100, 100, 300][i - set_size];
+                    trial.stimuli[i].startX = [-1.5*stepsize_x, -.5*stepsize_x, .5*stepsize_x, 1.5*stepsize_x][i - set_size];
                     trial.stimuli[i].text_color = ["black", "green", "red", "blue"][i - set_size];
                     trial.stimuli[i].font = '60px Arial';
                 }
@@ -306,8 +309,9 @@
         repetitions: nTrials_update + nTrials_immediate,
     };
 
+    jsPsych.run([mixed_node_practice, instructions_test, mixed_node_main]);
 
-    jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
+    //jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
 
     /*
         const image1 = {
