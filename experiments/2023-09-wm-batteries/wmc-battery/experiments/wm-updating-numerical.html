@@ -7,8 +7,10 @@
     <script src="../jspsych-dist/dist/plugin-html-keyboard-response.js"></script>
     <script src="../jspsych-dist/dist/plugin-preload.js"></script>
     <script src="../jspsych-dist/dist/plugin-survey-text.js"></script>
+    <script src="../jspsych-dist/dist/plugin-fullscreen.js"></script>
     <script src="../jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
     <script src="https://pixijs.download/release/pixi.js"></script>
+    <script src="../jquery.min.js"></script>
     <script src="../js-helpers.js"></script>
     <script src="../jspsych-psychophysics.js"></script>
     <link rel="stylesheet" href="../jspsych-dist/dist/jspsych.css">
@@ -139,7 +141,11 @@
     var n_recalled;
     var n_recalled_correctly;
 
-
+    var instructionsGo = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: '<div style="font-size:30px;"><b>INSTRUCTIONS</b><br><br>Click on "Next" to start. <br><br><br><br><br><br><br><br><br><br><br></div>',
+        choices: ["Next"]
+    };
     var instructions1 = {
         type: jsPsychHtmlButtonResponse,
         stimulus: '<div style="font-size:30px;"><b>INSTRUCTIONS</b><br><br>This is the updating task. <br>This task has two parts: <br>(1) Memorization of the initially presented digits <br>(2) Individually updating selected digits <br><br><br><br><br><br><br><br><br><br><br></div>',
@@ -169,10 +175,10 @@
     stepsize_x = screen.width / 10;
     stepsize_y = screen.height / 10;
 
-    rect_object_ll = make_rect(-1.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
-    rect_object_l = make_rect(-.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
-    rect_object_r = make_rect(.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
-    rect_object_rr = make_rect(1.5*stepsize_x, -stepsize_y/2, stepsize_x, stepsize_y);
+    rect_object_ll = make_rect(-1.5*stepsize_x, 0, stepsize_x, stepsize_y);
+    rect_object_l = make_rect(-.5*stepsize_x, 0, stepsize_x, stepsize_y);
+    rect_object_r = make_rect(.5*stepsize_x, 0, stepsize_x, stepsize_y);
+    rect_object_rr = make_rect(1.5*stepsize_x, 0, stepsize_x, stepsize_y);
 
     const updating_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
     for (let i = set_size; i < (n_upd_steps + 2 * set_size); i++) {
@@ -227,7 +233,7 @@
                 set_size: set_size,
                 sequence_correct: correct_sequence,
                 sequence_recalled: result_array,
-                rt: data.select("rt")
+                rt: data.rt
             };
             saveSeveralData(JSON.stringify(data_recall), file_name + participant_id + ".json")
 
@@ -293,8 +299,15 @@
         }
     }
 
+    timeline_mixed = [instructions4];
+    timeline_mixed.push({
+        type: jsPsychFullscreen,
+        fullscreen_mode: true
+    });
+    timeline_mixed.push(instructionsGo);
+
     const mixed_node_practice = {
-        timeline: [mixed_trial, cued_response],
+        timeline: [mixed_trial, cued_response],// [mixed_trial, cued_response],
         repetitions: 2,
         /* loop_function: function (data) {
     if (jsPsych.pluginAPI.compareKeys(data.values()[0].response, ' ')) {
@@ -304,12 +317,19 @@
     }
 } */
     };
+    timeline_mixed.push(mixed_node_practice);
     const mixed_node_main = {
         timeline: [mixed_trial, cued_response],
         repetitions: nTrials_update + nTrials_immediate,
     };
+    timeline_mixed.push(mixed_node_main);
+    timeline_mixed.push({
+        type: jsPsychFullscreen,
+        fullscreen_mode: false
+    });
 
-    jsPsych.run([mixed_node_practice, instructions_test, mixed_node_main]);
+    jsPsych.run(timeline_mixed);
+    //jsPsych.run([instructions4, timeline_mixed, instructions_test, mixed_node_main]);
 
     //jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
 
