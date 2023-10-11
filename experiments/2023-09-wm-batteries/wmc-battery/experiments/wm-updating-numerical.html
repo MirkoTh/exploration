@@ -148,7 +148,7 @@
     };
     var instructions1 = {
         type: jsPsychHtmlButtonResponse,
-        stimulus: '<div style="font-size:30px;"><b>INSTRUCTIONS</b><br><br>This is the updating task. <br>This task has two parts: <br>(1) Memorization of the initially presented digits <br>(2) Individually updating selected digits</div>',
+        stimulus: '<div style="font-size:30px;"><b>INSTRUCTIONS</b><br>This is the updating task. <br>This task has two parts: <br>(1) Memorization of the initially presented digits <br>(2) Individually updating selected digits </div>',
         choices: ["Next"]
     };
     var instructions2 = {
@@ -163,7 +163,7 @@
     };
     var instructions4 = {
         type: jsPsychHtmlButtonResponse,
-        stimulus: '<div style="font-size:30px;">Occasionally, you have to recall the initial set of digits immediately. Again, please recall in the correct order. You get two practice trials to get used to the two versions of the task (immediate recall and recall after the updating steps).</div>',
+        stimulus: '<div style="font-size:30px;">Occasionally, you have to recall the initial set of digits immediately. Again, please recall in the correct order.<br>You get two practice trials to get used to the two versions of the task (immediate recall and recall after the updating steps).</div>',
         choices: ["Start Practice"]
     };
     var instructions_test = {
@@ -172,15 +172,20 @@
         choices: ["Start Main Part"]
     };
 
+    const viewing_time_initial = 2500; // 5000
+    const viewing_time_updating = 1000; // ms
+    const isi = 250; // ms
+
     stepsize_x = screen.width / 10;
     stepsize_y = screen.height / 10;
 
-    rect_object_ll = make_rect(-1.5 * stepsize_x, 0, stepsize_x, stepsize_y);
-    rect_object_l = make_rect(-.5 * stepsize_x, 0, stepsize_x, stepsize_y);
-    rect_object_r = make_rect(.5 * stepsize_x, 0, stepsize_x, stepsize_y);
-    rect_object_rr = make_rect(1.5 * stepsize_x, 0, stepsize_x, stepsize_y);
+    trial_time_updating = n_upd_steps * viewing_time_updating + viewing_time_initial;
+    rect_object_ll_u = make_rect(-1.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_updating);
+    rect_object_l_u = make_rect(-.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_updating);
+    rect_object_r_u = make_rect(.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_updating);
+    rect_object_rr_u = make_rect(1.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_updating);
 
-    const updating_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
+    const updating_object = [rect_object_ll_u, rect_object_l_u, rect_object_r_u, rect_object_rr_u];
     for (let i = set_size; i < (n_upd_steps + 2 * set_size); i++) {
         const updating_temporal_object = {
             obj_type: 'text',
@@ -188,7 +193,13 @@
         updating_object.push(updating_temporal_object)
     }
 
-    const immediate_object = [rect_object_ll, rect_object_l, rect_object_r, rect_object_rr];
+    trial_time_immediate = viewing_time_initial;
+    rect_object_ll_i = make_rect(-1.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_immediate);
+    rect_object_l_i = make_rect(-.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_immediate);
+    rect_object_r_i = make_rect(.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_immediate);
+    rect_object_rr_i = make_rect(1.5 * stepsize_x, 0, stepsize_x, stepsize_y, trial_time_immediate);
+
+    const immediate_object = [rect_object_ll_i, rect_object_l_i, rect_object_r_i, rect_object_rr_i];
     for (let i = set_size; i < 2 * set_size; i++) {
         const immediate_temporal_object = {
             obj_type: 'text',
@@ -196,10 +207,7 @@
         immediate_object.push(immediate_temporal_object)
     }
 
-    const viewing_time_initial = 2500; // 5000
-    const viewing_time_updating = 1000; // ms
-    const isi = 250; // ms
-
+    
     const cued_response = {
         type: jsPsychSurveyText,
         textarea: "width:40%;height:40%",
@@ -251,7 +259,6 @@
 
     const mixed_trial = {
         type: jsPsychPsychophysics,
-
         pixi: pixi_flag,
         stimuli: function () {
             if (trial_type[n] == "update") {
@@ -307,21 +314,16 @@
     timeline_mixed.push(instructionsGo);
 
     const mixed_node_practice = {
-        timeline: [mixed_trial, cued_response],// [mixed_trial, cued_response],
+        timeline: [mixed_trial, cued_response],
         repetitions: 2,
-        /* loop_function: function (data) {
-    if (jsPsych.pluginAPI.compareKeys(data.values()[0].response, ' ')) {
-        return true;
-    } else {
-        return false;
-    }
-} */
     };
     timeline_mixed.push(mixed_node_practice);
+
     const mixed_node_main = {
         timeline: [mixed_trial, cued_response],
         repetitions: nTrials_update + nTrials_immediate,
     };
+    timeline_mixed.push(instructions_test);
     timeline_mixed.push(mixed_node_main);
     timeline_mixed.push({
         type: jsPsychFullscreen,
@@ -329,9 +331,6 @@
     });
 
     jsPsych.run(timeline_mixed);
-    //jsPsych.run([instructions4, timeline_mixed, instructions_test, mixed_node_main]);
-
-    //jsPsych.run([instructions1, instructions2, instructions3, instructions4, mixed_node_practice, instructions_test, mixed_node_main]);
 
     /*
         const image1 = {
