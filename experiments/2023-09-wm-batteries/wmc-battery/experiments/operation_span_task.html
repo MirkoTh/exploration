@@ -8,11 +8,15 @@
 
 <head>
   <title>WM operation span task</title>
+  <script src="../jspsych-dist/dist/plugin-html-button-response.js"></script>
+  <script src="../jspsych-dist/dist/plugin-survey-multi-choice.js"></script>
   <script src="../seedrandom.min.js"></script>
   <script src="../jquery.min.js"></script>
   <script src="../jspsych-6.0.4/jspsych.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-html-button-operationspan.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-html-button-response.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-survey-multi-choice.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-survey-text.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-fullscreen.js"></script>
@@ -462,6 +466,7 @@
   });
 
   timeline = timeline.concat([instructions, lettersDemo, instructions2, loadDemo, instructions3, fullDemo, instructions4, test_procedure]);
+  timeline.push(comp_check_os_loop);
   //timeline = timeline.concat([test_procedure]);
   timeline.push({
     type: 'fullscreen',
