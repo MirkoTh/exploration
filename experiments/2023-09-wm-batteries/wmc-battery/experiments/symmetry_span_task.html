@@ -4,12 +4,15 @@
   <title>WM symmetry span task</title>
   <script src="../seedrandom.min.js"></script>
   <script src="../jquery.min.js"></script>
-  <script src="../js-helpers.js"></script>
+  <script src="../js-helpers-old.js"></script>
   <script src="../jstat.js"></script>
   <script src="../jspsych-6.0.4/jspsych.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-html-keyboard-response.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-html-button-response.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-symmetry-judgement-task.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-survey-text.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-survey-multi-choice.js"></script>
+  <script src="../jspsych-6.0.4/plugins/jspsych-sur.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-instructions.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-fullscreen.js"></script>
   <script src="../jspsych-6.0.4/plugins/jspsych-spatial-span.js"></script>
@@ -385,7 +388,10 @@
     type: 'fullscreen',
     fullscreen_mode: true
   });
-  timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
+  timeline.push(comp_check_ss_loop);
+
+  //  timeline = timeline.concat([instructions, squaresDemo, instructions2, symmetryDemo, instructions3, fullDemo])
+  //  timeline = timeline.concat([instructions4, test_procedure]);
   //timeline = timeline.concat([instructions2, symmetryDemo, instructions3, fullDemo, instructions4, test_procedure])
   timeline.push({
     type: 'fullscreen',
@@ -398,8 +404,11 @@
     timeline: timeline,
     on_finish: function () {
       jsPsych.data.displayData(); // comment out if you do not want to display results at the end of task
+
     }
   });
+
+
 </script>
 
 </html>
