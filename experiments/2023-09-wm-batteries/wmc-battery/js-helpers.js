@@ -203,6 +203,7 @@ var comprehension_question_wmu1 = {
         },
     ],
     preamble: "<h3>Please answer the following question.</h3>",
+    randomize_question_order: true,
 
     on_finish: function (data) {
         //var data = jsPsych.data.getLastTrialData().values()[0]; 

@@ -236,6 +236,7 @@ var comprehension_question_os_allinone = {
         },
     ],
     preamble: "<h3>Please answer the following question.</h3>",
+    randomize_question_order: true,
 
     on_finish: function (data) {
         var answer_Q1 = data.response.question1;
@@ -323,6 +324,7 @@ var comprehension_question_ss_allinone = {
         },
     ],
     preamble: "<h3>Please answer the following questions.</h3>",
+    randomize_question_order: true,
 
     on_finish: function (data) {
         var answer_Q1 = data.response.question1;
