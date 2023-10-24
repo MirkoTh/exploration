@@ -186,8 +186,7 @@ var final_set_updating = [
 ]
 
 // COMPREHENSION CHECK OPERATION SPAN
-
-var comprehension_question_os1 = {
+var comprehension_question_os_allinone = {
     type: 'survey-multi-choice',
     questions: [
         {
@@ -199,25 +198,9 @@ var comprehension_question_os1 = {
                 'I have to reorder the presented digits in ascending order and then recall them.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        if (answer_Q1 == 'Remember the letters and respond to the operations in between.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_os2 = {
-    type: 'survey-multi-choice',
-    questions: [
-        {
+            required: true,
+            name: "question1"
+        }, {
             prompt: '<div align=center><b>How do you respond to the operations?</b></div>',
             options: [
                 'Clicking on the true or false button on the screen.',
@@ -226,25 +209,9 @@ var comprehension_question_os2 = {
                 'I can just ignore the operations and always press the same button asap.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        if (answer_Q1 == 'Clicking on the true or false button on the screen.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_os3 = {
-    type: 'survey-multi-choice',
-    questions: [
-        {
+            required: true,
+            name: "question2"
+        }, {
             prompt: '<div align=center><b>How do you recall the letters?</b></div>',
             options: [
                 'Recall them by saying them into the microphone.',
@@ -253,25 +220,9 @@ var comprehension_question_os3 = {
                 'If I forget some of the letters, I can continue by just omitting that trial.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        if (answer_Q1 == 'Clicking on the letters in the correct order.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_os4 = {
-    type: 'survey-multi-choice',
-    questions: [
-        {
+            required: true,
+            name: "question3"
+        }, {
             prompt: '<div align=center><b>How do the trials look like?</b></div>',
             options: [
                 'Sometimes I only have to remember digits.',
@@ -280,26 +231,35 @@ var comprehension_question_os4 = {
                 'They may sometimes contain updating operations.'
             ],
 
-            required: true
+            required: true,
+            name: "question4"
         },
     ],
     preamble: "<h3>Please answer the following question.</h3>",
 
     on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        if (answer_Q1 == 'It is always a mixture between remembering characters and responding to operations.') {
+        var answer_Q1 = data.response.question1;
+        var answer_Q2 = data.response.question2;
+        var answer_Q3 = data.response.question3;
+        var answer_Q4 = data.response.question4;
+
+        if (answer_Q1 == 'Remember the letters and respond to the operations in between.' &&
+            answer_Q2 == 'Clicking on the true or false button on the screen.' &&
+            answer_Q3 == 'Clicking on the letters in the correct order.' &&
+            answer_Q4 == 'It is always a mixture between remembering characters and responding to operations.') {
             data.correct = true
         } else {
             data.correct = false
         }
     }
 };
+
+
 var comp_feedback_old = {
     type: "html-button-response",
     stimulus: function () {
-        var last_resp_correct = jsPsych.data.get().last(4).filter({ correct: true });
-        if (last_resp_correct.count() == 4) {
+        var last_resp_correct = jsPsych.data.get().last(1).filter({ correct: true });
+        if (last_resp_correct.count() == 1) {
             return "<p align='center'><b>Well done! You answered all questions correctly.</b></p>"
         } else {
             return "<p align='center'><b>Not all questions were answered correctyly.</b> Please try again. </p>"
@@ -309,26 +269,11 @@ var comp_feedback_old = {
 };
 
 
-//compcheck1: if answer incorrect, compcheck1 will be repeated until correct response inserted
-var comp_check_os_loop = {
-    timeline: [comprehension_question_os1, comprehension_question_os2, comprehension_question_os3, comprehension_question_os4, comp_feedback_old],
-    loop_function: function (data) {
-        console.log('data: ', data.values());
-        if (
-            data.values()[0].correct == true && data.values()[1].correct == true && data.values()[2].correct == true && data.values()[3].correct == true
-        ) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-};
 
 
 
 // COMPREHENSION CHECK SYMMETRY SPAN
-
-var comprehension_question_ss1 = {
+var comprehension_question_ss_allinone = {
     type: "survey-multi-choice",
     questions: [
         {
@@ -340,27 +285,9 @@ var comprehension_question_ss1 = {
                 'I have to reorder the presented locations in ascending order and then recall them from top to bottom.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        //var answer_Q1 = data.response.Q0;
-        var answer_Q1 = data.response.Q1;
-        console.log("response1 = " + answer_Q1);
-        if (answer_Q1 == 'Remember the locations in the grid in serial order and respond to the symmetry judgments in between.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_ss2 = {
-    type: "survey-multi-choice",
-    questions: [
-        {
+            required: true,
+            name: "question1"
+        }, {
             prompt: '<div align=center><b>How do you respond to the symmetry judgments?</b></div>',
             options: [
                 'Clicking on the symmetric or asymmetric button on the screen.',
@@ -369,27 +296,10 @@ var comprehension_question_ss2 = {
                 'I can just ignore the symmetry judgments and always press the same button asap.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        console.log("response2 = " + answer_Q1);
-        if (answer_Q1 == 'Clicking on the symmetric or asymmetric button on the screen.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_ss3 = {
-    type: "survey-multi-choice",
-    questions: [
-        {
-            prompt: '<div align=center><b>How do you recall the spatial loations presented in the grid?</b></div>',
+            required: true,
+            name: "question2"
+        }, {
+            prompt: '<div align=center><b>How do you recall the spatial locations presented in the grid?</b></div>',
             options: [
                 'Recall them by saying them into the microphone.',
                 'By using the arrows on my keyboard.',
@@ -397,26 +307,9 @@ var comprehension_question_ss3 = {
                 'If I forget some of the locations, I can continue by just omitting that trial.'
             ],
 
-            required: true
-        },
-    ],
-    preamble: "<h3>Please answer the following question.</h3>",
-
-    on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        console.log("response3 = " + answer_Q1);
-        if (answer_Q1 == 'Clicking on the locations in the correct order in the presented grid.') {
-            data.correct = true
-        } else {
-            data.correct = false
-        }
-    }
-};
-var comprehension_question_ss4 = {
-    type: "survey-multi-choice",
-    questions: [
-        {
+            required: true,
+            name: "question3"
+        }, {
             prompt: '<div align=center><b>How do the trials look like?</b></div>',
             options: [
                 'Sometimes I only have to remember locations.',
@@ -425,16 +318,22 @@ var comprehension_question_ss4 = {
                 'They may sometimes contain updating operations.'
             ],
 
-            required: true
+            required: true,
+            name: "question4"
         },
     ],
-    preamble: "<h3>Please answer the following question.</h3>",
+    preamble: "<h3>Please answer the following questions.</h3>",
 
     on_finish: function (data) {
-        //var data = jsPsych.data.getLastTrialData().values()[0]; 
-        var answer_Q1 = data.response.Q0;
-        console.log("response4 = " + data.response);
-        if (answer_Q1 == 'It is always a mixture between remembering spatial locations and judging the symmetry of the patterns.') {
+        var answer_Q1 = data.response.question1;
+        var answer_Q2 = data.response.question2;
+        var answer_Q3 = data.response.question3;
+        var answer_Q4 = data.response.question4;
+
+        if (answer_Q1 == 'Remember the locations in the grid in serial order and respond to the symmetry judgments in between.' &&
+            answer_Q2 == 'Clicking on the symmetric or asymmetric button on the screen.' &&
+            answer_Q3 == 'Clicking on the locations in the correct order in the presented grid.' &&
+            answer_Q4 == 'It is always a mixture between remembering spatial locations and judging the symmetry of the patterns.') {
             data.correct = true
         } else {
             data.correct = false
@@ -442,18 +341,3 @@ var comprehension_question_ss4 = {
     }
 };
 
-
-//compcheck1: if answer incorrect, compcheck1 will be repeated until correct response inserted
-var comp_check_ss_loop = {
-    timeline: [comprehension_question_ss1, comprehension_question_ss2, comprehension_question_ss3, comprehension_question_ss4, comp_feedback_old],
-    loop_function: function (data) {
-        console.log('data: ', data.values());
-        if (
-            data.values()[0].correct == true && data.values()[1].correct == true && data.values()[2].correct == true && data.values()[3].correct == true
-        ) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-};
