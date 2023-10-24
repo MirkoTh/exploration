@@ -59,6 +59,14 @@ tbl_rb <- tbl_rb %>%
   inner_join(tbl_ids, by = c("id", "payoff_group")) %>%
   mutate(
     diff_max_second_highest = max_reward - second_highest,
+    avg_reward_difference = (
+      abs(reward_c1 - reward_c2) +
+        abs(reward_c1 - reward_c3) +
+        abs(reward_c1 - reward_c4) +
+        abs(reward_c2 - reward_c3) +
+        abs(reward_c2 - reward_c4) +
+        abs(reward_c3 - reward_c4)
+    ) / 6,
     trial_id_cut = cut(trial_id, breaks = c(-1, seq(25.5, 150.5, by = 25))),
     regret_empirical = max_reward - rewards
   )
@@ -84,14 +92,12 @@ pl_walking_arms <- tbl_rb %>%
   theme(strip.background = element_rect(fill = "white"))
 
 
-tbl_rb_bin <- grouped_agg(tbl_rb, c(id, id_within_payoff_group, trial_id_cut, payoff_group), regret_empirical)
+tbl_rb_bin <- grouped_agg(tbl_rb, c(id, id_within_payoff_group, trial_id_cut, payoff_group), c(regret_empirical, avg_reward_difference))
 
 
 
-# todos
-# correlations between regrets across different bins
 tbl_corr_diff <- tbl_rb_bin %>%
-  select(-c(n, nunique_regret_empirical, se_regret_empirical)) %>%
+  select(-c(n, nunique_regret_empirical, se_regret_empirical, nunique_avg_reward_difference, mean_avg_reward_difference, se_avg_reward_difference)) %>%
   pivot_wider(names_from = trial_id_cut, values_from = mean_regret_empirical) %>%
   group_by(payoff_group) %>%
   summarize(
@@ -134,12 +140,26 @@ pl_diff_violin <- ggplot(tbl_rb_bin, aes(trial_id_cut, mean_regret_empirical, gr
   scale_x_discrete(expand = c(0, 0)) +
   labs(y = "Mean Regret", x = "Trial (Binned)") +
   theme(strip.background = element_rect(fill = "white"))
+
+
+
+pl_avg_reward_violin <- ggplot(tbl_rb_bin, aes(trial_id_cut, mean_avg_reward_difference, group = r)) +
+  geom_hline(yintercept = c(0, 10, 20, 30)) +
+  geom_violin(aes(color = r, fill = r)) +
+  ggrepel::geom_label_repel(data = tbl_rb_bin %>% filter(id_within_payoff_group == 3), aes(label = str_c("r = ", round(r, 2), "\nsd = ", round(sd, 2)))) +
+  facet_wrap(~ payoff_group, nrow = 1) +
+  coord_flip(ylim = c(0, 40)) + 
+  theme_bw() +
+  scale_y_continuous(expand = c(.1, 0)) +
+  scale_x_discrete(expand = c(0, 0)) +
+  labs(y = "Mean Regret", x = "Trial (Binned)") +
+  theme(strip.background = element_rect(fill = "white"))
   
 grid.draw(arrangeGrob(pl_diff_violin, pl_walking_arms, nrow = 1))
 
 # correlation between difference of highest to second to highest reward and mean empirical regret
 
-tbl_prop_right <- as.data.frame(table(tbl_rb$payoff_group, tbl_rb$diff_max_second_highest, tbl_rb$regret_empirical > 0)) %>%
+tbl_prop_right_second_best <- as.data.frame(table(tbl_rb$payoff_group, tbl_rb$diff_max_second_highest, tbl_rb$regret_empirical > 0)) %>%
   pivot_wider(names_from = Var3, values_from = Freq) %>%
   mutate(
     prop_right = 1 - `TRUE` / (`TRUE` + `FALSE`),
@@ -149,7 +169,7 @@ tbl_prop_right <- as.data.frame(table(tbl_rb$payoff_group, tbl_rb$diff_max_secon
   rename(payoff_group = Var1) %>%
   filter(Var2 > 0)
 
-pl_difficulty <- ggplot(tbl_prop_right, aes(Var2, prop_right, group = 1)) +
+pl_difficulty_second_best <- ggplot(tbl_prop_right_second_best, aes(Var2, prop_right, group = 1)) +
   geom_line() + 
   geom_point(color = "white", size = 6) +
   geom_point(aes(size = `FALSE` + `TRUE`)) +
@@ -160,8 +180,34 @@ pl_difficulty <- ggplot(tbl_prop_right, aes(Var2, prop_right, group = 1)) +
   labs(x = "Difference Best - Second Best", y = "Proportion Correct") +
   theme(strip.background = element_rect(fill = "white"))
   
-grid.draw(arrangeGrob(pl_walking_arms, pl_diff_violin, pl_difficulty,
+grid.draw(arrangeGrob(pl_walking_arms, pl_diff_violin, pl_difficulty_second_best,
             layout_matrix = rbind(c(1, 1),
                                   c(2, 3)),
             nrow = 2, ncol = 2)
 )
+
+
+tbl_prop_right_avg_reward_difference <- as.data.frame(table(tbl_rb$payoff_group, cut(tbl_rb$avg_reward_difference, 10), tbl_rb$regret_empirical > 0)) %>%
+  pivot_wider(names_from = Var3, values_from = Freq) %>%
+  mutate(
+    prop_right = 1 - `TRUE` / (`TRUE` + `FALSE`),
+    Var1 = as.numeric(as.character(Var1))
+  ) %>%
+  rename(payoff_group = Var1)
+
+pl_difficulty_avg_reward_difference <- ggplot(tbl_prop_right_avg_reward_difference, aes(Var2, prop_right, group = 1)) +
+  geom_line() + 
+  geom_point(color = "white", size = 6) +
+  geom_point(aes(size = `FALSE` + `TRUE`)) +
+  facet_wrap(~ payoff_group) +
+  theme_bw() +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Difference Best - Second Best", y = "Proportion Correct") +
+  theme(strip.background = element_rect(fill = "white"), axis.text.x = element_text(angle = 90))
+
+as.data.frame(table(tbl_rb$payoff_group, cut(tbl_rb$avg_reward_difference, 10))) %>%
+  group_by(Var1) %>%
+  mutate(prop = Freq / sum(Freq)) %>% ungroup() %>%
+  ggplot(aes(Var2, prop, group = Var1)) +
+  geom_line(aes(color = Var1), linewidth = 1)
