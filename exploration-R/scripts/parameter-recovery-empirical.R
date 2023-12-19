@@ -148,17 +148,20 @@ tbl_cor_softmax_0var_long <- tbl_recovery_kalman_softmax %>%
   ) %>% rename("Gamma" = r_gamma) %>%
   pivot_longer(cols = c(Gamma))
 
-
+saveRDS(tbl_rb, file = "open-data/speekenbrink-konstantinidis-2015-recovery.csv")
 
 
 ## UCB with Softmax -------------------------------------------------------
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
+params_init <- c(runif(1, bds$gamma$lo, bds$gamma$hi), runif(1, bds$beta$lo, bds$beta$hi))
 
 if (fit_or_load == "fit") {
   plan(multisession, workers = availableCores() - 2)
   l_kalman_ucb_no_variance <- furrr:::future_map(
     l_participants, fit_ucb_no_variance_wrapper,
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+    bds = bds, params_init = params_init,
     .progress = TRUE
   )
   saveRDS(l_kalman_ucb_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-fit.rds")
@@ -172,9 +175,9 @@ if (fit_or_load == "fit") {
   )
   
   tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
-  tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, FALSE)
-  tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   
   tbl_results_kalman_ucb <- rbind(tbl_results_kalman_ucb_fix, tbl_results_kalman_ucb_sim)
   saveRDS(tbl_results_kalman_ucb, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-recovery.rds")
@@ -182,8 +185,6 @@ if (fit_or_load == "fit") {
   l_kalman_ucb_no_variance <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-fit.rds")
   tbl_results_kalman_ucb <- readRDS(file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-recovery.rds")
 }
-
-
 
 
 tbl_recovery_kalman_ucb <- tbl_results_kalman_ucb %>%
@@ -657,7 +658,7 @@ save_my_pdf_and_tiff(
 )
 
 
-    # Summarize Results -------------------------------------------------------
+# Summarize Results -------------------------------------------------------
 
 wrangle_recoveries <- function(my_tbl, modelname) {
   tbl_summary <- crossing(

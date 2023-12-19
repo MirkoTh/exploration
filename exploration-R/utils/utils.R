@@ -1286,18 +1286,21 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
 
 
 fit_ucb_no_variance_wrapper <- function(
-    tbl_results, tbl_rewards, condition_on_observed_choices, bds
+    tbl_results, tbl_rewards, condition_on_observed_choices, bds, params_init = NULL
 ) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   
-  params_init <- pmap_dbl(
-    list(c(.5, .25), map_dbl(bds, "lo"), map_dbl(bds, "hi")),
+  if (is.null(params_init)) {
+    params_init <- c(.5, .25)
+  }
+  params_init_tf <- pmap_dbl(
+    list(params_init, map_dbl(bds, "lo"), map_dbl(bds, "hi")),
     upper_and_lower_bounds
   )
   
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_ucb_no_variance,
+      params_init_tf, fit_kalman_ucb_no_variance,
       tbl_results = tbl_results, nr_options = 4, bds = bds
     )
     
