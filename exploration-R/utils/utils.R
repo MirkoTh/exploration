@@ -1,10 +1,7 @@
-library(DEoptim)
-
 make_conditions_and_rewards <- function(
-    opts, mn_spacing, vars, n_trials
-) {
+    opts, mn_spacing, vars, n_trials) {
   #' create tbl with info about conditions and rewards per trial
-  #' 
+  #'
   #' @description creates a tbl with cols condition_id, n_options
   #' and list cols reward_stats (mns and sds) and rewards (by-trial rewards)
   #' @param opts vector with number of response options across conditions
@@ -15,9 +12,9 @@ make_conditions_and_rewards <- function(
   
   tbl_conditions <- crossing(opts, mn_spacing, vars)
   colnames(tbl_conditions) <- c("n_options", "mn_spacing", "var")
-  tbl_conditions$reward_stats = pmap(
+  tbl_conditions$reward_stats <- pmap(
     tbl_conditions, ~ list(
-      reward_mn = seq(..2, ..1*..2, by = ..2),
+      reward_mn = seq(..2, ..1 * ..2, by = ..2),
       reward_var = rep(..3, ..1)
     )
   )
@@ -26,15 +23,14 @@ make_conditions_and_rewards <- function(
     rnorm(n, mn, sd)
   }
   
-  l_out <- map(1:nrow(tbl_conditions), ~pmap(list(
+  l_out <- map(1:nrow(tbl_conditions), ~ pmap(list(
     tbl_conditions$reward_stats[[.x]]$reward_mn,
     tbl_conditions$reward_stats[[.x]]$reward_var
-  ), ~ my_rnorm(n = n_trials, mn = ..1, sd = sqrt(..2))
-  ))
+  ), ~ my_rnorm(n = n_trials, mn = ..1, sd = sqrt(..2))))
   
   # rewards per trial as matrix
-  tbl_conditions$rewards <- l_out %>% 
-    map(~ unlist(.x) %>% matrix(nrow = length(.x), byrow = TRUE)) %>% 
+  tbl_conditions$rewards <- l_out %>%
+    map(~ unlist(.x) %>% matrix(nrow = length(.x), byrow = TRUE)) %>%
     map(~ t(.x))
   
   return(tbl_conditions)
@@ -52,46 +48,43 @@ update_kalman_filter <- function(var_prev, var_innov, var_error) {
 rl_softmax_sim <- function(rewards, sigma_epsilon_sq, m0, params, choices = NULL) {
   nt <- nrow(rewards) # number of time points
   no <- ncol(rewards) # number of options
-  m <- matrix(m0,ncol=no,nrow=nt+1) # to hold the posterior means
-  v <- matrix(sigma_epsilon_sq,ncol=no,nrow=nt+1) # to hold the posterior variances
-  choice <- rep(0,nt) # to hold the choices of the RL agent
-  reward <- rep(0.0,nt) # to hold the obtained rewards by the RL agent
+  m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
+  v <- matrix(sigma_epsilon_sq, ncol = no, nrow = nt + 1) # to hold the posterior variances
+  choice <- rep(0, nt) # to hold the choices of the RL agent
+  reward <- rep(0.0, nt) # to hold the obtained rewards by the RL agent
   # loop over all time points
-  for(t in 1:nt) {
+  for (t in 1:nt) {
     if (is.null(choices)) {
       # use the prior means and compute the probability of choosing each option
-      tb_exp <- params$gamma*m[t,]
+      tb_exp <- params$gamma * m[t, ]
       p <- exp(ifelse(tb_exp > 700, 700, tb_exp))
-      p <- p/sum(p)
+      p <- p / sum(p)
       # choose an option according to these probabilities
-      choice[t] <- sample(1:no,size=1,prob=p)
+      choice[t] <- sample(1:no, size = 1, prob = p)
       # get the reward of the choice
     } else {
       choice <- choices
     }
     
-    reward[t] <- rewards[t,choice[t]]
+    reward[t] <- rewards[t, choice[t]]
     
     if (params$model == "Kalman") {
       # set the Kalman gain for not chosen options
-      kt <- rep(0,no)
+      kt <- rep(0, no)
       # set the Kalman gain for the chosen option
-      kt[choice[t]] <- (v[t,choice[t]])/(v[t,choice[t]] + sigma_epsilon_sq)
+      kt[choice[t]] <- (v[t, choice[t]]) / (v[t, choice[t]] + sigma_epsilon_sq)
       # compute the posterior means
-      m[t+1,] <- m[t,] + kt*(reward[t] - m[t,])
+      m[t + 1, ] <- m[t, ] + kt * (reward[t] - m[t, ])
       # compute the posterior variances
-      v[t+1,] <- (1-kt)*(v[t,])
-      
+      v[t + 1, ] <- (1 - kt) * (v[t, ])
     } else if (params$model == "Decay") {
-      m[t+1, ] <- params$eta * m[t, ]
-      m[t+1, choice[t]] <- m[t+1, choice[t]] + reward[t]
-      v[t+1, choice[t]] <- 0
-      
+      m[t + 1, ] <- params$eta * m[t, ]
+      m[t + 1, choice[t]] <- m[t + 1, choice[t]] + reward[t]
+      v[t + 1, choice[t]] <- 0
     }
-    
   }
   # return everything of interest
-  return(list(m=m,v=v,choice=choice,reward=reward))
+  return(list(m = m, v = v, choice = choice, reward = reward))
 }
 
 
@@ -107,13 +100,12 @@ total_rewards <- function(model, gamma, eta) {
     m0 = 0, params = l_params
   )
   map_dbl(l_l_m, ~ sum(.x[["reward"]]))
-  
 }
 
 
 iterate_once <- function(x) {
   #' iterate over gamma values for each condition
-  #' 
+  #'
   #' @description iterate once over a sequence of gamma values and return total_rewards
   #' once for each condition in tbl_conditions
   #' @param x dummy param to iterate over
@@ -122,10 +114,12 @@ iterate_once <- function(x) {
   tbl_params <- params_grid()
   tbl_conditions <- make_conditions_and_rewards(opts, mn_spacing, vars, n_trials)
   l_results <- pmap(tbl_params, total_rewards)
-  tbl_results <- l_results %>% reduce(rbind) %>% as_tibble(.name_repair = "unique")
+  tbl_results <- l_results %>%
+    reduce(rbind) %>%
+    as_tibble(.name_repair = "unique")
   colnames(tbl_results) <- interaction(tbl_conditions$n_options, tbl_conditions$var)
   tbl_results <- cbind(tbl_results, tbl_params)
-  tbl_results <- tbl_results %>% 
+  tbl_results <- tbl_results %>%
     pivot_longer(cols = -colnames(tbl_params), names_to = "noxvar", values_to = "reward_tot") %>%
     mutate(
       n_options = str_extract(noxvar, "^([0-9]+)"),
@@ -137,7 +131,7 @@ iterate_once <- function(x) {
 
 params_grid <- function() {
   #' create grid of parameter combinations to iterate over
-  #' 
+  #'
   #' @description crosses different different parameters for each model
   #' and combines them in one tbl
   #' @return tbl with parameter combinations
@@ -156,7 +150,7 @@ params_grid <- function() {
 
 make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii) {
   #' make forced-choice trials for all conditions
-  #' 
+  #'
   #' @description makes a tbl for the forced-choice trials
   #' using desired parameter settings
   #' @param n_options number of response options
@@ -168,16 +162,17 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
   l_rewards <- pmap(list(m = params_fixed$v_means, sd = params_fixed$v_sd), my_rnorm)
   tbl_prep <- tibble(
     trial_id = rep(
-      seq(1, params_fixed$n_trials, by = 1), length(params_fixed$conditions)),
+      seq(1, params_fixed$n_trials, by = 1), length(params_fixed$conditions)
+    ),
     condition = rep(params_fixed$conditions, each = params_fixed$n_trials),
     setsize = n_options,
     option_selected = factor(c(
-      rep(1:n_options, each = params_fixed$n_trials/n_options),
-      rep(1:n_options, params_fixed$n_trials/n_options),
+      rep(1:n_options, each = params_fixed$n_trials / n_options),
+      rep(1:n_options, params_fixed$n_trials / n_options),
       condition_distinct_ii
     )),
     value_sampled = NA,
-    #value_sampled = rnorm(params_fixed$v_means[option_selected], params_fixed$v_sd),
+    # value_sampled = rnorm(params_fixed$v_means[option_selected], params_fixed$v_sd),
     distance_t = abs(params_fixed$n_trials - trial_id) + params_fixed$ri,
     distance_t_log = log(distance_t)
   )
@@ -192,39 +187,39 @@ make_condition_trials <- function(n_options, params_fixed, condition_distinct_ii
 
 calc_discriminability <- function(tb, c, alpha) {
   #' SIMPLE discriminability
-  #' 
+  #'
   #' @description calculates discriminability of presented items
   #' given temporal structure using SIMPLE formulae
   #' @param tbl for one of the three conditions with by-trial info
   #' @param c SIMPLE parameter: scaling of exponential function
   #' @param alpha SIMPLE parameter: 1 = exponential, 2 = Gaussian
   #' @return list with all discriminabilities
-  #' 
+  #'
   distances_all <- tb$distance_t_log
   # map over all distances besides n
   all_positions <- seq(1, length(distances_all), by = 1)
-  f_distinct <- function(n) 1/sum(map_dbl(distances_all, ~ exp(-c*abs(distances_all[n] - .x)^alpha)))
+  f_distinct <- function(n) 1 / sum(map_dbl(distances_all, ~ exp(-c * abs(distances_all[n] - .x)^alpha)))
   map_dbl(all_positions, f_distinct)
 }
 
-kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
+kalman_forced_choice <- function(params_fixed, l_tbl_rewards) {
   #' update Kalman filter using forced-choices
-  #' 
+  #'
   #' @description update Kalman filter over n trials using forced choices
   #' from tbl with by-trial info
   #' @param params_fixed list with simulation parameters
   #' @l_tbl_rewards nested list with reward matrix
   #' and tbl with by-trial info about choices and rewards
-  #' @return nested list containing list with Kalman 
+  #' @return nested list containing list with Kalman
   #' results (i.e., ms, sds, choices, rewards)
-  #' 
+  #'
   
   # reward matrix
   rewards <- l_tbl_rewards[[2]]
   # tbl with by-trial info
   tbl_2 <- l_tbl_rewards[[1]]
   m_rewards_2 <- matrix(
-    unlist(rewards)[1:(2*params_fixed$n_trials)], 
+    unlist(rewards)[1:(2 * params_fixed$n_trials)],
     nrow = params_fixed$n_trials, ncol = 2, byrow = FALSE
   )
   l_options_selected <- list(
@@ -246,9 +241,8 @@ kalman_forced_choice <- function(params_fixed, l_tbl_rewards){
 
 # two helper functions to calculate density above zero after each choice
 cum_density_above_zero <- function(i, l) {
-  
   #' @description calculate density of difference of posterior distributions above zero
-  #' 
+  #'
   
   m <- l$m[i, 1] + l$m[i, 2]
   sd <- sqrt(l$v[i, 1] + l$v[i, 2])
@@ -262,7 +256,7 @@ wrap_all_densities <- function(l) {
 
 agg_runs <- function(condition_idx, l_results, params_fixed) {
   #' aggregate simulation runs by condition and trial
-  #' 
+  #'
   #' @description calculate average proportion people should
   #' choose the option with the higher mean
   #' @param condition_idx index stating which condition should be aggregated
@@ -270,7 +264,7 @@ agg_runs <- function(condition_idx, l_results, params_fixed) {
   #' @param params_fixed list with simulation parameters
   #' @return tbl grouped by condition and trial
   
-  map(l_results, condition_idx) %>% 
+  map(l_results, condition_idx) %>%
     unlist() %>%
     matrix(nrow = 13, ncol = n_runs, byrow = FALSE) %>%
     as.data.frame() %>%
@@ -285,13 +279,13 @@ agg_runs <- function(condition_idx, l_results, params_fixed) {
     #   val_sd = sd(value)
     # ) %>%
     ungroup()
-} 
+}
 
 
 
 sample_y <- function(subj, mu_t1, mu_t2, var, n) {
   #' sample t1 and t2 values for one subject given means and error variance
-  #' 
+  #'
   #' @description sample t1 and t2 values from normal distributions
   #' for one subject given means and error variance; assemble everything in tibble
   #' @param subj subject id
@@ -312,8 +306,8 @@ sample_y <- function(subj, mu_t1, mu_t2, var, n) {
 
 reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   #' run reliability pipeline of Bayesian model once
-  #' 
-  #' @description create a data set with given number of subjects, trials, 
+  #'
+  #' @description create a data set with given number of subjects, trials,
   #' and reliability and run Bayesian model on that data set
   #' @param n_subjects number of subjects in simulated data set
   #' @param n_trials number of subjects in simulated data set
@@ -323,7 +317,7 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   # set up data set ---------------------------------------------------------
   
   d_r <- 1.5
-  a_r <- c(0 - d_r/2, 0 + d_r/2) # fixed effect over two time points
+  a_r <- c(0 - d_r / 2, 0 + d_r / 2) # fixed effect over two time points
   
   sig_sq_0 <- .5 # within variance
   var_subj_t1 <- 1 # between-subjects variance t1
@@ -357,13 +351,15 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   stan_normal_rel <- stan_normal_reliability()
   mod_normal_rel <- cmdstan_model(stan_normal_rel)
   
-  x <- tbl_sim_long$timepoint %>% as.factor() %>% as.numeric()
+  x <- tbl_sim_long$timepoint %>%
+    as.factor() %>%
+    as.numeric()
   
   l_data <- list(
     n_data = nrow(tbl_sim_long),
     n_subj = length(unique(tbl_sim_long$subject)),
     subj = as.numeric(factor(
-      tbl_sim_long$subject, 
+      tbl_sim_long$subject,
       labels = 1:length(unique(tbl_sim_long$subject))
     )),
     x = x,
@@ -378,7 +374,7 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
   tbl_draws <- fit_normal_rel$draws(variables = pars_interest, format = "df")
   tbl_summary <- fit_normal_rel$summary(variables = pars_interest)
   
-  tbl_posterior <- tbl_draws %>% 
+  tbl_posterior <- tbl_draws %>%
     dplyr::select(starts_with(c("mu", "Sigma[2,1]")), .chain) %>%
     rename(chain = .chain) %>%
     pivot_longer(starts_with(c("mu", "Sigma[2,1]")), names_to = "parameter", values_to = "value") %>%
@@ -393,7 +389,7 @@ reliability_pipeline <- function(n_subjects, n_trials, reliability) {
 
 repeat_tibble <- function(tbl_df, n_reps) {
   #' concatenate the same tibble several times
-  #' 
+  #'
   #' @description copy a tibble n_reps times and rbind it to the original tibble
   #' @param tbl_df the tbl to be repeated
   #' @param n_reps the number of times the tbl should be repeated
@@ -411,7 +407,7 @@ repeat_tibble <- function(tbl_df, n_reps) {
 
 kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq, m0 = NULL, v0 = NULL) {
   #' Kalman filter without choice model given chosen options by participants
-  #' 
+  #'
   #' @description applies Kalman filter equations for a given bandit task with existing choices by participants
   #' @param tbl_df with made choices and collected rewards as columns
   #' @param no number of response options
@@ -431,14 +427,14 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq, m0 = NULL
   m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
   v <- matrix(v0, ncol = no, nrow = nt + 1) # to hold the posterior variances
   
-  for(t in 1:nt) {
+  for (t in 1:nt) {
     kt <- rep(0, no)
     # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
+    kt[choices[t]] <- (v[t, choices[t]] + sigma_xi_sq) / (v[t, choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
     # compute the posterior means
-    m[t+1,] <- m[t,] + kt*(rewards[t] - m[t,])
+    m[t + 1, ] <- m[t, ] + kt * (rewards[t] - m[t, ])
     # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,] + sigma_xi_sq)
+    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
   }
   tbl_m <- as.data.frame(m)
   # prevent v from becoming too small
@@ -454,7 +450,7 @@ kalman_learning <- function(tbl_df, no, sigma_xi_sq, sigma_epsilon_sq, m0 = NULL
 
 kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_epsilon_sq, params_choice, m0 = NULL, v0 = NULL) {
   #' Kalman filter with choice model
-  #' 
+  #'
   #' @description applies Kalman filter equations for a given bandit task with existing choices by participants
   #' @param tbl_df with made choices and collected rewards as columns
   #' @param no number of response options
@@ -475,7 +471,7 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
   choices <- rep(0, nt)
   rewards <- rep(0, nt)
   
-  for(t in 1:nt) {
+  for (t in 1:nt) {
     if (params_choice$choicemodel == "softmax") {
       c_probs[t, ] <- softmax_choice_prob(matrix(m[t, ], ncol = no), params_choice$gamma)
     } else if (params_choice$choicemodel == "thompson") {
@@ -488,12 +484,11 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
     
     kt <- rep(0, no)
     # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
+    kt[choices[t]] <- (v[t, choices[t]] + sigma_xi_sq) / (v[t, choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
     # compute the posterior means
-    m[t+1,] <- m[t,] + kt*(rewards[t] - m[t,])
+    m[t + 1, ] <- m[t, ] + kt * (rewards[t] - m[t, ])
     # compute the posterior variances
-    v[t+1,] <- (1-kt)*(v[t,] + sigma_xi_sq)
-    
+    v[t + 1, ] <- (1 - kt) * (v[t, ] + sigma_xi_sq)
   }
   tbl_m <- as.data.frame(m)
   # constrain v from becoming to small
@@ -509,7 +504,7 @@ kalman_learning_choose <- function(tbl_df, tbl_rewards, no, sigma_xi_sq, sigma_e
 
 delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
   #' delta learning without choice model given chosen options by participants
-  #' 
+  #'
   #' @description applies delta rule learning for a given bandit task with existing choices by participants
   #' @param tbl_df with made choices and collected rewards as columns
   #' @param no number of response options
@@ -525,13 +520,13 @@ delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
   }
   m <- matrix(m0, ncol = no, nrow = nt + 1) # to hold the posterior means
   
-  if (!is_decay){
+  if (!is_decay) {
     f_update <- function() {
       lr <- rep(0, no)
       # set the learning rate for the chosen option
       lr[choices[t]] <- delta
       # compute the estimated means
-      out <- m[t,] + lr*(rewards[t] - m[t,])
+      out <- m[t, ] + lr * (rewards[t] - m[t, ])
       return(out)
     }
   } else if (is_decay) {
@@ -541,13 +536,13 @@ delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
       # set the decay rate for all options
       choices_oh[choices[t]] <- 1
       # compute the estimated means
-      out <- m[t,] * lr + (rewards[t] * choices_oh)
+      out <- m[t, ] * lr + (rewards[t] * choices_oh)
       return(out)
     }
   }
   
-  for(t in 1:nt) {
-    m[t+1,] <- f_update()
+  for (t in 1:nt) {
+    m[t + 1, ] <- f_update()
   }
   tbl_m <- as.data.frame(m)
   colnames(tbl_m) <- str_c("m_", 1:no)
@@ -559,7 +554,7 @@ delta_learning <- function(tbl_df, no, delta, m0 = NULL, is_decay = FALSE) {
 
 
 
-normprobs <- function(A_current, mt, vt){
+normprobs <- function(A_current, mt, vt) {
   #' @description computes probabilities of current bandit being larger than other bandits
   #' @param A_current matrix with pairwise comparisons for current bandit
   #' @param mt prior predictive means on trial t
@@ -569,9 +564,9 @@ normprobs <- function(A_current, mt, vt){
   # newV is the covariance matrix of the difference scores
   newV <- A_current %*% diag(vt) %*% t(A_current)
   # calculate the (inverse) cumulative probability with the Miwa algorithm. Note: this is slow!
-  prob <- pmvnorm(lower=rep(0, nrow(A_current)), mean = newM, sigma = newV, algorithm=Miwa(steps=128))
+  prob <- pmvnorm(lower = rep(0, nrow(A_current)), mean = newM, sigma = newV, algorithm = Miwa(steps = 128))
   # If there are any probabilities below 0 due to numerical issues, set these to 0
-  prob[prob<0] <- 0
+  prob[prob < 0] <- 0
   return(prob)
 }
 
@@ -580,8 +575,9 @@ choice_probs_rb <- function(l_results_by_id) {
   #' @description wrapper around Thompson sampling for RB
   ms_rb <- l_results_by_id[, c("m_1", "m_2", "m_3", "m_4")] %>% as.matrix()
   vs_rb <- l_results_by_id[, c("v_1", "v_2", "v_3", "v_4")] %>% as.matrix()
-  tbl_choice_probs <- thompson_choice_prob_map(ms_rb, vs_rb, 4) %>% 
-    as.data.frame() %>% as_tibble()
+  tbl_choice_probs <- thompson_choice_prob_map(ms_rb, vs_rb, 4) %>%
+    as.data.frame() %>%
+    as_tibble()
   return(tbl_choice_probs)
 }
 
@@ -590,17 +586,17 @@ choice_probs_e2 <- function(l_results_by_id) {
   #' @description wrapper around Thompson sampling for E2
   ms_e2 <- l_results_by_id[, c("m_1", "m_2")] %>% as.matrix()
   vs_e2 <- l_results_by_id[, c("v_1", "v_2")] %>% as.matrix()
-  tbl_choice_probs <- thompson_choice_prob_map(ms_e2, vs_e2, 2) %>% 
-    as.data.frame() %>% as_tibble()
+  tbl_choice_probs <- thompson_choice_prob_map(ms_e2, vs_e2, 2) %>%
+    as.data.frame() %>%
+    as_tibble()
   return(tbl_choice_probs)
 }
 
 
 simulate_kalman <- function(
-    sigma_prior, mu_prior, sigma_xi_sq, sigma_epsilon_sq, lambda, nr_trials, 
-    params_decision, simulate_data, seed, tbl_rewards
-) {
-  #' 
+    sigma_prior, mu_prior, sigma_xi_sq, sigma_epsilon_sq, lambda, nr_trials,
+    params_decision, simulate_data, seed, tbl_rewards) {
+  #'
   #' @description simulate choices from a Kalman filter with some choice model
   #' @param sigma_prior prior variance
   #' @param mu_prior prior mean
@@ -613,7 +609,7 @@ simulate_kalman <- function(
   #' @param seed seed value of iteration
   #' @param tbl_rewards if data are not simulated, take this tbl instead
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
-  #' 
+  #'
   set.seed(seed)
   if (simulate_data) {
     tbl_rewards <- generate_restless_bandits(
@@ -628,7 +624,7 @@ simulate_kalman <- function(
   choices <- rep(0, nt + 1) # to hold the choices of the RL agent
   rewards <- rep(0.0, nt + 1) # to hold the obtained rewards by the RL agent
   
-  for(t in 1:nt) {
+  for (t in 1:nt) {
     p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(v[t, ], 1, ncol(v)), sigma_xi_sq, params_decision)
     # choose an option according to these probabilities
     choices[t] <- sample(1:4, size = 1, prob = p)
@@ -636,7 +632,7 @@ simulate_kalman <- function(
     rewards[t] <- tbl_rewards[t, choices[t]] %>% as_vector()
     kt <- rep(0, no)
     # set the Kalman gain for the chosen option
-    kt[choices[t]] <- (v[t,choices[t]] + sigma_xi_sq)/(v[t,choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
+    kt[choices[t]] <- (v[t, choices[t]] + sigma_xi_sq) / (v[t, choices[t]] + sigma_epsilon_sq + sigma_xi_sq)
     # compute the posterior means
     m[t + 1, ] <- m[t, ] + kt * (tbl_rewards[t, ] - m[t, ]) %>% as_vector()
     # compute the posterior variances
@@ -656,10 +652,9 @@ simulate_kalman <- function(
 
 
 simulate_delta <- function(
-    delta, lambda, nr_trials, params_decision, 
-    simulate_data, seed, tbl_rewards, is_decay = FALSE
-) {
-  #' 
+    delta, lambda, nr_trials, params_decision,
+    simulate_data, seed, tbl_rewards, is_decay = FALSE) {
+  #'
   #' @description simulate choices from a Kalman filter with some choice model
   #' @param delta learning rate
   #' @param lambda decay parameter of random walk
@@ -669,7 +664,7 @@ simulate_delta <- function(
   #' @param seed seed value of iteration
   #' @param tbl_rewards if data are not simulated, take this tbl instead
   #' @return a tbl with by-trial posterior means and variances for the chosen bandits
-  #' 
+  #'
   if (params_decision$choicemodel %in% c("thompson", "ucb")) stop("only softmax implemented currently")
   set.seed(seed)
   if (simulate_data) {
@@ -700,7 +695,7 @@ simulate_delta <- function(
     }
   }
   
-  for(t in 1:nt) {
+  for (t in 1:nt) {
     # variance components are just set to NA
     p <- choice_prob(matrix(m[t, ], 1, ncol(m)), matrix(NA, 1, ncol(m)), NA, params_decision)
     # choose an option according to these probabilities
@@ -722,10 +717,10 @@ simulate_delta <- function(
 
 
 choice_prob <- function(m, v, sigma_xi_sq, pars) {
-  #' 
+  #'
   #' @description choose choice model
   #' @return matrix with choice probabilities
-  #' 
+  #'
   switch(pars$choicemodel,
          softmax = softmax_choice_prob(m, pars$gamma),
          thompson = thompson_choice_prob_map(m, v, pars$no),
@@ -742,7 +737,7 @@ choice_prob <- function(m, v, sigma_xi_sq, pars) {
 
 
 softmax_choice_prob <- function(ms, gamma) {
-  #' 
+  #'
   #' @description soft max choice rule
   #' @param ms posterior means of the bandits
   #' @param gamma inverse temperature parameter
@@ -757,8 +752,8 @@ softmax_choice_prob <- function(ms, gamma) {
 
 thompson_choice_prob_map <- function(m, v, no) {
   #' Thompson sampling implemented with pmvnorm
-  #' 
-  #' @description takes prior means and variances and computes p(highest) 
+  #'
+  #' @description takes prior means and variances and computes p(highest)
   #' given all pairwise comparisons between response options
   #' @param m matrix with prior predictive means for each bandit in a column
   #' and every time point in a row
@@ -767,25 +762,25 @@ thompson_choice_prob_map <- function(m, v, no) {
   #' @param no number of response options
   #' @return a tbl with by-trial choice probabilities
   
-  # construct the transformation matrix for the difference scores for the first option  
+  # construct the transformation matrix for the difference scores for the first option
   A <- list()
   if (no == 4) {
-    A1 <- matrix(c(1,-1,0,0, 1,0,-1,0, 1,0,0,-1), nrow = 3, byrow = TRUE)
+    A1 <- matrix(c(1, -1, 0, 0, 1, 0, -1, 0, 1, 0, 0, -1), nrow = 3, byrow = TRUE)
     # construct an array to contain the transformation matrices for all options
     A[[1]] <- A1
     # transformation of each other option is just a shuffle of the one for option 1
-    A[[2]] <- A1[,c(2,1,3,4)]
-    A[[3]] <- A1[,c(2,3,1,4)]
-    A[[4]] <- A1[,c(2,3,4,1)]
+    A[[2]] <- A1[, c(2, 1, 3, 4)]
+    A[[3]] <- A1[, c(2, 3, 1, 4)]
+    A[[4]] <- A1[, c(2, 3, 4, 1)]
   } else if (no == 2) {
     A[[1]] <- matrix(c(1, -1), nrow = 1)
     A[[2]] <- matrix(c(-1, 1), nrow = 1)
   }
   
   # initialize a matrix for the choice probabilities
-  prob <- matrix(0.0,ncol=ncol(m),nrow=nrow(m))
+  prob <- matrix(0.0, ncol = ncol(m), nrow = nrow(m))
   # loop through all trials
-  for(t in 1:nrow(m)) {
+  for (t in 1:nrow(m)) {
     # iterate over all options
     prob[t, ] <- map_dbl(A, normprobs, mt = m[t, ], vt = v[t, ])
   }
@@ -794,21 +789,21 @@ thompson_choice_prob_map <- function(m, v, no) {
 
 
 ucb_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta) {
-  #' 
+  #'
   #' @description soft max choice rule with exploration bonus
   #' @param ms posterior means of the bandits
   #' @param vs posterior variances of the bandits
   #' @param gamma inverse temperature parameter
   #' @param beta ucb parameter
   #' @return a tbl with by-trial choice probabilities
-  prob <- exp(gamma * ms + beta * sqrt(vs + sigma_xi_sq))
+  prob <- exp(gamma * (ms + beta * sqrt(vs + sigma_xi_sq)))
   prob <- prob / rowSums(prob)
   return(prob)
 }
 
 
 ru_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix, nr_options) {
-  #' 
+  #'
   #' @description mixture between relative uncertainty and Thompson sampling
   #' @param ms posterior means of the bandits
   #' @param vs posterior variances of the bandits
@@ -830,7 +825,7 @@ ru_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix,
 
 
 ucb_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix, nr_options) {
-  #' 
+  #'
   #' @description mixture between ucb and Thompson sampling
   #' @param ms posterior means of the bandits
   #' @param vs posterior variances of the bandits
@@ -849,29 +844,29 @@ ucb_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix
 
 
 fit_kalman_softmax <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description Kalman soft max fitting wrapper
   #' conditioned on ground truth responses
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
   gamma <- upper_and_lower_bounds_revert(x[[3]], 0, 3)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
     gamma
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
+  #'
   #' @description Kalman soft max fitting wrapper
   #' choosing according to learned choice probabilities
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
   gamma <- upper_and_lower_bounds_revert(x[[3]], 0, 3)
@@ -882,35 +877,35 @@ fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description Kalman soft max fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
-  #' 
+  #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
     gamma
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_softmax_no_variance_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
+  #'
   #' @description Kalman soft max fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
-  #' 
+  #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
@@ -921,35 +916,35 @@ fit_kalman_softmax_no_variance_choose <- function(x, tbl_results, tbl_rewards, n
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description kalman softmax fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
     gamma
   )
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_softmax_xi_variance_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
+  #'
   #' @description kalman softmax fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
@@ -959,34 +954,36 @@ fit_kalman_softmax_xi_variance_choose <- function(x, tbl_results, tbl_rewards, n
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_thompson <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description kalman thompson fitting wrapper
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- thompson_choice_prob_map(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(), 
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(),
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(),
     nr_options
-  ) %>% as.data.frame() %>% as_tibble()
+  ) %>%
+    as.data.frame() %>%
+    as_tibble()
   lik <- pmap_dbl(tibble(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
+  #'
   #' @description kalman thompson fitting wrapper
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
   params_choice <- list(choicemodel = "thompson")
@@ -996,34 +993,36 @@ fit_kalman_thompson_choose <- function(x, tbl_results, tbl_rewards, nr_options) 
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_thompson_xi_variance <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description kalman thompson fitting wrapper
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- 16
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- thompson_choice_prob_map(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(), 
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")) %>% as.matrix(),
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")) %>% as.matrix(),
     nr_options
-  ) %>% as.data.frame() %>% as_tibble()
+  ) %>%
+    as.data.frame() %>%
+    as_tibble()
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_thompson_xi_variance_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
-  #' 
+  #'
   #' @description kalman thompson fitting wrapper
-  #' 
+  #'
   sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
   sigma_epsilon_sq <- 16
   params_choice <- list(choicemodel = "thompson")
@@ -1033,23 +1032,23 @@ fit_kalman_thompson_xi_variance_choose <- function(x, tbl_results, tbl_rewards, 
   lik <- pmax(lik, .0000001)
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
-fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
-  #' 
+fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options, bds) {
+  #'
   #' @description Kalman soft max with ucb fitting wrapper,
   #' fix Kalman variances to the true value
-  #' 
+  #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
-  beta <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
+  gamma <- upper_and_lower_bounds_revert(x[[1]], bds$gamma$lo, bds$gamma$hi)
+  beta <- upper_and_lower_bounds_revert(x[[2]], bds$beta$lo, bds$beta$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- ucb_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_")),
     sigma_xi_sq,
     gamma,
     beta
@@ -1057,15 +1056,15 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options) {
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description Kalman ru and thompson mixture fitting wrapper,
   #' fix Kalman variances to the true value
-  #' 
+  #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
@@ -1073,22 +1072,22 @@ fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
   w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ru_and_thompson_choice_prob(
-    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))), 
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))),
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_"))),
     sigma_xi_sq, gamma, beta, w_mix, nr_options
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices_mix, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_kalman_ucb_thompson_no_variance <- function(x, tbl_results, nr_options) {
-  #' 
+  #'
   #' @description Kalman ucb and thompson mixture fitting wrapper,
   #' fix Kalman variances to the true value
-  #' 
+  #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
@@ -1096,35 +1095,35 @@ fit_kalman_ucb_thompson_no_variance <- function(x, tbl_results, nr_options) {
   w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ucb_and_thompson_choice_prob(
-    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))), 
+    as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))),
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("v_"))),
     sigma_xi_sq, gamma, beta, w_mix, nr_options
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices_mix, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
 fit_delta_softmax <- function(x, tbl_results, nr_options, is_decay = FALSE) {
-  #' 
+  #'
   #' @description delta rule soft max fitting wrapper
   #' conditioned on ground truth responses
   #' can be used for delta rule or decay rule
   #' @param is_decay flags what learning rule is used (i.e., delta or decay)
-  #' 
+  #'
   delta <- upper_and_lower_bounds_revert(x[[1]], 0, 1)
   gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
   tbl_learned <- delta_learning(tbl_results, nr_options, delta, is_decay = is_decay)
   p_choices <- softmax_choice_prob(
-    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")), 
+    tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
     gamma
   )
   lik <- pmap_dbl(as.data.frame(cbind(p_choices, tbl_results$choices)), ~ c(..1, ..2, ..3, ..4)[..5])
   llik <- log(lik)
   sllik <- sum(llik)
-  return(-2*sllik)
+  return(-2 * sllik)
 }
 
 
@@ -1159,7 +1158,7 @@ fit_thompson_one_variance_wrapper <- function(tbl_results, tbl_rewards, conditio
   params_init <- c(upper_and_lower_bounds(15, 0, 30))
   if (condition_on_observed_choices) {
     result_optim <- optimize(
-      fit_kalman_thompson_xi_variance, c(-10.308, 12.611), 
+      fit_kalman_thompson_xi_variance, c(-10.308, 12.611),
       tbl_results = tbl_results, nr_options = 4
     )
     r <- c(
@@ -1186,13 +1185,14 @@ fit_thompson_one_variance_wrapper <- function(tbl_results, tbl_rewards, conditio
 fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(
-    upper_and_lower_bounds(15, 0, 30), 
+    upper_and_lower_bounds(15, 0, 30),
     upper_and_lower_bounds(15, 0, 30),
     upper_and_lower_bounds(.2, 0, 3)
   )
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_softmax, tbl_results = tbl_results, nr_options = 4
+      params_init, fit_kalman_softmax,
+      tbl_results = tbl_results, nr_options = 4
     )
     r <- c(
       upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
@@ -1201,7 +1201,7 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
     )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
-      fit_kalman_softmax_choose, 
+      fit_kalman_softmax_choose,
       lower = c(-19.51929, -19.51929, -17.21671),
       upper = c(19.51929, 19.51929, 17.21671),
       control = DEoptim.control(trace = 10),
@@ -1221,12 +1221,12 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
 fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(
-    upper_and_lower_bounds(15, 0, 30), 
+    upper_and_lower_bounds(15, 0, 30),
     upper_and_lower_bounds(.2, 0, 3)
   )
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_softmax_xi_variance, 
+      params_init, fit_kalman_softmax_xi_variance,
       tbl_results = tbl_results, nr_options = 4
     )
     r <- c(
@@ -1236,7 +1236,7 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
     )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
-      fit_kalman_softmax_xi_variance_choose, 
+      fit_kalman_softmax_xi_variance_choose,
       lower = c(-19.51929, -17.21671),
       upper = c(19.51929, 17.21671),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
@@ -1285,22 +1285,30 @@ fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
 }
 
 
-fit_ucb_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_ucb_no_variance_wrapper <- function(
+    tbl_results, tbl_rewards, condition_on_observed_choices, bds
+) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(
-    upper_and_lower_bounds(1.5, 0, 3),
-    upper_and_lower_bounds(0.001, 0, 3)
+  
+  params_init <- pmap_dbl(
+    list(c(.5, .25), map_dbl(bds, "lo"), map_dbl(bds, "hi")),
+    upper_and_lower_bounds
   )
+  
   if (condition_on_observed_choices) {
     result_optim <- optim(
       params_init, fit_kalman_ucb_no_variance,
-      tbl_results = tbl_results, nr_options = 4
+      tbl_results = tbl_results, nr_options = 4, bds = bds
     )
+    
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$par[1], 0, 3),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
-      result_optim$value
+      pmap_dbl(list(
+        c(result_optim$par[1], result_optim$par[2]), 
+        map_dbl(bds, "lo"), map_dbl(bds, "hi")
+      ), upper_and_lower_bounds_revert
+      ), result_optim$value
     )
+    
   } else if (!condition_on_observed_choices) {
     stop("code not yet developed")
   }
@@ -1338,10 +1346,10 @@ fit_mixture_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_
 
 
 fit_delta_softmax_wrapper <- function(tbl_results, tbl_rewards, is_decay, condition_on_observed_choices) {
-  #' 
+  #'
   #' @description wrapper around delta rule soft max fitting wrapper
   #' conditioned on ground truth responses
-  #' 
+  #'
   
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
   params_init <- c(
@@ -1379,21 +1387,19 @@ upper_and_lower_bounds_revert <- function(par, lo, hi) {
 
 
 kalman_softmax_experiment <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_softmax(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
     nr_trials, lambda, nr_vars
   )
   
   tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
     simulate data = ", simulate_data, ", nr participants = ", nr_participants,
     " nr trials = ", nr_trials, "\n"
   )
@@ -1403,22 +1409,20 @@ kalman_softmax_experiment <- function(
 }
 
 simulate_and_fit_softmax <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
-) {
-  
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials) {
   # simulate data
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   
   plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
-    simulate_kalman, 
+    simulate_kalman,
     tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
@@ -1433,19 +1437,19 @@ simulate_and_fit_softmax <- function(
   
   plan(multisession, workers = availableCores() / 2)
   l_softmax <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(my_current_wrapper), 
+    safely(my_current_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
   l_results <- map(l_softmax, "result")
   idx <- 1
-  for (p in l_results){
-    if (is.null(p)){
+  for (p in l_results) {
+    if (is.null(p)) {
       l_results[[idx]] <- rep(NA, (nr_vars + 2))
     }
     idx <- idx + 1
@@ -1457,7 +1461,7 @@ simulate_and_fit_softmax <- function(
     colnames(tbl_results_softmax) <- c("gamma_ml", "neg_ll")
   } else if (nr_vars == 1) {
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "gamma_ml", "neg_ll")
-  }  else if (nr_vars == 2) {
+  } else if (nr_vars == 2) {
     colnames(tbl_results_softmax) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "neg_ll")
   }
   
@@ -1470,21 +1474,19 @@ simulate_and_fit_softmax <- function(
 
 
 kalman_thompson_experiment <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_thompson(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
     nr_trials, lambda, nr_vars
   )
   
   tbl_results_kalman_thompson <- simulate_and_fit_thompson(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
   
   progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ", 
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
     simulate data = ", simulate_data, ", nr participants = ", nr_participants,
     " nr trials = ", nr_trials, "\n"
   )
@@ -1496,23 +1498,22 @@ kalman_thompson_experiment <- function(
 
 
 simulate_and_fit_thompson <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
-) {
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials) {
   # create a tbl with simulation & model parameters
   
   
   # simulate data
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
-    simulate_kalman, 
+    simulate_kalman,
     tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
@@ -1521,23 +1522,23 @@ simulate_and_fit_thompson <- function(
     my_current_wrapper <- fit_thompson_one_variance_wrapper
   } else if (nr_vars == 2) {
     my_current_wrapper <- fit_thompson_wrapper
-  } 
+  }
   
   plan(multisession, workers = availableCores() / 2)
   l_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(my_current_wrapper), 
+    safely(my_current_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
   l_results <- map(l_thompson, "result")
   idx <- 1
-  for (p in l_results){
-    if (is.null(p)){
+  for (p in l_results) {
+    if (is.null(p)) {
       l_results[[idx]] <- c(NA, NA, NA)
     }
     idx <- idx + 1
@@ -1547,7 +1548,7 @@ simulate_and_fit_thompson <- function(
   
   if (nr_vars == 1) {
     colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "neg_ll")
-  }  else if (nr_vars == 2) {
+  } else if (nr_vars == 2) {
     colnames(tbl_results_thompson) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "neg_ll")
   }
   
@@ -1559,23 +1560,21 @@ simulate_and_fit_thompson <- function(
 
 
 kalman_ucb_experiment <- function(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars, bds) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_ucb(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, 
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data,
     nr_participants, nr_trials, lambda, nr_vars
   )
   
   tbl_results_kalman_ucb <- simulate_and_fit_ucb(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds
   )
   
   progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd,
     " beta_mn = ", beta_mn, ", beta sd = ", beta_sd,
     ", simulate data = ", simulate_data, ", nr participants = ", nr_participants,
     " nr trials = ", nr_trials, "\n"
@@ -1586,41 +1585,40 @@ kalman_ucb_experiment <- function(
 }
 
 simulate_and_fit_ucb <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
-) {
-  
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds) {
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   # simulate
-  plan(multisession, workers = availableCores() / 2)
+  plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
-    simulate_kalman, 
+    simulate_kalman,
     tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # fit
-  plan(multisession, workers = availableCores() / 2)
+  plan(multisession, workers = availableCores() - 2)
   l_ucb <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ucb_no_variance_wrapper), 
+    safely(fit_ucb_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    bds = bds,
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
   l_results <- map(l_ucb, "result")
   idx <- 1
-  for (p in l_results){
-    if (is.null(p)){
+  for (p in l_results) {
+    if (is.null(p)) {
       l_results[[idx]] <- c(NA, NA, NA)
     }
     idx <- idx + 1
@@ -1632,7 +1630,7 @@ simulate_and_fit_ucb <- function(
     colnames(tbl_results_ucb) <- c("gamma_ml", "beta_ml", "neg_ll")
   } else if (nr_vars == 1) {
     colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "neg_ll")
-  }  else if (nr_vars == 2) {
+  } else if (nr_vars == 2) {
     colnames(tbl_results_ucb) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "neg_ll")
   }
   
@@ -1642,50 +1640,47 @@ simulate_and_fit_ucb <- function(
   
   
   return(tbl_results_ucb)
-  
 }
 
 
 simulate_and_fit_mixture <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
-) {
-  
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials) {
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   # simulate
   plan(multisession, workers = availableCores() - 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
-    simulate_kalman, 
+    simulate_kalman,
     tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # fit
   mixturetype <- tbl_params_participants$params_decision[[1]][["choicemodel"]]
-  if(mixturetype == "ucb_thompson") f_fit <- fit_kalman_ucb_thompson_no_variance
-  if(mixturetype == "ru_thompson") f_fit <- fit_kalman_ru_thompson_no_variance
+  if (mixturetype == "ucb_thompson") f_fit <- fit_kalman_ucb_thompson_no_variance
+  if (mixturetype == "ru_thompson") f_fit <- fit_kalman_ru_thompson_no_variance
   plan(multisession, workers = availableCores() - 2)
   l_mixture <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_mixture_no_variance_wrapper), 
+    safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = f_fit,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
   l_results <- map(l_mixture, "result")
   idx <- 1
-  for (p in l_results){
-    if (is.null(p)){
+  for (p in l_results) {
+    if (is.null(p)) {
       l_results[[idx]] <- c(NA, NA, NA)
     }
     idx <- idx + 1
@@ -1697,7 +1692,7 @@ simulate_and_fit_mixture <- function(
     colnames(tbl_results_mixture) <- c("gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   } else if (nr_vars == 1) {
     colnames(tbl_results_mixture) <- c("sigma_xi_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
-  }  else if (nr_vars == 2) {
+  } else if (nr_vars == 2) {
     colnames(tbl_results_mixture) <- c("sigma_xi_sq_ml", "sigma_epsilon_sq_ml", "gamma_ml", "beta_ml", "w_mix_ml", "neg_ll")
   }
   
@@ -1707,19 +1702,16 @@ simulate_and_fit_mixture <- function(
   
   
   return(tbl_results_mixture)
-  
 }
 
 
 kalman_mixture_experiment <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars, mixturetype
-) {
-  
+    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars, mixturetype) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_mixture(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data, 
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data,
     nr_participants, nr_trials, lambda, nr_vars, mixturetype
   )
   
@@ -1728,7 +1720,7 @@ kalman_mixture_experiment <- function(
   )
   
   progress_msg <- str_c(
-    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, 
+    "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd,
     " w_mix_mn = ", w_mix_mn, ", w_mix sd = ", w_mix_sd,
     ", simulate data = ", simulate_data, ", nr participants = ", nr_participants,
     " nr trials = ", nr_trials, "\n"
@@ -1740,14 +1732,12 @@ kalman_mixture_experiment <- function(
 
 
 delta_experiment <- function(
-    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, is_decay, lambda
-) {
-  
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, is_decay, lambda) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_delta(
-    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
     nr_trials, is_decay, lambda
   )
   
@@ -1766,40 +1756,38 @@ delta_experiment <- function(
 
 
 simulate_and_fit_delta <- function(
-    tbl_params_participants, is_decay, cond_on_choices, nr_trials
-) {
-  
+    tbl_params_participants, is_decay, cond_on_choices, nr_trials) {
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   plan(multisession, workers = availableCores() / 2)
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
-    simulate_delta, 
+    simulate_delta,
     tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   plan(multisession, workers = availableCores() / 2)
   l_softmax <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_delta_softmax_wrapper), 
+    safely(fit_delta_softmax_wrapper),
     is_decay = is_decay,
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   # replace empty results with NAs
   l_results <- map(l_softmax, "result")
   idx <- 1
-  for (p in l_results){
-    if (is.null(p)){
+  for (p in l_results) {
+    if (is.null(p)) {
       l_results[[idx]] <- rep(NA, (nr_vars + 2))
     }
     idx <- idx + 1
@@ -1813,12 +1801,11 @@ simulate_and_fit_delta <- function(
   
   
   return(tbl_results_delta)
-  
 }
 
 
 generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials) {
-  #' 
+  #'
   #' @description generate random walk data on bandits with independent means
   #' @param sigma_xi_sq innovation variance
   #' @param sigma_epsilon_sq noise variance
@@ -1830,13 +1817,13 @@ generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda
   mus <- matrix(nrow = nr_trials, ncol = nr_bandits)
   mus[1, ] <- mu1
   for (t in 2:nr_trials) {
-    mus[t, ] <- lambda * mus[t-1, ] + rnorm(nr_bandits, 0, sqrt(sigma_xi_sq))
+    mus[t, ] <- lambda * mus[t - 1, ] + rnorm(nr_bandits, 0, sqrt(sigma_xi_sq))
   }
   noise <- matrix(
     rnorm(nr_trials * nr_bandits, 0, sqrt(sigma_epsilon_sq)),
     nrow = nr_trials, ncol = nr_bandits
   )
-  as_tibble(as.data.frame(mus + noise)) %>% 
+  as_tibble(as.data.frame(mus + noise)) %>%
     mutate(trial_id = 1:nr_trials) %>%
     rename("Arm 1" = V1, "Arm 2" = V2, "Arm 3" = V3, "Arm 4" = V4)
 }
@@ -1844,10 +1831,9 @@ generate_restless_bandits <- function(sigma_xi_sq, sigma_epsilon_sq, mu1, lambda
 
 
 create_participant_sample_softmax <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nr_vars
-) {
-  #' 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, lambda, nr_vars) {
+  #'
   #' @description create pool of participants deciding according to soft max rule
   #' with individual parameters fixed or sampled from normal distribution
   #' @param gamma_mn average inverse temperature
@@ -1869,12 +1855,12 @@ create_participant_sample_softmax <- function(
   }
   
   s_gamma <- -1
-  while(s_gamma < 0){
+  while (s_gamma < 0) {
     gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
     s_gamma <- min(gamma)
   }
   s_seeds <- -1
-  while(s_seeds < nr_participants) {
+  while (s_seeds < nr_participants) {
     seed <- round(rnorm(nr_participants, 100000, 10000), 0)
     s_seeds <- length(unique(seed))
   }
@@ -1897,10 +1883,9 @@ create_participant_sample_softmax <- function(
 
 
 create_participant_sample_thompson <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nr_vars
-) {
-  #' 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, lambda, nr_vars) {
+  #'
   #' @description create pool of participants deciding according to thompson sampling (MAP)
   #' with individual parameters fixed or sampled from normal distribution
   #' @param gamma_mn average inverse temperature
@@ -1910,7 +1895,7 @@ create_participant_sample_thompson <- function(
   #' @param nr_trials number of choices in the restless bandit task
   #' @param lambda decay parameter of random walk
   #' @param nr_vars how many variances of the kalman filter are varied and fit
-  #' @return a tbl with by-participant parameters  
+  #' @return a tbl with by-participant parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   sigma_xi_sq <- rep(16, nr_participants)
   sigma_epsilon_sq <- rep(16, nr_participants)
@@ -1919,11 +1904,11 @@ create_participant_sample_thompson <- function(
   } else if (nr_vars == 2) {
     sigma_xi_sq <- rnorm(nr_participants, 16, 3)
     sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
-  }  
+  }
   
   
   s_seeds <- -1
-  while(s_seeds < nr_participants) {
+  while (s_seeds < nr_participants) {
     seed <- round(rnorm(nr_participants, 100000, 10000), 0)
     s_seeds <- length(unique(seed))
   }
@@ -1942,14 +1927,12 @@ create_participant_sample_thompson <- function(
   )
   
   return(tbl_params_thompson)
-  
 }
 
 
 create_participant_sample_ucb <- function(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nr_vars
-) {
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
+    nr_trials, lambda, nr_vars) {
   # create a tbl with simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   sigma_xi_sq <- rep(16, nr_participants)
@@ -1959,20 +1942,21 @@ create_participant_sample_ucb <- function(
   } else if (nr_vars == 2) {
     sigma_xi_sq <- rnorm(nr_participants, 16, 3)
     sigma_epsilon_sq <- rnorm(nr_participants, 16, 3)
-  }  
+  }
   
   s_gamma <- -1
-  while(s_gamma < 0){
+  while (s_gamma < 0) {
     gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
     s_gamma <- min(gamma)
   }
   s_beta <- -1
-  while(s_beta < 0) {
-    beta <- rnorm(nr_participants, beta_mn, beta_sd)
-    s_beta <- min(beta)
-  }
+  #can be theoretically below 0
+  #while (s_beta < 0) {
+  beta <- rnorm(nr_participants, beta_mn, beta_sd)
+  #s_beta <- min(beta)
+  #}
   s_seeds <- -1
-  while(s_seeds < nr_participants) {
+  while (s_seeds < nr_participants) {
     seed <- round(rnorm(nr_participants, 100000, 10000), 0)
     s_seeds <- length(unique(seed))
   }
@@ -1985,7 +1969,7 @@ create_participant_sample_ucb <- function(
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = map2(
-      gamma, beta, 
+      gamma, beta,
       ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
     ),
     simulate_data = simulate_data,
@@ -1997,10 +1981,9 @@ create_participant_sample_ucb <- function(
 
 
 create_participant_sample_mixture <- function(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, 
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
     simulate_data, nr_participants, nr_trials, lambda, nr_vars,
-    mixturetype
-) {
+    mixturetype) {
   # create a tbl with simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   sigma_xi_sq <- rep(16, nr_participants)
@@ -2014,24 +1997,24 @@ create_participant_sample_mixture <- function(
   
   max_w_mix <- 1.1
   min_w_mix <- -1
-  while(max_w_mix > 1 | min_w_mix < 0) {
+  while (max_w_mix > 1 | min_w_mix < 0) {
     w_mix <- rnorm(nr_participants, w_mix_mn, w_mix_sd)
     max_w_mix <- max(w_mix)
     min_w_mix <- min(w_mix)
   }
   s_beta <- -1
-  while(s_beta < 0) {
+  while (s_beta < 0) {
     beta <- rnorm(nr_participants, beta_mn, beta_sd)
     s_beta <- min(beta)
   }
   s_gamma <- -1
-  while(s_gamma < 0){
+  while (s_gamma < 0) {
     gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
     s_gamma <- min(gamma)
   }
   
   s_seeds <- -1
-  while(s_seeds < nr_participants) {
+  while (s_seeds < nr_participants) {
     seed <- round(rnorm(nr_participants, 100000, 10000), 0)
     s_seeds <- length(unique(seed))
   }
@@ -2044,7 +2027,7 @@ create_participant_sample_mixture <- function(
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = pmap(
-      list(gamma, beta, w_mix), 
+      list(gamma, beta, w_mix),
       ~ list(gamma = ..1, beta = ..2, w_mix = ..3, choicemodel = mixturetype, no = 4)
     ),
     simulate_data = simulate_data,
@@ -2056,11 +2039,10 @@ create_participant_sample_mixture <- function(
 
 
 create_participant_sample_delta <- function(
-    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, is_decay, lambda
-) {
-  #' 
-  #' @description create pool of participants learning with delta rule and 
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
+    nr_trials, is_decay, lambda) {
+  #'
+  #' @description create pool of participants learning with delta rule and
   #' deciding according to soft max rule
   #' with individual parameters fixed or sampled from normal distribution
   #' @param gamma_mn average inverse temperature
@@ -2076,18 +2058,18 @@ create_participant_sample_delta <- function(
   
   min_delta <- -1
   max_delta <- 1.1
-  while(min_delta < 0 |max_delta > 1){
+  while (min_delta < 0 | max_delta > 1) {
     delta <- rnorm(nr_participants, delta_mn, delta_sd)
     min_delta <- min(delta)
     max_delta <- max(delta)
   }
   s_gamma <- -1
-  while(s_gamma < 0){
+  while (s_gamma < 0) {
     gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
     s_gamma <- min(gamma)
   }
   s_seeds <- -1
-  while(s_seeds < nr_participants) {
+  while (s_seeds < nr_participants) {
     seed <- round(rnorm(nr_participants, 100000, 10000), 0)
     s_seeds <- length(unique(seed))
   }
@@ -2098,7 +2080,7 @@ create_participant_sample_delta <- function(
     lambda = lambda,
     nr_trials = nr_trials,
     params_decision = map(
-      gamma,  
+      gamma,
       ~ list(gamma = ..1, choicemodel = "softmax", no = 4)
     ),
     simulate_data = simulate_data,
@@ -2110,25 +2092,26 @@ create_participant_sample_delta <- function(
 
 
 recover_softmax <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  #' 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars) {
+  #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_softmax(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, nr_vars)
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, lambda, nr_vars
+  )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_params_participants, tbl_rewards, cond_on_choices,
+    family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2138,25 +2121,26 @@ recover_softmax <- function(
 
 
 recover_thompson <- function(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  #' 
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars) {
+  #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_thompson(
-    gamma_mn, gamma_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, 1)
+    gamma_mn, gamma_sd, simulate_data, nr_participants,
+    nr_trials, lambda, 1
+  )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_params_participants, tbl_rewards, cond_on_choices,
+    family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2166,25 +2150,26 @@ recover_thompson <- function(
 
 
 recover_ucb <- function(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, lambda, nr_vars
-) {
-  #' 
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, lambda, nr_vars) {
+  #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_ucb(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants, 
-    nr_trials, lambda, 1)
+    gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
+    nr_trials, lambda, 1
+  )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq[1], sigma_epsilon_sq[1], mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_params_participants, tbl_rewards, cond_on_choices,
+    family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2195,26 +2180,26 @@ recover_ucb <- function(
 
 recover_mixture <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype, 
-    lambda, nr_vars
-) {
-  #' 
+    simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype,
+    lambda, nr_vars) {
+  #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_mixture(
-    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data, 
+    gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd, simulate_data,
     nr_participants, nr_trials, lambda, nr_vars, mixturetype
-    )
+  )
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_params_participants, tbl_rewards, cond_on_choices,
+    family = "kalman"
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2224,26 +2209,26 @@ recover_mixture <- function(
 
 
 recover_delta <- function(
-    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
-    nr_trials, cond_on_choices, is_decay, lambda
-) {
-  #' 
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
+    nr_trials, cond_on_choices, is_decay, lambda) {
+  #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
   
   tbl_params_participants <- create_participant_sample_delta(
-    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants, 
+    gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
     nr_trials, is_decay, lambda
   ) %>% select(-is_decay)
   
   # simulate one fixed data set in case needed
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
-  ) %>% 
+  ) %>%
     select(-trial_id)
   
   l_models_fit <- simulate_and_fit_models(
-    tbl_params_participants, tbl_rewards, cond_on_choices, family = "delta", is_decay = is_decay
+    tbl_params_participants, tbl_rewards, cond_on_choices,
+    family = "delta", is_decay = is_decay
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2252,30 +2237,30 @@ recover_delta <- function(
 }
 
 
-simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_choices, family, is_decay = NULL) {
-  #' 
+simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_choices, family, is_decay = NULL, bds) {
+  #'
   #' @description simulate choices with specifications from tbl_params_simulate
   #' and fit all models afterwards
   
   # simulate choices given soft max choice model
   plan(multisession, workers = availableCores() / 2)
-  #plan(multisession, workers = 2)
+  # plan(multisession, workers = 2)
   cat("\nsimulating data")
   if (family == "kalman") {
     l_choices_simulated <- future_pmap(
-    tbl_params_simulate,
-    simulate_kalman, 
-    tbl_rewards = tbl_rewards,
-    .progress = TRUE, 
-    .options = furrr_options(seed = NULL)
-  )
+      tbl_params_simulate,
+      simulate_kalman,
+      tbl_rewards = tbl_rewards,
+      .progress = TRUE,
+      .options = furrr_options(seed = NULL)
+    )
   } else if (family == "delta") {
     l_choices_simulated <- future_pmap(
       tbl_params_simulate,
-      simulate_delta, 
+      simulate_delta,
       tbl_rewards = tbl_rewards,
       is_decay = is_decay,
-      .progress = TRUE, 
+      .progress = TRUE,
       .options = furrr_options(seed = NULL)
     )
   }
@@ -2283,75 +2268,76 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   cat("\nfitting kalman softmax")
   # fit candidate models on generated data
   l_softmax <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_softmax_no_variance_wrapper), 
+    safely(fit_softmax_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting kalman thompson")
   l_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_thompson_one_variance_wrapper), 
+    safely(fit_thompson_one_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting kalman ucb")
   l_ucb <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_ucb_no_variance_wrapper), 
+    safely(fit_ucb_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    bds = bds[["ucb"]], 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting kalman ucb & thompson")
   l_ucb_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_mixture_no_variance_wrapper), 
+    safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = fit_kalman_ucb_thompson_no_variance,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting kalman ru & thompson")
   l_ru_thompson <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_mixture_no_variance_wrapper), 
+    safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = fit_kalman_ru_thompson_no_variance,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting delta")
   l_delta <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_delta_softmax_wrapper), 
+    safely(fit_delta_softmax_wrapper),
     is_decay = FALSE,
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
   cat("\nfitting decay")
   l_decay <- future_map2(
-    map(l_choices_simulated, "tbl_return"), 
+    map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
-    safely(fit_delta_softmax_wrapper), 
+    safely(fit_delta_softmax_wrapper),
     is_decay = TRUE,
     condition_on_observed_choices = cond_on_choices,
-    .progress = TRUE, 
+    .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
   
@@ -2368,7 +2354,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
 
 
 read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
-  #' 
+  #'
   #' @description read out by-participant log likelihoods for each model
   #' and summarize these results
   
@@ -2387,11 +2373,11 @@ read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
     # bic
     bic_softmax = log(nr_participants) + neg2ll_softmax,
     bic_thompson = log(nr_participants) + neg2ll_thompson,
-    bic_ucb = 2*log(nr_participants) + neg2ll_ucb,
-    bic_ucb_thompson = 3*log(nr_participants) + neg2ll_ucb_thompson,
-    bic_ru_thompson = 3*log(nr_participants) + neg2ll_ru_thompson,
-    bic_delta = 2*log(nr_participants) + neg2ll_delta,
-    bic_decay = 2*log(nr_participants) + neg2ll_decay,
+    bic_ucb = 2 * log(nr_participants) + neg2ll_ucb,
+    bic_ucb_thompson = 3 * log(nr_participants) + neg2ll_ucb_thompson,
+    bic_ru_thompson = 3 * log(nr_participants) + neg2ll_ru_thompson,
+    bic_delta = 2 * log(nr_participants) + neg2ll_delta,
+    bic_decay = 2 * log(nr_participants) + neg2ll_decay,
     
     # aic
     aic_softmax = 2 + neg2ll_softmax,
@@ -2414,15 +2400,16 @@ read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
 }
 
 summarize_model_recovery <- function(tbl_lls, ic) {
-  #' 
+  #'
   #' @description summarize by-participant log likelihoods
-  #' 
+  #'
   tbl_models <- tibble(
     model = str_c(
       ic, c("_softmax", "_thompson", "_ucb", "_ucb_thompson", "_ru_thompson", "_delta", "_decay")
-      ))
+    )
+  )
   
-  tbl_recovered <- tbl_lls %>% 
+  tbl_recovered <- tbl_lls %>%
     pivot_longer(cols = starts_with(ic), names_to = "model") %>%
     group_by(participant_id) %>%
     mutate(min_ic = min(value)) %>%
@@ -2435,3 +2422,5 @@ summarize_model_recovery <- function(tbl_lls, ic) {
   
   return(tbl_recovered)
 }
+
+add_repl_id <- function(x, y) {x$replication_id <- y; return(x)}

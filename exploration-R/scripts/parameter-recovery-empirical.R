@@ -44,6 +44,11 @@ l_participants <- tbl_rb %>% split(., .$"id2")
 
 tbl_rewards <- tibble(NA)
 
+tbl_rb %>% filter(cond == "nts") %>% 
+  ggplot(aes(trial, rewards, group = choices)) + 
+  stat_summary(geom = "line", fun = "mean", aes(color = choices)) +
+  stat_summary(geom = "point", fun = "mean", aes(color = choices)) + 
+  facet_grid( ~ seed)
 
 # generate randomly walking arms
 mu1 <- c(-60, -20, 20, 60)

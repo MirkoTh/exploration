@@ -60,6 +60,11 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 }
 
 
+bds <- list(
+  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
+)
+
+
 
 # Softmax & Kalman --------------------------------------------------------
 
@@ -135,10 +140,14 @@ l_params_decision <- map2(
   ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
 )
 
+bds <- list(
+  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
+)
+
 tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
 if (fit_or_load == "fit") {
-  l_models_fit_kalman_ucb <- simulate_and_fit_models(
-    tbl_participants_kalman_ucb, tbl_rewards, cond_on_choices, family = "kalman"
+  l_models_fit_kalman_ucb <- simuelate_and_fit_models(
+    tbl_participants_kalman_ucb, tbl_rewards, cond_on_choices, family = "kalman", bds = bds
   )
   saveRDS(l_models_fit_kalman_ucb, file = "exploration-R/data/model-recovery-empirical-ucb.rds")
 } else if (fit_or_load == "load") {

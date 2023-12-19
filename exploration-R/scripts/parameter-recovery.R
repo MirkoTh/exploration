@@ -18,6 +18,7 @@ library(furrr)
 library(reactable)
 library(reactablefmtr)
 library(ggbeeswarm)
+library(DEoptim)
 
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
@@ -239,7 +240,6 @@ if (fit_or_load == "fit")  {
   l_results_softmax_0var <- readRDS("exploration-R/data/recovery-softmax-no-variance.RDS")
 }
 
-add_repl_id <- function(x, y) {x$replication_id <- y; return(x)}
 
 l_results_softmax_0var <- map2(
   l_results_softmax_0var, 1:length(l_results_softmax_0var), 
@@ -420,12 +420,12 @@ tbl_params_thompson <- crossing(
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.08, .16, 1),#[1],
-  gamma_sd = c(.05, .1, .2)#[1]
+  gamma_mn = c(.02, .08, .16),#[1],
+  gamma_sd = c(.007, .05, .1)#[1]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, 1.5),#[1],
-  beta_sd = c(.05, .25)#[1]
+  beta_mn = c(.15, 1.5),#[1],
+  beta_sd = c(.76, 1)#[1]
 )
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
@@ -437,13 +437,14 @@ tbl_params_ucb <- crossing(
   tbl_gammas, tbl_betas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
 
 if (fit_or_load == "fit")  {
   l_results_ucb_0var_all <- list()
   for (i in 1:n_reps) {
     l_results_ucb_0var <- pmap(
       tbl_params_ucb, kalman_ucb_experiment,
-      lambda = lambda, nr_vars = 0
+      lambda = lambda, nr_vars = 0, bds = bds
     )
     l_results_ucb_0var_all[[i]] <- l_results_ucb_0var
     saveRDS(l_results_ucb_0var_all, "exploration-R/data/recovery-ucb-no-variance.RDS")
@@ -475,7 +476,8 @@ for (tbl_r in l_results_ucb_0var) {
   counter_design[counter_design == 0] <- nrow(tbl_params_ucb)
 }
 
-tbl_cor_ucb_0var <- reduce(l_results_c_0var, rbind) %>%
+tbl_ucb_0var_results <- reduce(l_results_c_0var, rbind)
+tbl_cor_ucb_0var <- tbl_ucb_0var_results %>% filter(beta_mn == .17) %>%
   group_by(replication_id, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
@@ -557,6 +559,26 @@ pl_tradeoffs_ucb <- do.call("arrangeGrob", c(l_heatmaps_par_cor, ncol = 4))
 save_my_pdf_and_tiff(
   pl_tradeoffs_ucb, "figures/4arlb-ucb-param-correlations", 12, 9
 )
+
+tbl_ucb_0var_results %>%
+  group_by(gamma_mn, beta_mn, simulate_data, nr_participants, nr_trials)
+
+tbl_ucb_0var_agg <- grouped_agg(
+  tbl_ucb_0var_results, 
+  c(gamma_mn, beta_mn, simulate_data, nr_participants, nr_trials),
+  c(gamma_ml, beta_ml)
+  ) %>% ungroup()
+
+ggplot(tbl_ucb_0var_agg, aes(gamma_mn, mean_gamma_ml, group = beta_mn)) +
+  geom_abline() +
+  geom_point() +
+  coord_cartesian(xlim = c(0, .2), ylim = c(0, .2))
+
+ggplot(tbl_ucb_0var_agg, aes(beta_mn, mean_beta_ml, group = gamma_mn)) +
+  geom_abline() +
+  geom_point() +
+  coord_cartesian(xlim = c(0, 2), ylim = c(0, 2))
+
 
 
 # Kalman & Mixture: Fix Variances ------------------------------------------
