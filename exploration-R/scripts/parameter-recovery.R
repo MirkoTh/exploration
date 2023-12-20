@@ -53,8 +53,8 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.08, .16, 1, 3),
-  gamma_sd = c(.05, .1, .2, .2)
+  gamma_mn = c(.08, .16, .16),
+  gamma_sd = c(.05, .1, 1)
 )
 simulate_data <- c(TRUE, FALSE)[1]
 nr_participants <- c(200) 
@@ -65,11 +65,13 @@ cond_on_choices <- c(TRUE)
 tbl_params_softmax <- crossing(
   tbl_gammas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
+bds <- list(sigma_xi_sq = list(lo = 0, hi = 30), sigma_epsilon_sq = list(lo = 0, hi = 30), gamma = list(lo = 0, hi = 1))
+
 
 if (fit_or_load == "fit")  {
   l_results_softmax <- pmap(
     tbl_params_softmax, kalman_softmax_experiment, 
-    lambda = lambda, nr_vars = 2
+    lambda = lambda, nr_vars = 2, bds = bds
   )
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
   
@@ -151,13 +153,15 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 # take same combination of hyperparameters as before
+bds <- list(sigma_xi_sq = list(lo = 0, hi = 30), gamma = list(lo = 0, hi = 1))
 
 if (fit_or_load == "fit")  {
   l_results_softmax_1var <- pmap(
     tbl_params_softmax, 
     kalman_softmax_experiment, 
     lambda = lambda,
-    nr_vars = 1
+    nr_vars = 1,
+    bds = bds
   )
   saveRDS(l_results_softmax_1var, "exploration-R/data/recovery-softmax-one-variance.RDS")
 } else if (fit_or_load == "load")  {
@@ -224,6 +228,8 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 # Kalman & Softmax: Fix Variances ------------------------------------------
 
 
+bds <- list(gamma = list(lo = 0, hi = 1))
+
 if (fit_or_load == "fit")  {
   l_results_softmax_0var_all <- list()
   for (i in 1:n_reps) {
@@ -231,7 +237,8 @@ if (fit_or_load == "fit")  {
       tbl_params_softmax, 
       kalman_softmax_experiment, 
       lambda = lambda,
-      nr_vars = 0
+      nr_vars = 0,
+      bds = bds
     )
     l_results_softmax_0var_all[[i]] <- l_results_softmax_0var
     saveRDS(l_results_softmax_0var_all, "exploration-R/data/recovery-softmax-no-variance.RDS")
@@ -618,13 +625,14 @@ tbl_params_mixture <- crossing(
   simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype
 )
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
 
 if (fit_or_load == "fit")  {
   l_results_mixture_0var_all <- list()
   for (i in 1:n_reps) {
     l_results_mixture_0var <- pmap(
       tbl_params_mixture, kalman_mixture_experiment,
-      lambda = lambda, nr_vars = 0
+      lambda = lambda, nr_vars = 0, bds = bds
     )
     l_results_mixture_0var_all[[i]] <- l_results_mixture_0var
     saveRDS(l_results_mixture_0var_all, "exploration-R/data/recovery-mixture-no-variance.RDS")

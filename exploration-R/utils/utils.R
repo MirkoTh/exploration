@@ -843,14 +843,14 @@ ucb_and_thompson_choice_prob <- function(ms, vs, sigma_xi_sq, gamma, beta, w_mix
 }
 
 
-fit_kalman_softmax <- function(x, tbl_results, nr_options) {
+fit_kalman_softmax <- function(x, tbl_results, nr_options, bds) {
   #'
   #' @description Kalman soft max fitting wrapper
   #' conditioned on ground truth responses
   #'
-  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
-  sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], 0, 30)
-  gamma <- upper_and_lower_bounds_revert(x[[3]], 0, 3)
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], bds$sigma_xi_sq$lo, bds$sigma_xi_sq$hi)
+  sigma_epsilon_sq <- upper_and_lower_bounds_revert(x[[2]], bds$sigma_epsilon_sq$lo, bds$sigma_epsilon_sq$hi)
+  gamma <- upper_and_lower_bounds_revert(x[[3]], bds$gamma$lo, bds$gamma$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
@@ -881,14 +881,14 @@ fit_kalman_softmax_choose <- function(x, tbl_results, tbl_rewards, nr_options) {
 }
 
 
-fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options) {
+fit_kalman_softmax_no_variance <- function(x, tbl_results, nr_options, bds) {
   #'
   #' @description Kalman soft max fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
   #'
   sigma_xi_sq <- 16
   sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
+  gamma <- upper_and_lower_bounds_revert(x[[1]], bds$gamma$lo, bds$gamma$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
@@ -920,14 +920,15 @@ fit_kalman_softmax_no_variance_choose <- function(x, tbl_results, tbl_rewards, n
 }
 
 
-fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options) {
+fit_kalman_softmax_xi_variance <- function(x, tbl_results, nr_options, bds) {
   #'
   #' @description kalman softmax fitting wrapper, only optimize one of the
   #' two available variances, fix the other to the true value
   #'
-  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], 0, 30)
+  sigma_xi_sq <- upper_and_lower_bounds_revert(x[[1]], bds$sigma_xi_sq$lo, bds$sigma_xi_sq$hi)
   sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
+  gamma <- upper_and_lower_bounds_revert(x[[2]], bds$gamma$lo, bds$gamma$hi)
+  
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices <- softmax_choice_prob(
     tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_")),
@@ -1178,34 +1179,44 @@ fit_thompson_one_variance_wrapper <- function(tbl_results, tbl_rewards, conditio
 }
 
 
-fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, bds, params_init = NULL) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(
-    upper_and_lower_bounds(15, 0, 30),
-    upper_and_lower_bounds(15, 0, 30),
-    upper_and_lower_bounds(.2, 0, 3)
+  
+  if (is.null(params_init)) {
+    params_init <- c(16, 16, .25)
+  }
+  params_init_tf <- pmap_dbl(
+    list(params_init, map_dbl(bds, "lo"), map_dbl(bds, "hi")),
+    upper_and_lower_bounds
   )
+  
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_softmax,
-      tbl_results = tbl_results, nr_options = 4
+      params_init_tf, fit_kalman_softmax,
+      tbl_results = tbl_results, nr_options = 4,
+      bds = bds
     )
+    
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$par[1:2], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$par[3], 0, 3),
-      result_optim$value
+      pmap_dbl(list(
+        c(result_optim$par[1], result_optim$par[2], result_optim$par[3]), 
+        map_dbl(bds, "lo"), map_dbl(bds, "hi")
+      ), upper_and_lower_bounds_revert
+      ), result_optim$value
     )
+    
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_choose,
-      lower = c(-19.51929, -19.51929, -17.21671),
-      upper = c(19.51929, 19.51929, 17.21671),
+      lower = rep(-100, 3),
+      upper = rep(100, 3),
       control = DEoptim.control(trace = 10),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1:2], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], 0, 3),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], bds$sigma_xi_sq$lo, bds$sigma_xi_sq$hi),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], bds$sigma_epsilon_sq$lo, bds$sigma_epsilon_sq$hi),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[3], bds$gamma$lo, bds$gamma$hi),
       result_optim$optim$bestval
     )
   }
@@ -1214,32 +1225,41 @@ fit_softmax_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_
 }
 
 
-fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, bds, params_init = NULL) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(
-    upper_and_lower_bounds(15, 0, 30),
-    upper_and_lower_bounds(.2, 0, 3)
+  
+  if (is.null(params_init)) {
+    params_init <- c(16, .25)
+  }
+  params_init_tf <- pmap_dbl(
+    list(params_init, map_dbl(bds, "lo"), map_dbl(bds, "hi")),
+    upper_and_lower_bounds
   )
+  
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, fit_kalman_softmax_xi_variance,
-      tbl_results = tbl_results, nr_options = 4
+      params_init_tf, fit_kalman_softmax_xi_variance,
+      tbl_results = tbl_results, nr_options = 4,
+      bds = bds
     )
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$par[1], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
-      result_optim$value
+      pmap_dbl(list(
+        c(result_optim$par[1], result_optim$par[2]), 
+        map_dbl(bds, "lo"), map_dbl(bds, "hi")
+      ), upper_and_lower_bounds_revert
+      ), result_optim$value
     )
+
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_xi_variance_choose,
-      lower = c(-19.51929, -17.21671),
-      upper = c(19.51929, 17.21671),
+      lower = rep(-100, 2),
+      upper = rep(100, 2),
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], 0, 30),
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], 0, 3),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[1], bds$sigma_xi_sq$lo, bds$sigma_xi_sq$hi),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem[2], bds$gamma$lo, bds$gamma$hi),
       result_optim$optim$bestval
     )
   }
@@ -1248,30 +1268,29 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
 }
 
 
-fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices) {
+fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, bds, params_init = NULL) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(
-    upper_and_lower_bounds(.2, 0, 3)
-  )
+
   if (condition_on_observed_choices) {
     result_optim <- optimize(
-      fit_kalman_softmax_no_variance, c(-10.308, 12.611),
-      tbl_results = tbl_results, nr_options = 4
+      fit_kalman_softmax_no_variance, c(-100, 100),
+      tbl_results = tbl_results, nr_options = 4,
+      bds = bds
     )
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$minimum, 0, 3),
+      upper_and_lower_bounds_revert(result_optim$minimum, bds$gamma$lo, bds$gamma$hi),
       result_optim$objective
     )
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_no_variance_choose,
-      lower = -10.308,
-      upper = 12.611,
+      lower = -100,
+      upper = 100,
       tbl_results = tbl_results, tbl_rewards = tbl_rewards, nr_options = 4
     )
     
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$optim$bestmem, 0, 3),
+      upper_and_lower_bounds_revert(result_optim$optim$bestmem, bds$gamma$lo, bds$gamma$hi),
       result_optim$optim$bestval
     )
   }
@@ -1396,7 +1415,9 @@ upper_and_lower_bounds_revert <- function(par, lo, hi) {
 
 kalman_softmax_experiment <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants,
-    nr_trials, cond_on_choices, lambda, nr_vars) {
+    nr_trials, cond_on_choices, lambda, nr_vars,
+    bds
+    ) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_softmax(
@@ -1404,7 +1425,9 @@ kalman_softmax_experiment <- function(
     nr_trials, lambda, nr_vars
   )
   
-  tbl_results_kalman_softmax <- simulate_and_fit_softmax(tbl_params_participants, nr_vars, cond_on_choices, nr_trials)
+  tbl_results_kalman_softmax <- simulate_and_fit_softmax(
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds
+  )
   
   progress_msg <- str_c(
     "finished iteration: gamma mn = ", gamma_mn, ", gamma sd = ", gamma_sd, ",
@@ -1417,7 +1440,7 @@ kalman_softmax_experiment <- function(
 }
 
 simulate_and_fit_softmax <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials) {
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds) {
   # simulate data
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
@@ -1449,6 +1472,7 @@ simulate_and_fit_softmax <- function(
     map(l_choices_simulated, "tbl_rewards"),
     safely(my_current_wrapper),
     condition_on_observed_choices = cond_on_choices,
+    bds = bds,
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
