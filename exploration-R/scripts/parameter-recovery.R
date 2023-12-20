@@ -121,7 +121,7 @@ ggplot(tbl_cor_softmax_long, aes(gamma_mn, value, group = name)) +
   scale_color_viridis_d(name = "Parameter") +
   labs(x = "Gamma", y = "Correlation") +
   theme(strip.background = element_rect(fill = "white"))
-  
+
 
 
 # cors between pars
@@ -424,12 +424,12 @@ tbl_gammas <- tibble(
   gamma_sd = c(.007, .05, .1)#[1]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.15, 1.5),#[1],
-  beta_sd = c(.76, 1)#[1]
+  beta_mn = c(.15, .15, 1.5),#[1],
+  beta_sd = c(.1, .76, 1)#[1]
 )
-simulate_data <- c(TRUE, FALSE)#[1]
+simulate_data <- c(FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- c(200, 300)
 cond_on_choices <- c(TRUE)
 
 
@@ -477,20 +477,27 @@ for (tbl_r in l_results_ucb_0var) {
 }
 
 tbl_ucb_0var_results <- reduce(l_results_c_0var, rbind)
-tbl_cor_ucb_0var <- tbl_ucb_0var_results %>% filter(beta_mn == .17) %>%
-  group_by(replication_id, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
+tbl_cor_ucb_0var <- tbl_ucb_0var_results %>% 
+  group_by(replication_id, gamma_mn, beta_mn, beta_sd, simulate_data, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml)
   ) %>% ungroup()
 
+tbl_cor_ucb_0var$simulate_data <- factor(tbl_cor_ucb_0var$simulate_data)
+levels(tbl_cor_ucb_0var$simulate_data) <- c("Simulate Once", "Simulate By Participant")[
+  as.numeric(as.logical(levels(tbl_cor_ucb_0var$simulate_data))) + 1
+]
+tbl_cor_ucb_0var$nr_trials <- factor(tbl_cor_ucb_0var$nr_trials)
+levels(tbl_cor_ucb_0var$nr_trials) <-  str_c(levels(tbl_cor_ucb_0var$nr_trials), " Trials")
+# tbl_cor_ucb_0var$gamma_mn <- factor(tbl_cor_ucb_0var$gamma_mn)
+# levels(tbl_cor_ucb_0var$gamma_mn) <- str_c("m (gamma) = ", levels(tbl_cor_ucb_0var$gamma_mn))
+tbl_cor_ucb_0var$beta_mn <- factor(tbl_cor_ucb_0var$beta_mn)
+levels(tbl_cor_ucb_0var$beta_mn) <- str_c("m (beta) = ", levels(tbl_cor_ucb_0var$beta_mn))
+tbl_cor_ucb_0var$beta_sd <- factor(tbl_cor_ucb_0var$beta_sd)
+levels(tbl_cor_ucb_0var$beta_sd) <- str_c("sd (beta) = ", levels(tbl_cor_ucb_0var$beta_sd))
+
 tbl_cor_ucb_0var_long <- tbl_cor_ucb_0var %>% 
-  mutate(
-    simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    nr_trials = factor(nr_trials, labels = c("200 Trials", "400 Trials")),
-    beta_mn = factor(beta_mn, labels = c("Beta = .17", "Beta = 1.5"))
-  ) %>% 
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta
@@ -506,7 +513,7 @@ plot_ucb_param_recovery <- function(param, ttl) {
     geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
     geom_violin(alpha = .25) +
     geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
-    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ beta_mn) +
+    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ interaction(beta_mn, beta_sd, sep = " & ")) +
     coord_cartesian(ylim = c(0, 1)) +
     theme_bw() +
     scale_x_discrete(expand = c(0, 0)) +
@@ -516,8 +523,10 @@ plot_ucb_param_recovery <- function(param, ttl) {
     theme(strip.background = element_rect(fill = "white"))
 }
 
-plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
-plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
+pl_cors_invtemp <- plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
+pl_cors_beta <- plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
+
+grid.draw(arrangeGrob(pl_cors_invtemp, pl_cors_beta, nrow = 2))
 
 # correlations between parameters
 
@@ -547,7 +556,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 4, by = 1), nrow(.)/4),
     param = rep(c("Beta", "Gamma"), nrow(.)/2)
-    ) %>%
+  ) %>%
   filter(gamma_mn <= .16 & req <= 2) %>%
   group_by(param, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml)) %>%
@@ -567,7 +576,7 @@ tbl_ucb_0var_agg <- grouped_agg(
   tbl_ucb_0var_results, 
   c(gamma_mn, beta_mn, simulate_data, nr_participants, nr_trials),
   c(gamma_ml, beta_ml)
-  ) %>% ungroup()
+) %>% ungroup()
 
 ggplot(tbl_ucb_0var_agg, aes(gamma_mn, mean_gamma_ml, group = beta_mn)) +
   geom_abline() +
@@ -589,8 +598,8 @@ tbl_gammas <- tibble(
   gamma_sd = c(.05, .1)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, 1.5),
-  beta_sd = c(.05, .25)
+  beta_mn = c(.17, .17, 1.5),
+  beta_sd = c(.05, .76, 1)
 )
 tbl_w_mix <- tibble(
   w_mix_mn = c(.4, .6),
@@ -724,7 +733,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 6, by = 1), nrow(.)/6),
     param = rep(c("Beta", "Gamma", "w_mix"), nrow(.)/3)
-    ) %>%
+  ) %>%
   filter(req <= 3) %>%
   group_by(param, beta_mn, gamma_mn, w_mix_mn, simulate_data, nr_trials, mixturetype) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml), w_mix_ml = mean(w_mix_ml)) %>%
@@ -823,7 +832,7 @@ ggplot(
   tbl_cor_delta_softmax_long %>% 
     filter(gamma_mn %in% c("Gamma = .08", "Gamma = .16") & 
              simulate_data == "Simulate By Participant"
-           ), 
+    ), 
   aes(gamma_mn, value, group = interaction(nr_trials, name))
 ) +
   geom_hline(yintercept = 1, linetype = "dotdash", color = "grey") +
@@ -896,7 +905,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 4, by = 1), nrow(.)/4),
     param = rep(c("Delta", "Gamma"), nrow(.)/2)
-    ) %>%
+  ) %>%
   filter(req <= 2) %>%
   group_by(param, delta_mn, gamma_mn, simulate_data, nr_trials) %>%
   summarize(delta_ml = mean(delta_ml), gamma_ml = mean(gamma_ml)) %>%

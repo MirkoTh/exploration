@@ -1036,13 +1036,11 @@ fit_kalman_thompson_xi_variance_choose <- function(x, tbl_results, tbl_rewards, 
 }
 
 
-fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options, bds) {
+fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options, sigma_xi_sq = 16, sigma_epsilon_sq = 16, bds) {
   #'
   #' @description Kalman soft max with ucb fitting wrapper,
   #' fix Kalman variances to the true value
   #'
-  sigma_xi_sq <- 16
-  sigma_epsilon_sq <- 16
   gamma <- upper_and_lower_bounds_revert(x[[1]], bds$gamma$lo, bds$gamma$hi)
   beta <- upper_and_lower_bounds_revert(x[[2]], bds$beta$lo, bds$beta$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
@@ -1060,16 +1058,15 @@ fit_kalman_ucb_no_variance <- function(x, tbl_results, nr_options, bds) {
 }
 
 
-fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
+fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options, sigma_xi_sq = 16, sigma_epsilon_sq = 16, bds) {
   #'
   #' @description Kalman ru and thompson mixture fitting wrapper,
   #' fix Kalman variances to the true value
   #'
-  sigma_xi_sq <- 16
-  sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
-  beta <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
-  w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
+  
+  gamma <- upper_and_lower_bounds_revert(x[[1]], bds$gamma$lo, bds$gamma$hi)
+  beta <- upper_and_lower_bounds_revert(x[[2]], bds$beta$lo, bds$beta$hi)
+  w_mix <- upper_and_lower_bounds_revert(x[[3]], bds$w_mix$lo, bds$w_mix$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ru_and_thompson_choice_prob(
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))),
@@ -1083,16 +1080,15 @@ fit_kalman_ru_thompson_no_variance <- function(x, tbl_results, nr_options) {
 }
 
 
-fit_kalman_ucb_thompson_no_variance <- function(x, tbl_results, nr_options) {
+fit_kalman_ucb_thompson_no_variance <- function(x, tbl_results, nr_options, sigma_xi_sq = 16, sigma_epsilon_sq = 16, bds) {
   #'
   #' @description Kalman ucb and thompson mixture fitting wrapper,
   #' fix Kalman variances to the true value
   #'
-  sigma_xi_sq <- 16
-  sigma_epsilon_sq <- 16
-  gamma <- upper_and_lower_bounds_revert(x[[1]], 0, 3)
-  beta <- upper_and_lower_bounds_revert(x[[2]], 0, 3)
-  w_mix <- upper_and_lower_bounds_revert(x[[3]], 0, 1)
+  
+  gamma <- upper_and_lower_bounds_revert(x[[1]], bds$gamma$lo, bds$gamma$hi)
+  beta <- upper_and_lower_bounds_revert(x[[2]], bds$beta$lo, bds$beta$hi)
+  w_mix <- upper_and_lower_bounds_revert(x[[3]], bds$w_mix$lo, bds$w_mix$hi)
   tbl_learned <- kalman_learning(tbl_results, nr_options, sigma_xi_sq, sigma_epsilon_sq)
   p_choices_mix <- ucb_and_thompson_choice_prob(
     as.matrix(tbl_learned[1:nrow(tbl_results), ] %>% select(starts_with("m_"))),
@@ -1320,24 +1316,33 @@ fit_ucb_no_variance_wrapper <- function(
 }
 
 
-fit_mixture_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, f_fit) {
+fit_mixture_no_variance_wrapper <- function(
+    tbl_results, tbl_rewards, condition_on_observed_choices, f_fit, 
+    bds, params_init = NULL
+) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-  params_init <- c(
-    upper_and_lower_bounds(1.5, 0, 3),
-    upper_and_lower_bounds(0.001, 0, 3),
-    upper_and_lower_bounds(.5, 0, 1)
+  
+  if (is.null(params_init)) {
+    params_init <- c(.5, .25, .5)
+  }
+  params_init_tf <- pmap_dbl(
+    list(params_init, map_dbl(bds, "lo"), map_dbl(bds, "hi")),
+    upper_and_lower_bounds
   )
+  
   if (condition_on_observed_choices) {
     result_optim <- optim(
-      params_init, f_fit,
-      tbl_results = tbl_results, nr_options = 4
+      params_init_tf, f_fit,
+      tbl_results = tbl_results, nr_options = 4, bds = bds
     )
     r <- c(
-      upper_and_lower_bounds_revert(result_optim$par[1], 0, 3),
-      upper_and_lower_bounds_revert(result_optim$par[2], 0, 3),
-      upper_and_lower_bounds_revert(result_optim$par[3], 0, 1),
-      result_optim$value
+      pmap_dbl(list(
+        c(result_optim$par[1], result_optim$par[2], result_optim$par[3]), 
+        map_dbl(bds, "lo"), map_dbl(bds, "hi")
+      ), upper_and_lower_bounds_revert
+      ), result_optim$value
     )
+    
   } else if (!condition_on_observed_choices) {
     stop("code not yet developed")
   }
@@ -1596,7 +1601,7 @@ simulate_and_fit_ucb <- function(
     select(-trial_id)
   
   # simulate
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores())
   l_choices_simulated <- future_pmap(
     tbl_params_participants,
     simulate_kalman,
@@ -1606,7 +1611,7 @@ simulate_and_fit_ucb <- function(
   )
   
   # fit
-  plan(multisession, workers = availableCores() - 2)
+  plan(multisession, workers = availableCores())
   l_ucb <- future_map2(
     map(l_choices_simulated, "tbl_return"),
     map(l_choices_simulated, "tbl_rewards"),
@@ -1647,7 +1652,7 @@ simulate_and_fit_ucb <- function(
 
 
 simulate_and_fit_mixture <- function(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials) {
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds) {
   # simulate fixed data set
   tbl_rewards <- generate_restless_bandits(
     sigma_xi_sq, sigma_epsilon_sq, mu1, lambda, nr_trials
@@ -1675,6 +1680,7 @@ simulate_and_fit_mixture <- function(
     safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = f_fit,
+    bds = bds,
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
@@ -1710,7 +1716,10 @@ simulate_and_fit_mixture <- function(
 
 kalman_mixture_experiment <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
-    simulate_data, nr_participants, nr_trials, cond_on_choices, lambda, nr_vars, mixturetype) {
+    simulate_data, nr_participants, nr_trials, cond_on_choices, 
+    lambda, nr_vars, mixturetype,
+    bds
+) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_mixture(
@@ -1719,7 +1728,7 @@ kalman_mixture_experiment <- function(
   )
   
   tbl_results_kalman_mixture <- simulate_and_fit_mixture(
-    tbl_params_participants, nr_vars, cond_on_choices, nr_trials
+    tbl_params_participants, nr_vars, cond_on_choices, nr_trials, bds
   )
   
   progress_msg <- str_c(
