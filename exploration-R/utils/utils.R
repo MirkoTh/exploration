@@ -2129,7 +2129,7 @@ create_participant_sample_delta <- function(
 
 recover_softmax <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants,
-    nr_trials, cond_on_choices, lambda, nr_vars) {
+    nr_trials, cond_on_choices, lambda, nr_vars, bds) {
   #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
@@ -2147,7 +2147,7 @@ recover_softmax <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices,
-    family = "kalman"
+    family = "kalman", bds = bds
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2158,7 +2158,7 @@ recover_softmax <- function(
 
 recover_thompson <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants,
-    nr_trials, cond_on_choices, lambda, nr_vars) {
+    nr_trials, cond_on_choices, lambda, nr_vars, bds) {
   #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
@@ -2176,7 +2176,7 @@ recover_thompson <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices,
-    family = "kalman"
+    family = "kalman", bds = bds
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2187,7 +2187,7 @@ recover_thompson <- function(
 
 recover_ucb <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
-    nr_trials, cond_on_choices, lambda, nr_vars) {
+    nr_trials, cond_on_choices, lambda, nr_vars, bds) {
   #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
@@ -2205,7 +2205,7 @@ recover_ucb <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices,
-    family = "kalman"
+    family = "kalman", bds = bds
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2217,7 +2217,7 @@ recover_ucb <- function(
 recover_mixture <- function(
     gamma_mn, gamma_sd, beta_mn, beta_sd, w_mix_mn, w_mix_sd,
     simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype,
-    lambda, nr_vars) {
+    lambda, nr_vars, bds) {
   #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
@@ -2235,7 +2235,7 @@ recover_mixture <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices,
-    family = "kalman"
+    family = "kalman", bds = bds
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)
@@ -2246,7 +2246,7 @@ recover_mixture <- function(
 
 recover_delta <- function(
     gamma_mn, gamma_sd, delta_mn, delta_sd, simulate_data, nr_participants,
-    nr_trials, cond_on_choices, is_decay, lambda) {
+    nr_trials, cond_on_choices, is_decay, lambda, bds) {
   #'
   #' @description generate choices according to soft max
   #' and fit them with soft max, thompson, and ucb
@@ -2264,7 +2264,8 @@ recover_delta <- function(
   
   l_models_fit <- simulate_and_fit_models(
     tbl_params_participants, tbl_rewards, cond_on_choices,
-    family = "delta", is_decay = is_decay
+    family = "delta", is_decay = is_decay,
+    bds = bds
   )
   
   l_goodness <- read_out_lls_and_ics(l_models_fit, nr_participants)

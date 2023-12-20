@@ -30,6 +30,13 @@ lambda <- .9836
 
 fit_or_load <- "load"
 
+bds <- list(
+  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5)),
+  sm = list(gamma = list(lo = 0, hi = 1)),
+  ucb_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1)),
+  ru_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
+)
+
 
 # Soft Max ----------------------------------------------------------------
 
@@ -50,7 +57,8 @@ tbl_params_softmax <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_softmax <- pmap(
     tbl_params_softmax, recover_softmax,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_softmax, "exploration-R/data/model-recovery-softmax.RDS")
 } else if (fit_or_load == "load")  {
@@ -107,7 +115,8 @@ tbl_params_thompson <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_thompson <- pmap(
     tbl_params_thompson, recover_thompson,
-    lambda = lambda, nr_vars = 1
+    lambda = lambda, nr_vars = 1,
+    bds = bds
   )
   saveRDS(l_model_recovery_thompson, "exploration-R/data/model-recovery-thompson.RDS")
 } else if (fit_or_load == "load")  {
@@ -171,7 +180,8 @@ tbl_params_ucb <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_ucb <- pmap(
     tbl_params_ucb, recover_ucb,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_ucb, "exploration-R/data/model-recovery-ucb.RDS")
 } else if (fit_or_load == "load")  {
@@ -246,7 +256,8 @@ tbl_params_mixture <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_mixture <- pmap(
     tbl_params_mixture, recover_mixture,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_mixture, "exploration-R/data/model-recovery-mixture.RDS")
 } else if (fit_or_load == "load")  {
