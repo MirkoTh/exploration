@@ -2308,6 +2308,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     map(l_choices_simulated, "tbl_rewards"),
     safely(fit_softmax_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
+    bds = bds[["sm"]],
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
@@ -2340,6 +2341,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = fit_kalman_ucb_thompson_no_variance,
+    bds = bds[["ucb_thompson"]],
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
@@ -2351,6 +2353,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     safely(fit_mixture_no_variance_wrapper),
     condition_on_observed_choices = cond_on_choices,
     f_fit = fit_kalman_ru_thompson_no_variance,
+    bds = bds[["ru_thompson"]],
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )

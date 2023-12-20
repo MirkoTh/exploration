@@ -61,7 +61,10 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 
 
 bds <- list(
-  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
+  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5)),
+  sm = list(gamma = list(lo = 0, hi = 1)),
+  ucb_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1)),
+  ru_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
 )
 
 
@@ -85,7 +88,7 @@ tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision,
 
 if (fit_or_load == "fit") {
   l_models_fit_softmax_kalman <- simulate_and_fit_models(
-    tbl_participants_kalman_softmax, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_participants_kalman_softmax, tbl_rewards, cond_on_choices, family = "kalman", bds = bds
   )
   saveRDS(l_models_fit_softmax_kalman, file = "exploration-R/data/model-recovery-empirical-softmax.rds")
 } else if (fit_or_load == "load") {
@@ -146,7 +149,7 @@ bds <- list(
 
 tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
 if (fit_or_load == "fit") {
-  l_models_fit_kalman_ucb <- simuelate_and_fit_models(
+  l_models_fit_kalman_ucb <- simulate_and_fit_models(
     tbl_participants_kalman_ucb, tbl_rewards, cond_on_choices, family = "kalman", bds = bds
   )
   saveRDS(l_models_fit_kalman_ucb, file = "exploration-R/data/model-recovery-empirical-ucb.rds")
@@ -181,7 +184,7 @@ tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_deci
 
 if (fit_or_load == "fit") {
   l_models_fit_kalman_ucb_thompson <- simulate_and_fit_models(
-    tbl_participants_kalman_ucb_thompson, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_participants_kalman_ucb_thompson, tbl_rewards, cond_on_choices, family = "kalman", bds = bds
   )
   saveRDS(l_models_fit_kalman_ucb_thompson, file = "exploration-R/data/model-recovery-empirical-ucb_thompson.rds")
 } else if (fit_or_load == "load") {
@@ -215,7 +218,7 @@ tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decis
 
 if (fit_or_load == "fit") {
   l_models_fit_kalman_ru_thompson <- simulate_and_fit_models(
-    tbl_participants_kalman_ru_thompson, tbl_rewards, cond_on_choices, family = "kalman"
+    tbl_participants_kalman_ru_thompson, tbl_rewards, cond_on_choices, family = "kalman", bds = bds
   )
   saveRDS(l_models_fit_kalman_ru_thompson, file = "exploration-R/data/model-recovery-empirical-ru_thompson.rds")
 } else if (fit_or_load == "load") {
@@ -243,7 +246,7 @@ tbl_participants_delta <- my_participants_tbl_delta(l_params_decision, tbl_delta
 
 if (fit_or_load == "fit") {
   l_models_fit_delta <- simulate_and_fit_models(
-    tbl_participants_delta, tbl_rewards, cond_on_choices, family = "delta", is_decay = FALSE
+    tbl_participants_delta, tbl_rewards, cond_on_choices, family = "delta", is_decay = FALSE, bds = bds
   )
   saveRDS(l_models_fit_delta, file = "exploration-R/data/model-recovery-empirical-delta.rds")
 } else if (fit_or_load == "load") {
@@ -274,7 +277,7 @@ tbl_participants_decay <- my_participants_tbl_delta(l_params_decision, tbl_decay
 
 if (fit_or_load == "fit") {
   l_models_fit_decay <- simulate_and_fit_models(
-    tbl_participants_decay, tbl_rewards, cond_on_choices, family = "delta", is_decay = TRUE
+    tbl_participants_decay, tbl_rewards, cond_on_choices, family = "delta", is_decay = TRUE, bds = bds
   )
   saveRDS(l_models_fit_decay, file = "exploration-R/data/model-recovery-empirical-decay.rds")
 } else if (fit_or_load == "load") {
