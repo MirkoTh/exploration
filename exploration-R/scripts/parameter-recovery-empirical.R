@@ -96,13 +96,18 @@ my_participants_tbl_delta <- function(l_params_decision, delta, sim_d) {
 
 ## Softmax no variance ----------------------------------------------------
 
+bds <- list(gamma = list(lo = 0, hi = 1))
+
+
 if (fit_or_load == "fit") {
   plan(multisession, workers = availableCores() - 2)
   l_kalman_softmax_no_variance <- furrr::future_map(
     l_participants, fit_softmax_no_variance_wrapper, 
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
+    bds = bds,
     .progress = TRUE
   )
+  plan("sequential")
   saveRDS(l_kalman_softmax_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-softmax-fit.rds")
   
   tbl_kalman_softmax_no_variance <- reduce(l_kalman_softmax_no_variance, rbind) %>%
@@ -115,11 +120,15 @@ if (fit_or_load == "fit") {
   
   tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, TRUE)
   tbl_results_kalman_softmax_sim <- simulate_and_fit_softmax(
-    tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+    tbl_participants_kalman_softmax, nr_vars = 0, 
+    cond_on_choices = TRUE, nr_trials = nr_trials,
+    bds = bds
   )
   tbl_participants_kalman_softmax <- my_participants_tbl_kalman(l_params_decision, FALSE)
   tbl_results_kalman_softmax_fix <- simulate_and_fit_softmax(
-    tbl_participants_kalman_softmax, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials
+    tbl_participants_kalman_softmax, nr_vars = 0, 
+    cond_on_choices = TRUE, nr_trials = nr_trials,
+    bds = bds
   )
   
   tbl_results_kalman_softmax <- rbind(
@@ -154,16 +163,16 @@ saveRDS(tbl_rb, file = "open-data/speekenbrink-konstantinidis-2015-recovery.csv"
 ## UCB with Softmax -------------------------------------------------------
 
 bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
-params_init <- c(runif(1, bds$gamma$lo, bds$gamma$hi), runif(1, bds$beta$lo, bds$beta$hi))
 
 if (fit_or_load == "fit") {
   plan(multisession, workers = availableCores() - 2)
   l_kalman_ucb_no_variance <- furrr:::future_map(
     l_participants, fit_ucb_no_variance_wrapper,
     tbl_rewards = tbl_rewards, condition_on_observed_choices = TRUE,
-    bds = bds, params_init = params_init,
+    bds = bds, 
     .progress = TRUE
   )
+  plan("sequential")
   saveRDS(l_kalman_ucb_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-fit.rds")
   
   tbl_kalman_ucb_no_variance <- reduce(l_kalman_ucb_no_variance, rbind) %>%
@@ -175,9 +184,15 @@ if (fit_or_load == "fit") {
   )
   
   tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
-  tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
+  tbl_results_kalman_ucb_sim <- simulate_and_fit_ucb(
+    tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, 
+    nr_trials = nr_trials, bds = bds
+    )
   tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, FALSE)
-  tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
+  tbl_results_kalman_ucb_fix <- simulate_and_fit_ucb(
+    tbl_participants_kalman_ucb, nr_vars = 0, cond_on_choices = TRUE, 
+    nr_trials = nr_trials, bds = bds
+    )
   
   tbl_results_kalman_ucb <- rbind(tbl_results_kalman_ucb_fix, tbl_results_kalman_ucb_sim)
   saveRDS(tbl_results_kalman_ucb, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb-recovery.rds")
@@ -236,13 +251,18 @@ save_my_pdf_and_tiff(
 ## UCB Thompson ------------------------------------------------------------
 
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
+
 if (fit_or_load == "fit") {
   plan(multisession, workers = availableCores() - 2)
   l_kalman_ucb_thompson_no_variance <- furrr:::future_map(
     l_participants, fit_mixture_no_variance_wrapper,
     tbl_rewards = tbl_rewards, f_fit = fit_kalman_ucb_thompson_no_variance,
-    condition_on_observed_choices = TRUE, .progress = TRUE
+    condition_on_observed_choices = TRUE,
+    bds = bds,
+    .progress = TRUE
   )
+  plan("sequential")
   saveRDS(l_kalman_ucb_thompson_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-fit.rds")
   
   tbl_kalman_ucb_thompson_no_variance <- reduce(l_kalman_ucb_thompson_no_variance, rbind) %>%
@@ -341,9 +361,11 @@ if (fit_or_load == "fit") {
   l_kalman_ru_thompson_no_variance <- furrr:::future_map(
     l_participants, fit_mixture_no_variance_wrapper,
     tbl_rewards = tbl_rewards, f_fit = fit_kalman_ru_thompson_no_variance,
-    condition_on_observed_choices = TRUE, .progress = TRUE
+    condition_on_observed_choices = TRUE, 
+    bds = bds,
+    .progress = TRUE
   )
-  
+  plan("sequential")
   l_kalman_ucb_thompson_no_variance <- furrr:::future_map(
     l_participants, fit_mixture_no_variance_wrapper,
     tbl_rewards = tbl_rewards, f_fit = fit_kalman_ucb_thompson_no_variance,

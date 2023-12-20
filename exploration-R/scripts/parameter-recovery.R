@@ -617,7 +617,7 @@ simulate_data <- c(FALSE) # TRUE,
 nr_participants <- c(200)
 nr_trials <- c(400) # 200, 
 cond_on_choices <- c(TRUE)
-mixturetype <- c("ucb_thompson") #"ru_thompson"
+mixturetype <- c("ucb_thompson", "ru_thompson")
 
 
 tbl_params_mixture <- crossing(
