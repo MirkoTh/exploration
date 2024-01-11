@@ -1249,7 +1249,7 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
       ), upper_and_lower_bounds_revert
       ), result_optim$value
     )
-
+    
   } else if (!condition_on_observed_choices) {
     result_optim <- DEoptim(
       fit_kalman_softmax_xi_variance_choose,
@@ -1270,7 +1270,7 @@ fit_softmax_one_variance_wrapper <- function(tbl_results, tbl_rewards, condition
 
 fit_softmax_no_variance_wrapper <- function(tbl_results, tbl_rewards, condition_on_observed_choices, bds, params_init = NULL) {
   tbl_results <- tbl_results[1:(nrow(tbl_results) - 1), ]
-
+  
   if (condition_on_observed_choices) {
     result_optim <- optimize(
       fit_kalman_softmax_no_variance, c(-100, 100),
@@ -1417,7 +1417,7 @@ kalman_softmax_experiment <- function(
     gamma_mn, gamma_sd, simulate_data, nr_participants,
     nr_trials, cond_on_choices, lambda, nr_vars,
     bds
-    ) {
+) {
   # create a tbl with by-participant simulation & model parameters
   # if nr_vars == 0, same values on sig_xi and sig_eps for all participants
   tbl_params_participants <- create_participant_sample_softmax(
@@ -1692,6 +1692,7 @@ simulate_and_fit_mixture <- function(
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
+  plan("sequential")
   
   # fit
   mixturetype <- tbl_params_participants$params_decision[[1]][["choicemodel"]]
@@ -1708,6 +1709,7 @@ simulate_and_fit_mixture <- function(
     .progress = TRUE,
     .options = furrr_options(seed = NULL)
   )
+  plan("sequential")
   
   # replace empty results with NAs
   l_results <- map(l_mixture, "result")
@@ -2038,11 +2040,11 @@ create_participant_sample_mixture <- function(
     max_w_mix <- max(w_mix)
     min_w_mix <- min(w_mix)
   }
-  s_beta <- -1
-  while (s_beta < 0) {
-    beta <- rnorm(nr_participants, beta_mn, beta_sd)
-    s_beta <- min(beta)
-  }
+  # s_beta <- -1
+  # while (s_beta < 0) {
+  beta <- rnorm(nr_participants, beta_mn, beta_sd)
+  # s_beta <- min(beta)
+  # }
   s_gamma <- -1
   while (s_gamma < 0) {
     gamma <- rnorm(nr_participants, gamma_mn, gamma_sd)
@@ -2165,7 +2167,7 @@ recover_thompson <- function(
   
   tbl_params_participants <- create_participant_sample_thompson(
     gamma_mn, gamma_sd, simulate_data, nr_participants,
-    nr_trials, lambda, 1
+    nr_trials, lambda, nr_vars
   )
   
   # simulate one fixed data set in case needed
@@ -2194,7 +2196,7 @@ recover_ucb <- function(
   
   tbl_params_participants <- create_participant_sample_ucb(
     gamma_mn, gamma_sd, beta_mn, beta_sd, simulate_data, nr_participants,
-    nr_trials, lambda, 1
+    nr_trials, lambda, nr_vars
   )
   
   # simulate one fixed data set in case needed
@@ -2280,7 +2282,7 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
   #' and fit all models afterwards
   
   # simulate choices given soft max choice model
-  plan(multisession, workers = availableCores() / 2)
+  plan(multisession, workers = availableCores() - 1)
   # plan(multisession, workers = 2)
   cat("\nsimulating data")
   if (family == "kalman") {
@@ -2381,6 +2383,8 @@ simulate_and_fit_models <- function(tbl_params_simulate, tbl_rewards, cond_on_ch
     .options = furrr_options(seed = NULL)
   )
   
+  plan("sequential")
+  
   return(list(
     softmax = l_softmax,
     thompson = l_thompson,
@@ -2409,6 +2413,15 @@ read_out_lls_and_ics <- function(l_models_fit, nr_participants) {
   
   tbl_lls <- tibble(
     participant_id = 1:nr_participants,
+    
+    # neg2ll
+    ll_softmax = neg2ll_softmax,
+    ll_thompson = neg2ll_thompson,
+    ll_ucb = neg2ll_ucb,
+    ll_ucb_thompson = neg2ll_ucb_thompson,
+    ll_ru_thompson = neg2ll_ru_thompson,
+    ll_delta = neg2ll_delta,
+    ll_decay = neg2ll_decay,
     
     # bic
     bic_softmax = log(nr_participants) + neg2ll_softmax,
