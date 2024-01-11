@@ -22,7 +22,7 @@ home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
 
 
 
@@ -238,9 +238,10 @@ pl_recov_ucb_sm <- ggplot(tbl_recovery_kalman_ucb_long, aes(param_in, param_out)
   scale_fill_gradient2(name = "") +
   geom_label(aes(label = str_c("r = ", round(value, 2)))) +
   theme_bw() +
-  theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
+  #theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
   scale_x_discrete(expand = c(0, 0)) +
-  scale_y_discrete(expand = c(0, 0))
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(x = "Parameter In", y = "Parameter Out")
 
 
 
@@ -278,9 +279,9 @@ if (fit_or_load == "fit") {
   )
   
   tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
-  tbl_results_kalman_ucb_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ucb_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   tbl_participants_kalman_ucb_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
-  tbl_results_kalman_ucb_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ucb_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ucb_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   
   tbl_results_kalman_ucb_thompson <- rbind(tbl_results_kalman_ucb_thompson_fix, tbl_results_kalman_ucb_thompson_sim)
   saveRDS(tbl_results_kalman_ucb_thompson, file = "exploration-R/data/empirical-parameter-recovery-kalman-ucb_thompson-recovery.rds")
@@ -366,11 +367,6 @@ if (fit_or_load == "fit") {
     .progress = TRUE
   )
   plan("sequential")
-  l_kalman_ucb_thompson_no_variance <- furrr:::future_map(
-    l_participants, fit_mixture_no_variance_wrapper,
-    tbl_rewards = tbl_rewards, f_fit = fit_kalman_ucb_thompson_no_variance,
-    condition_on_observed_choices = TRUE, .progress = TRUE
-  )
   saveRDS(l_kalman_ru_thompson_no_variance, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-fit.rds")
   
   tbl_kalman_ru_thompson_no_variance <- reduce(l_kalman_ru_thompson_no_variance, rbind) %>%
@@ -386,9 +382,9 @@ if (fit_or_load == "fit") {
   )
   
   tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, TRUE)
-  tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ru_thompson_sim <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   tbl_participants_kalman_ru_thompson <- my_participants_tbl_kalman(l_params_decision, FALSE)
-  tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials)
+  tbl_results_kalman_ru_thompson_fix <- simulate_and_fit_mixture(tbl_participants_kalman_ru_thompson, nr_vars = 0, cond_on_choices = TRUE, nr_trials = nr_trials, bds = bds)
   
   tbl_results_kalman_ru_thompson <- rbind(tbl_results_kalman_ru_thompson_fix, tbl_results_kalman_ru_thompson_sim)
   saveRDS(tbl_results_kalman_ru_thompson, file = "exploration-R/data/empirical-parameter-recovery-kalman-ru_thompson-recovery.rds")

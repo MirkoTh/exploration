@@ -58,7 +58,7 @@ tbl_gammas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)[1]
 nr_participants <- c(200) 
-nr_trials <- c(400)[1]
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 
 
@@ -81,7 +81,7 @@ if (fit_or_load == "fit")  {
 
 counter <- 1
 l_results_c <- list()
-for (tbl_r in l_results_softmax) {
+for (tbl_r in l_results_softmax[[1]]) {
   l_results_c[[counter]] <- as_tibble(cbind(
     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
   ))
@@ -269,7 +269,7 @@ for (tbl_r in l_results_softmax_0var) {
 
 tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
   unnest_wider(params_decision) %>%
-  group_by(replication_id, gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  group_by(replication_id, gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
   ) %>% ungroup()
@@ -287,7 +287,7 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
 
 # pd <- position_dodge(width = .9)
 # plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
-ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
+ggplot(tbl_cor_softmax_0var_long, aes(str_c("mn = ", interaction(gamma_mn, gamma_sd, sep = ",\nsd = ")), value)) +
   geom_violin(alpha = .25) +
   geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
   facet_wrap(nr_trials ~ simulate_data) +
@@ -305,7 +305,7 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
 
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300, 500)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 
@@ -431,12 +431,12 @@ tbl_gammas <- tibble(
   gamma_sd = c(.007, .05, .1)#[1]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.15, .15, 1.5),#[1],
-  beta_sd = c(.1, .76, 1)#[1]
+  beta_mn = c(.15, .15, 2),#[1],
+  beta_sd = c(.1, .76, .76)#[1]
 )
 simulate_data <- c(FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(200, 300)
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 
 
@@ -615,7 +615,7 @@ tbl_w_mix <- tibble(
 
 simulate_data <- c(FALSE) # TRUE, 
 nr_participants <- c(200)
-nr_trials <- c(400) # 200, 
+nr_trials <- 200 
 cond_on_choices <- c(TRUE)
 mixturetype <- c("ucb_thompson", "ru_thompson")
 
@@ -768,7 +768,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 

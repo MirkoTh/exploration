@@ -17,7 +17,7 @@ home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
 walk(home_grown, source)
 
 
-fit_or_load <- "fit"
+fit_or_load <- "load"
 
 
 
@@ -95,6 +95,7 @@ if (fit_or_load == "fit") {
   l_models_fit_softmax_kalman <- readRDS(file = "exploration-R/data/model-recovery-empirical-softmax.rds")
 }
 
+nr_participants <- nrow(tbl_participants_kalman_softmax)
 
 l_goodness_softmax_kalman <- read_out_lls_and_ics(l_models_fit_softmax_kalman, nr_participants)
 
@@ -143,9 +144,6 @@ l_params_decision <- map2(
   ~ list(gamma = ..1, beta = ..2, choicemodel = "ucb", no = 4)
 )
 
-bds <- list(
-  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
-)
 
 tbl_participants_kalman_ucb <- my_participants_tbl_kalman(l_params_decision, TRUE)
 if (fit_or_load == "fit") {
@@ -159,7 +157,6 @@ if (fit_or_load == "fit") {
 
 
 l_goodness_kalman_ucb <- read_out_lls_and_ics(l_models_fit_kalman_ucb, nr_participants)
-
 
 
 # UCB & Thompson -----------------------------------------------------------
@@ -288,8 +285,9 @@ l_goodness_decay <- read_out_lls_and_ics(l_models_fit_decay, nr_participants)
 
 
 my_ic_comparison <- function(ic){
-  if (ic == "bic") nm <- "tbl_recovered_bic"
-  else if (ic == "aic") nm <- "tbl_recovered_aic"
+  if (ic == "bic") {
+    nm <- "tbl_recovered_bic"
+    } else if (ic == "aic") nm <- "tbl_recovered_aic"
   tbl_ic <- l_goodness_softmax_kalman[[nm]] %>%
     mutate(model_in = "Kalman & Softmax") %>%
     # rbind(

@@ -28,7 +28,7 @@ sigma_epsilon_sq <- 16
 lambda <- .9836
 
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
 
 bds <- list(
   ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5)),
@@ -47,7 +47,7 @@ tbl_gammas <- tibble(
 )
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 tbl_params_softmax <- crossing(
@@ -104,7 +104,7 @@ tbl_results_softmax <- tbl_results_softmax %>%
 
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 
@@ -164,12 +164,12 @@ tbl_gammas <- tibble(
   gamma_sd = c(.025)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.05),
-  beta_sd = c(.025)
+  beta_mn = c(2), # changed from .15
+  beta_sd = c(.76)
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 tbl_params_ucb <- crossing(
@@ -230,20 +230,20 @@ tbl_results_ucb <- tbl_results_ucb %>%
 
 tbl_gammas <- tibble(
   gamma_mn = c(.05),
-  gamma_sd = c(.025)
+  gamma_sd = c(.0225)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.05),
-  beta_sd = c(.025)
+  beta_mn = c(.15),
+  beta_sd = c(.76)
 )
 tbl_w_mix <- tibble(
-  w_mix_mn = c(.85),
-  w_mix_sd = c(.07)
+  w_mix_mn = c(.65),
+  w_mix_sd = c(.1)
 )
 
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 mixturetype <- c("ucb_thompson", "ru_thompson")
 
@@ -322,7 +322,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -334,7 +334,7 @@ tbl_params_delta <- crossing(
 
 if (fit_or_load == "fit")  {
   l_model_recovery_delta <- pmap(
-    tbl_params_delta, recover_delta, lambda = lambda
+    tbl_params_delta, recover_delta, lambda = lambda, bds = bds
   )
   saveRDS(l_model_recovery_delta, "exploration-R/data/model-recovery-delta.RDS")
 } else if (fit_or_load == "load")  {
