@@ -28,7 +28,14 @@ sigma_epsilon_sq <- 16
 lambda <- .9836
 
 
-fit_or_load <- "load"
+fit_or_load <- "fit"
+
+bds <- list(
+  ucb = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5)),
+  sm = list(gamma = list(lo = 0, hi = 1)),
+  ucb_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1)),
+  ru_thompson = list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
+)
 
 
 # Soft Max ----------------------------------------------------------------
@@ -40,7 +47,7 @@ tbl_gammas <- tibble(
 )
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 tbl_params_softmax <- crossing(
@@ -50,7 +57,8 @@ tbl_params_softmax <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_softmax <- pmap(
     tbl_params_softmax, recover_softmax,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_softmax, "exploration-R/data/model-recovery-softmax.RDS")
 } else if (fit_or_load == "load")  {
@@ -96,7 +104,7 @@ tbl_results_softmax <- tbl_results_softmax %>%
 
 simulate_data <- c(TRUE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 
@@ -107,7 +115,8 @@ tbl_params_thompson <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_thompson <- pmap(
     tbl_params_thompson, recover_thompson,
-    lambda = lambda, nr_vars = 1
+    lambda = lambda, nr_vars = 1,
+    bds = bds
   )
   saveRDS(l_model_recovery_thompson, "exploration-R/data/model-recovery-thompson.RDS")
 } else if (fit_or_load == "load")  {
@@ -155,12 +164,12 @@ tbl_gammas <- tibble(
   gamma_sd = c(.025)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.05),
-  beta_sd = c(.025)
+  beta_mn = c(2), # changed from .15
+  beta_sd = c(.76)
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 tbl_params_ucb <- crossing(
@@ -171,7 +180,8 @@ tbl_params_ucb <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_ucb <- pmap(
     tbl_params_ucb, recover_ucb,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_ucb, "exploration-R/data/model-recovery-ucb.RDS")
 } else if (fit_or_load == "load")  {
@@ -220,20 +230,20 @@ tbl_results_ucb <- tbl_results_ucb %>%
 
 tbl_gammas <- tibble(
   gamma_mn = c(.05),
-  gamma_sd = c(.025)
+  gamma_sd = c(.0225)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.05),
-  beta_sd = c(.025)
+  beta_mn = c(.15),
+  beta_sd = c(.76)
 )
 tbl_w_mix <- tibble(
-  w_mix_mn = c(.85),
-  w_mix_sd = c(.07)
+  w_mix_mn = c(.65),
+  w_mix_sd = c(.1)
 )
 
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 mixturetype <- c("ucb_thompson", "ru_thompson")
 
@@ -246,7 +256,8 @@ tbl_params_mixture <- crossing(
 if (fit_or_load == "fit")  {
   l_model_recovery_mixture <- pmap(
     tbl_params_mixture, recover_mixture,
-    lambda = lambda, nr_vars = 0
+    lambda = lambda, nr_vars = 0,
+    bds = bds
   )
   saveRDS(l_model_recovery_mixture, "exploration-R/data/model-recovery-mixture.RDS")
 } else if (fit_or_load == "load")  {
@@ -311,7 +322,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE)
 nr_participants <- c(200)
-nr_trials <- c(400)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -323,7 +334,7 @@ tbl_params_delta <- crossing(
 
 if (fit_or_load == "fit")  {
   l_model_recovery_delta <- pmap(
-    tbl_params_delta, recover_delta, lambda = lambda
+    tbl_params_delta, recover_delta, lambda = lambda, bds = bds
   )
   saveRDS(l_model_recovery_delta, "exploration-R/data/model-recovery-delta.RDS")
 } else if (fit_or_load == "load")  {

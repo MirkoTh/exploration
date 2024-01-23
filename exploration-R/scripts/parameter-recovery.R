@@ -18,6 +18,7 @@ library(furrr)
 library(reactable)
 library(reactablefmtr)
 library(ggbeeswarm)
+library(DEoptim)
 
 
 home_grown <- c("exploration-R/utils/utils.R", "exploration-R/utils/plotting.R")
@@ -52,23 +53,25 @@ ggplot(tbl_bandits %>% pivot_longer(-trial_id), aes(trial_id, value, group = nam
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.08, .16, 1, 3),
-  gamma_sd = c(.05, .1, .2, .2)
+  gamma_mn = c(.08, .16, .16),
+  gamma_sd = c(.05, .1, 1)
 )
 simulate_data <- c(TRUE, FALSE)[1]
 nr_participants <- c(200) 
-nr_trials <- c(400)[1]
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 
 
 tbl_params_softmax <- crossing(
   tbl_gammas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
+bds <- list(sigma_xi_sq = list(lo = 0, hi = 30), sigma_epsilon_sq = list(lo = 0, hi = 30), gamma = list(lo = 0, hi = 1))
+
 
 if (fit_or_load == "fit")  {
   l_results_softmax <- pmap(
     tbl_params_softmax, kalman_softmax_experiment, 
-    lambda = lambda, nr_vars = 2
+    lambda = lambda, nr_vars = 2, bds = bds
   )
   saveRDS(l_results_softmax, "exploration-R/data/recovery-softmax-two-variances.RDS")
   
@@ -78,7 +81,7 @@ if (fit_or_load == "fit")  {
 
 counter <- 1
 l_results_c <- list()
-for (tbl_r in l_results_softmax) {
+for (tbl_r in l_results_softmax[[1]]) {
   l_results_c[[counter]] <- as_tibble(cbind(
     tbl_r %>% select(-c(simulate_data, nr_trials)), tbl_params_softmax[counter, ]
   ))
@@ -120,7 +123,7 @@ ggplot(tbl_cor_softmax_long, aes(gamma_mn, value, group = name)) +
   scale_color_viridis_d(name = "Parameter") +
   labs(x = "Gamma", y = "Correlation") +
   theme(strip.background = element_rect(fill = "white"))
-  
+
 
 
 # cors between pars
@@ -150,13 +153,15 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 
 
 # take same combination of hyperparameters as before
+bds <- list(sigma_xi_sq = list(lo = 0, hi = 30), gamma = list(lo = 0, hi = 1))
 
 if (fit_or_load == "fit")  {
   l_results_softmax_1var <- pmap(
     tbl_params_softmax, 
     kalman_softmax_experiment, 
     lambda = lambda,
-    nr_vars = 1
+    nr_vars = 1,
+    bds = bds
   )
   saveRDS(l_results_softmax_1var, "exploration-R/data/recovery-softmax-one-variance.RDS")
 } else if (fit_or_load == "load")  {
@@ -223,6 +228,8 @@ grid.draw(marrangeGrob(l_heatmaps_par_cor, nrow = 4, ncol = 4))
 # Kalman & Softmax: Fix Variances ------------------------------------------
 
 
+bds <- list(gamma = list(lo = 0, hi = 1))
+
 if (fit_or_load == "fit")  {
   l_results_softmax_0var_all <- list()
   for (i in 1:n_reps) {
@@ -230,7 +237,8 @@ if (fit_or_load == "fit")  {
       tbl_params_softmax, 
       kalman_softmax_experiment, 
       lambda = lambda,
-      nr_vars = 0
+      nr_vars = 0,
+      bds = bds
     )
     l_results_softmax_0var_all[[i]] <- l_results_softmax_0var
     saveRDS(l_results_softmax_0var_all, "exploration-R/data/recovery-softmax-no-variance.RDS")
@@ -239,7 +247,6 @@ if (fit_or_load == "fit")  {
   l_results_softmax_0var <- readRDS("exploration-R/data/recovery-softmax-no-variance.RDS")
 }
 
-add_repl_id <- function(x, y) {x$replication_id <- y; return(x)}
 
 l_results_softmax_0var <- map2(
   l_results_softmax_0var, 1:length(l_results_softmax_0var), 
@@ -262,7 +269,7 @@ for (tbl_r in l_results_softmax_0var) {
 
 tbl_cor_softmax_0var <- reduce(l_results_c_0var, rbind) %>%
   unnest_wider(params_decision) %>%
-  group_by(replication_id, gamma_mn, simulate_data, nr_participants, nr_trials) %>%
+  group_by(replication_id, gamma_mn, gamma_sd, simulate_data, nr_participants, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml)
   ) %>% ungroup()
@@ -280,7 +287,7 @@ tbl_cor_softmax_0var_long <- tbl_cor_softmax_0var %>%
 
 # pd <- position_dodge(width = .9)
 # plot_cor_recovery(tbl_cor_softmax_0var_long, pd, "softmax")
-ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
+ggplot(tbl_cor_softmax_0var_long, aes(str_c("mn = ", interaction(gamma_mn, gamma_sd, sep = ",\nsd = ")), value)) +
   geom_violin(alpha = .25) +
   geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
   facet_wrap(nr_trials ~ simulate_data) +
@@ -298,7 +305,7 @@ ggplot(tbl_cor_softmax_0var_long, aes(as.factor(gamma_mn), value)) +
 
 simulate_data <- c(TRUE, FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(300, 500)
+nr_trials <- c(200)
 cond_on_choices <- c(TRUE)
 
 
@@ -420,16 +427,16 @@ tbl_params_thompson <- crossing(
 
 
 tbl_gammas <- tibble(
-  gamma_mn = c(.08, .16, 1),#[1],
-  gamma_sd = c(.05, .1, .2)#[1]
+  gamma_mn = c(.02, .08, .16),#[1],
+  gamma_sd = c(.007, .05, .1)#[1]
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, 1.5),#[1],
-  beta_sd = c(.05, .25)#[1]
+  beta_mn = c(.15, .15, 2),#[1],
+  beta_sd = c(.1, .76, .76)#[1]
 )
-simulate_data <- c(TRUE, FALSE)#[1]
+simulate_data <- c(FALSE)#[1]
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 
 
@@ -437,13 +444,14 @@ tbl_params_ucb <- crossing(
   tbl_gammas, tbl_betas, simulate_data, nr_participants, nr_trials, cond_on_choices
 )
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5))
 
 if (fit_or_load == "fit")  {
   l_results_ucb_0var_all <- list()
   for (i in 1:n_reps) {
     l_results_ucb_0var <- pmap(
       tbl_params_ucb, kalman_ucb_experiment,
-      lambda = lambda, nr_vars = 0
+      lambda = lambda, nr_vars = 0, bds = bds
     )
     l_results_ucb_0var_all[[i]] <- l_results_ucb_0var
     saveRDS(l_results_ucb_0var_all, "exploration-R/data/recovery-ucb-no-variance.RDS")
@@ -475,20 +483,28 @@ for (tbl_r in l_results_ucb_0var) {
   counter_design[counter_design == 0] <- nrow(tbl_params_ucb)
 }
 
-tbl_cor_ucb_0var <- reduce(l_results_c_0var, rbind) %>%
-  group_by(replication_id, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
+tbl_ucb_0var_results <- reduce(l_results_c_0var, rbind)
+tbl_cor_ucb_0var <- tbl_ucb_0var_results %>% 
+  group_by(replication_id, gamma_mn, beta_mn, beta_sd, simulate_data, nr_trials) %>%
   summarize(
     r_gamma = cor(gamma, gamma_ml),
     r_beta = cor(beta, beta_ml)
   ) %>% ungroup()
 
+tbl_cor_ucb_0var$simulate_data <- factor(tbl_cor_ucb_0var$simulate_data)
+levels(tbl_cor_ucb_0var$simulate_data) <- c("Simulate Once", "Simulate By Participant")[
+  as.numeric(as.logical(levels(tbl_cor_ucb_0var$simulate_data))) + 1
+]
+tbl_cor_ucb_0var$nr_trials <- factor(tbl_cor_ucb_0var$nr_trials)
+levels(tbl_cor_ucb_0var$nr_trials) <-  str_c(levels(tbl_cor_ucb_0var$nr_trials), " Trials")
+# tbl_cor_ucb_0var$gamma_mn <- factor(tbl_cor_ucb_0var$gamma_mn)
+# levels(tbl_cor_ucb_0var$gamma_mn) <- str_c("m (gamma) = ", levels(tbl_cor_ucb_0var$gamma_mn))
+tbl_cor_ucb_0var$beta_mn <- factor(tbl_cor_ucb_0var$beta_mn)
+levels(tbl_cor_ucb_0var$beta_mn) <- str_c("m (beta) = ", levels(tbl_cor_ucb_0var$beta_mn))
+tbl_cor_ucb_0var$beta_sd <- factor(tbl_cor_ucb_0var$beta_sd)
+levels(tbl_cor_ucb_0var$beta_sd) <- str_c("sd (beta) = ", levels(tbl_cor_ucb_0var$beta_sd))
+
 tbl_cor_ucb_0var_long <- tbl_cor_ucb_0var %>% 
-  mutate(
-    simulate_data = factor(simulate_data),
-    simulate_data = fct_recode(simulate_data, "Simulate By Participant" = "TRUE", "Simulate Once" = "FALSE"),
-    nr_trials = factor(nr_trials, labels = c("200 Trials", "400 Trials")),
-    beta_mn = factor(beta_mn, labels = c("Beta = .17", "Beta = 1.5"))
-  ) %>% 
   rename(
     "Gamma" = r_gamma,
     "Beta" = r_beta
@@ -504,7 +520,7 @@ plot_ucb_param_recovery <- function(param, ttl) {
     geom_hline(yintercept = 1, color = "grey", linetype = "dotdash") +
     geom_violin(alpha = .25) +
     geom_quasirandom(aes(color = nr_trials), method = "quasirandom", cex = 1.75, alpha = .5, width = .1) +
-    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ beta_mn) +
+    facet_grid(interaction(simulate_data, nr_trials, sep = " & ") ~ interaction(beta_mn, beta_sd, sep = " & ")) +
     coord_cartesian(ylim = c(0, 1)) +
     theme_bw() +
     scale_x_discrete(expand = c(0, 0)) +
@@ -514,8 +530,10 @@ plot_ucb_param_recovery <- function(param, ttl) {
     theme(strip.background = element_rect(fill = "white"))
 }
 
-plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
-plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
+pl_cors_invtemp <- plot_ucb_param_recovery("Gamma", "Gamma (inv. temp.)")
+pl_cors_beta <- plot_ucb_param_recovery("Beta", "Beta (inf. bonus)")
+
+grid.draw(arrangeGrob(pl_cors_invtemp, pl_cors_beta, nrow = 2))
 
 # correlations between parameters
 
@@ -545,7 +563,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 4, by = 1), nrow(.)/4),
     param = rep(c("Beta", "Gamma"), nrow(.)/2)
-    ) %>%
+  ) %>%
   filter(gamma_mn <= .16 & req <= 2) %>%
   group_by(param, gamma_mn, beta_mn, simulate_data, nr_trials) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml)) %>%
@@ -558,6 +576,26 @@ save_my_pdf_and_tiff(
   pl_tradeoffs_ucb, "figures/4arlb-ucb-param-correlations", 12, 9
 )
 
+tbl_ucb_0var_results %>%
+  group_by(gamma_mn, beta_mn, simulate_data, nr_participants, nr_trials)
+
+tbl_ucb_0var_agg <- grouped_agg(
+  tbl_ucb_0var_results, 
+  c(gamma_mn, beta_mn, simulate_data, nr_participants, nr_trials),
+  c(gamma_ml, beta_ml)
+) %>% ungroup()
+
+ggplot(tbl_ucb_0var_agg, aes(gamma_mn, mean_gamma_ml, group = beta_mn)) +
+  geom_abline() +
+  geom_point() +
+  coord_cartesian(xlim = c(0, .2), ylim = c(0, .2))
+
+ggplot(tbl_ucb_0var_agg, aes(beta_mn, mean_beta_ml, group = gamma_mn)) +
+  geom_abline() +
+  geom_point() +
+  coord_cartesian(xlim = c(0, 2), ylim = c(0, 2))
+
+
 
 # Kalman & Mixture: Fix Variances ------------------------------------------
 # mixture can be ucb & thompson or only ru & thompson (with means = 0)
@@ -567,8 +605,8 @@ tbl_gammas <- tibble(
   gamma_sd = c(.05, .1)
 )
 tbl_betas <- tibble(
-  beta_mn = c(.17, 1.5),
-  beta_sd = c(.05, .25)
+  beta_mn = c(.17, .17, 1.5),
+  beta_sd = c(.05, .76, 1)
 )
 tbl_w_mix <- tibble(
   w_mix_mn = c(.4, .6),
@@ -577,9 +615,9 @@ tbl_w_mix <- tibble(
 
 simulate_data <- c(FALSE) # TRUE, 
 nr_participants <- c(200)
-nr_trials <- c(400) # 200, 
+nr_trials <- 200 
 cond_on_choices <- c(TRUE)
-mixturetype <- c("ucb_thompson") #"ru_thompson"
+mixturetype <- c("ucb_thompson", "ru_thompson")
 
 
 tbl_params_mixture <- crossing(
@@ -587,13 +625,14 @@ tbl_params_mixture <- crossing(
   simulate_data, nr_participants, nr_trials, cond_on_choices, mixturetype
 )
 
+bds <- list(gamma = list(lo = 0, hi = 1), beta = list(lo = -5, hi = 5), w_mix = list(lo = 0, hi = 1))
 
 if (fit_or_load == "fit")  {
   l_results_mixture_0var_all <- list()
   for (i in 1:n_reps) {
     l_results_mixture_0var <- pmap(
       tbl_params_mixture, kalman_mixture_experiment,
-      lambda = lambda, nr_vars = 0
+      lambda = lambda, nr_vars = 0, bds = bds
     )
     l_results_mixture_0var_all[[i]] <- l_results_mixture_0var
     saveRDS(l_results_mixture_0var_all, "exploration-R/data/recovery-mixture-no-variance.RDS")
@@ -702,7 +741,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 6, by = 1), nrow(.)/6),
     param = rep(c("Beta", "Gamma", "w_mix"), nrow(.)/3)
-    ) %>%
+  ) %>%
   filter(req <= 3) %>%
   group_by(param, beta_mn, gamma_mn, w_mix_mn, simulate_data, nr_trials, mixturetype) %>%
   summarize(beta_ml = mean(beta_ml), gamma_ml = mean(gamma_ml), w_mix_ml = mean(w_mix_ml)) %>%
@@ -729,7 +768,7 @@ tbl_deltas <- tibble(
 )
 simulate_data <- c(TRUE, FALSE)
 nr_participants <- c(200)
-nr_trials <- c(200, 400)
+nr_trials <- 200
 cond_on_choices <- c(TRUE)
 is_decay <- c(FALSE, TRUE)
 
@@ -801,7 +840,7 @@ ggplot(
   tbl_cor_delta_softmax_long %>% 
     filter(gamma_mn %in% c("Gamma = .08", "Gamma = .16") & 
              simulate_data == "Simulate By Participant"
-           ), 
+    ), 
   aes(gamma_mn, value, group = interaction(nr_trials, name))
 ) +
   geom_hline(yintercept = 1, linetype = "dotdash", color = "grey") +
@@ -874,7 +913,7 @@ l_cors_params_agg <- reduce(l_cors_params, rbind) %>%
   mutate(
     req = rep(seq(1, 4, by = 1), nrow(.)/4),
     param = rep(c("Delta", "Gamma"), nrow(.)/2)
-    ) %>%
+  ) %>%
   filter(req <= 2) %>%
   group_by(param, delta_mn, gamma_mn, simulate_data, nr_trials) %>%
   summarize(delta_ml = mean(delta_ml), gamma_ml = mean(gamma_ml)) %>%
