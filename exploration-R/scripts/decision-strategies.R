@@ -545,8 +545,8 @@ my_treeplot(l_ms_strategy_all[[which(subjs == 42)]]$finalModel, "All Three #1")
 
 tbl_rb <- tbl_rb %>% select(-"L(Run)") %>%
   rename(
-    "L(Run)" = "L(Run)"_lagged, 
-    "Nr. Switches" = "Nr. Switches"_lagged,
+    "L(Run)" = "L(Run)_lagged", 
+    "Nr. Switches" = "Nr. Switches_lagged",
     repeat_choice = repeat_deck,
     "Value Diff." = m_diff,
     "V Diff." = v_diff,
